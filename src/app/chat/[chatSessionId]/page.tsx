@@ -367,7 +367,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 <Box sx={{ overflow: 'auto' }}>
                     <DropdownMenu buttonText='New Chat Session'>
                         <MenuItem
-                            key='logout'
+                            key='FM'
                             onClick={async () => {
                                 createChatSession({ aiBotInfo: { aiBotName: 'Foundation Model' } })
                             }}>
