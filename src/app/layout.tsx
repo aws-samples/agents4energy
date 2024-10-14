@@ -7,6 +7,10 @@ import Providers from '@/components/providers';
 
 import TopNavBar from '@/components/TopNavBar';
 
+import {
+  Toolbar,
+} from '@mui/material';
+
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
@@ -36,6 +40,7 @@ export default function RootLayout({
         <Providers>
           <ConfigureAmplify/>
           <TopNavBar/>
+          <Toolbar />
           {children}
         </Providers>
       </body>

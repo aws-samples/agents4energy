@@ -1,4 +1,13 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { defineFunction } from '@aws-amplify/backend';
+
+export const invokeBedrockAgentFunction = defineFunction({
+  // optionally specify a name for the Function (defaults to directory name)
+  name: 'invoke-bedrock-agent',
+  // optionally specify a path to your handler (defaults to "./handler.ts")
+  entry: '../functions/invokeBedrockAgent.ts',
+  timeoutSeconds: 120
+});
 
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
@@ -72,11 +81,12 @@ const schema = a.schema({
   
   invokeBedrockAgent: a
     .query()
-    .arguments({ prompt: a.string(), agentId: a.string(), agentAliasId: a.string(), sessionId: a.string() })
-    .returns(a.ref("BedrockResponse"))
+    .arguments({ prompt: a.string().required(), agentId: a.string().required(), agentAliasId: a.string().required(), sessionId: a.string().required() })
+    .returns(a.string())
     .authorization(allow => allow.authenticated())
     .handler(
-      a.handler.custom({ entry: "./invokeBedrockAgent.js", dataSource: "bedrockAgentRuntimeDS" })
+      a.handler.function(invokeBedrockAgentFunction)
+      // a.handler.custom({ entry: "./invokeBedrockAgent.js", dataSource: "bedrockAgentRuntimeDS" })
     ),
 });
 

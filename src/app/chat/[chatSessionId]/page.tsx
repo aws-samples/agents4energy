@@ -159,31 +159,10 @@ const invokeBedrockModelParseBodyGetText = async (prompt: string) => {
     return bedrockResponseBody.content.map(item => item.text).join('\n')
 }
 
-const parseAgentResponse = (body: string) => { //TODO, there's surely a better way to do this.
-    // Extract the JSON part (this is the string starting from {"bytes":...)
-    const jsonString = body.match(/{\"bytes\":.*}/)?.[0];
-
-    if (jsonString) {
-        // Parse the JSON string
-        const jsonResponse = JSON.parse(jsonString);
-
-        // Extract and decode the base64-encoded bytes
-        const base64String = jsonResponse.bytes;
-
-        // Decode the base64 string
-        const buffer = Buffer.from(base64String, 'base64');
-        const decodedString = buffer.toString('utf-8');
-
-        console.log('Decoded string:', decodedString);
-        return decodedString
-    } else {
-        console.log('Could not extract JSON from the body.');
-    }
-
-}
-
 const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
     console.log('Prompt: ', prompt)
+    if (!chatSession.aiBotInfo?.aiBotAliasId) throw new Error('No Agent Alias ID found in invoke request')
+    if (!chatSession.aiBotInfo?.aiBotId) throw new Error('No Agent ID found in invoke request')
     const response = await amplifyClient.queries.invokeBedrockAgent({
         prompt: prompt,
         agentId: chatSession.aiBotInfo?.aiBotId,
@@ -191,17 +170,18 @@ const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: S
         sessionId: chatSession.id
     })
     console.log('Bedrock Agent Response: ', response.data)
-    if (!(response.data && response.data.body)) {
+    if (!(response.data)) {
         console.log('No response from bedrock agent after prompt: ', prompt)
         return
     }
-    const bedrockAgentResponseText = parseAgentResponse(response.data.body)
+    // const bedrockAgentResponseText = response.data
+    // const bedrockAgentResponseText = parseAgentResponse(response.data)
     // const bedrockAgentResponseBody = new TextDecoder().decode(response.data.body)
     // const bedrockAgentResponseBody = Buffer.from(response.data.body).toString('utf-8')
     // const bedrockAgentResponseBody = Buffer.from(response.data.body).toString() as InvokeBedrockAgentResponseType
     // const bedrockAgentResponseBody = JSON.parse(response.data.body) as InvokeBedrockAgentResponseType
-    console.log('Bedrock Agent Response Text: ', bedrockAgentResponseText)
-    return bedrockAgentResponseText
+    // console.log('Bedrock Agent Response Text: ', bedrockAgentResponseText)
+    return response.data
 }
 
 
@@ -329,7 +309,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 }
                 // window.location.replace(`/chat/${newChatSession.id}`)
                 router.push(`/chat/${newChatSession.id}`)
-                
+
             }
         })
     }
@@ -363,6 +343,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             : (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') ? await invokeBedrockModelParseBodyGetText(prompt)
                 : 'defaultValue';
 
+        console.log('Response Text: ', responseText)
         if (!responseText) throw new Error("No response from agent");
         addChatMessage(responseText, "ai")
         setIsLoading(false);
@@ -385,8 +366,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 <Typography sx={{ textAlign: 'center' }}>Chatting with {activeChatSession?.aiBotInfo?.aiBotName} Alias Id: {activeChatSession?.aiBotInfo?.aiBotAliasId}</Typography>
                 <Box sx={{ overflow: 'auto' }}>
                     <DropdownMenu buttonText='New Chat Session'>
-                        <MenuItem key='logout'>
-                            <Typography sx={{ textAlign: 'center' }}>logout</Typography>
+                        <MenuItem
+                            key='logout'
+                            onClick={async () => {
+                                createChatSession({ aiBotInfo: { aiBotName: 'Foundation Model' } })
+                            }}>
+                            <Typography sx={{ textAlign: 'center' }}>Foundation Model</Typography>
                         </MenuItem>
                         {
                             bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")).map((agent) => (
@@ -403,47 +388,47 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                         }
                     </DropdownMenu>
 
+
+                    <Typography sx={{ textAlign: 'center' }}>My Chat Sessions:</Typography>
+                    {chatSessions
+                        .slice()
+                        .sort((a, b) => {
+                            if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
+                            return a.createdAt < b.createdAt ? 1 : -1
+                        })
+                        .map((session) => (
+
+                            <Card key={session.id} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
+                                <CardContent>
+                                    <Typography variant="h6" component="div" noWrap>
+                                        {session.firstMessage?.slice(0, 50)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {formatDate(session.createdAt)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        AI: {session.aiBotInfo?.aiBotName || 'Unknown'}
+                                    </Typography>
+                                </CardContent>
+                                <CardActions>
+                                    <Button
+                                        size="small"
+                                        onClick={() => router.push(`/chat/${session.id}`)}
+                                    >
+                                        Open Chat
+                                    </Button>
+                                    <IconButton
+                                        aria-label="delete"
+                                        onClick={() => deleteChatSession(session)}
+                                        sx={{ marginLeft: 'auto' }}
+                                    >
+                                        <DeleteIcon />
+                                    </IconButton>
+                                </CardActions>
+                            </Card>
+                        ))
+                    }
                 </Box>
-                <Typography sx={{ textAlign: 'center' }}>My Chat Sessions:</Typography>
-                {chatSessions
-                    .slice()
-                    .sort((a, b) => {
-                        if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-                        return a.createdAt < b.createdAt ? 1 : -1
-                    })
-                    .map((session) => (
-
-                        <Card key={session.id} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
-                            <CardContent>
-                                <Typography variant="h6" component="div" noWrap>
-                                    {session.firstMessage?.slice(0, 50)}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {formatDate(session.createdAt)}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                    Agent: {session.aiBotInfo?.aiBotName || 'Unknown'}
-                                </Typography>
-                            </CardContent>
-                            <CardActions>
-                                <Button
-                                    size="small"
-                                    onClick={() => router.push(`/chat/${session.id}`)}
-                                >
-                                    Open Chat
-                                </Button>
-                                <IconButton
-                                    aria-label="delete"
-                                    onClick={() => deleteChatSession(session)}
-                                    sx={{ marginLeft: 'auto' }}
-                                >
-                                    <DeleteIcon />
-                                </IconButton>
-                            </CardActions>
-                        </Card>
-                    ))
-                }
-
             </Drawer>
             <div style={{ marginLeft: '260px', padding: '20px' }}>
                 <Toolbar />

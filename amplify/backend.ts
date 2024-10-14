@@ -1,27 +1,14 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
-import { data } from './data/resource';
+import { data, invokeBedrockAgentFunction } from './data/resource';
+// import { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import * as iam from 'aws-cdk-lib/aws-iam';
 
-import { PolicyStatement } from "aws-cdk-lib/aws-iam";
-
-/**
- * @see https://docs.amplify.aws/react/build-a-backend/ to add storage, functions, and more
- */
 const backend = defineBackend({
   auth,
   data,
+  invokeBedrockAgentFunction
 });
-
-// const bedrockDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
-//   "bedrockDS",
-//   `https://bedrock.${backend.auth.stack.region}.amazonaws.com`,
-//   {
-//     authorizationConfig: {
-//       signingRegion: backend.auth.stack.region,
-//       signingServiceName: "bedrock",
-//     },
-//   }
-// );
 
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
   "bedrockRuntimeDS",
@@ -62,17 +49,17 @@ const noneDS = backend.data.resources.graphqlApi.addNoneDataSource(
 );
 
 bedrockRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
-  new PolicyStatement({
+  new iam.PolicyStatement({
     resources: [
       `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
     ],
     actions: ["bedrock:InvokeModel"],
-    
+
   })
 );
 
 bedrockAgentDataSource.grantPrincipal.addToPrincipalPolicy(
-  new PolicyStatement({
+  new iam.PolicyStatement({
     resources: [
       `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:*`,
     ],
@@ -84,7 +71,7 @@ bedrockAgentDataSource.grantPrincipal.addToPrincipalPolicy(
 );
 
 bedrockAgentRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
-  new PolicyStatement({
+  new iam.PolicyStatement({
     resources: [
       `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:agent-alias/*`,
     ],
@@ -94,3 +81,15 @@ bedrockAgentRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
 
   })
 );
+
+backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    resources: [
+      `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:agent-alias/*`,
+    ],
+    actions: [
+      "bedrock:InvokeAgent",
+    ],
+  }
+  )
+)

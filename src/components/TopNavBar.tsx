@@ -26,6 +26,7 @@ const getUserAttributes = async () => {
   }
 };
 
+
 const TopNavBar = () => {
   const [userAttributes, setUserAttributes] = useState<FetchUserAttributesOutput | null>();
   const { user, signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
@@ -61,88 +62,52 @@ const TopNavBar = () => {
       position="fixed"
       sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
     >
-      <Toolbar>
-        <IconButton
-          size="large"
-          edge="start"
-          color="inherit"
-          aria-label="menu"
-          sx={{ mr: 2 }}
-        >
-          {/* <MenuIcon /> */}
-        </IconButton>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          AWS Agents For Energy
-        </Typography>
-        {authStatus === 'authenticated' && userAttributes?.email ? (
+      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Link color="inherit" href='/' sx={{ textDecoration: 'none' }}>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              AWS Agents For Energy
+            </Typography>
+          </Link>
 
-          <Box sx={{ flexGrow: 0 }}>
-            <Tooltip title="Open settings">
-              <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                <Typography sx={{ textAlign: 'center' }}>{userAttributes.email}</Typography>
-              </IconButton>
-            </Tooltip>
-            <Menu
-              sx={{ mt: '45px' }}
-              id="menu-appbar"
-              anchorEl={anchorElUser}
-              anchorOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              open={Boolean(anchorElUser)}
-              onClose={handleCloseUserMenu}
-            >
-              <MenuItem key='logout' onClick={signOut}>
-                <Typography sx={{ textAlign: 'center' }}>logout</Typography>
-              </MenuItem>
+          <Link color="inherit" href='/chat' sx={{ textDecoration: 'none' }}>Chat</Link>
 
-            </Menu>
-          </Box>
+          {authStatus === 'authenticated' && userAttributes?.email ? (
+
+            <Box sx={{ flexGrow: 0 }}>
+              <Tooltip title="Open settings">
+                <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
+                  <Typography sx={{ textAlign: 'center' }}>{userAttributes.email}</Typography>
+                </IconButton>
+              </Tooltip>
+              <Menu
+                sx={{ mt: '45px' }}
+                id="menu-appbar"
+                anchorEl={anchorElUser}
+                anchorOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
+                }}
+                open={Boolean(anchorElUser)}
+                onClose={handleCloseUserMenu}
+              >
+                <MenuItem key='logout' onClick={signOut}>
+                  <Typography sx={{ textAlign: 'center' }}>logout</Typography>
+                </MenuItem>
+
+              </Menu>
+            </Box>
 
 
 
-        ) : <Link color="inherit" href='/login'>Login</Link>
-        }
-
-
-
-        {/* <Box sx={{ flexGrow: 0 }}>
-          <Tooltip title="Open settings">
-            <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-              hello
-            </IconButton>
-          </Tooltip>
-          <Menu
-            sx={{ mt: '45px' }}
-            id="menu-appbar"
-            anchorEl={anchorElUser}
-            anchorOrigin={{
-              vertical: 'top',
-              horizontal: 'right',
-            }}
-            keepMounted
-            transformOrigin={{
-              vertical: 'top',
-              horizontal: 'right',
-            }}
-            open={Boolean(anchorElUser)}
-            onClose={handleCloseUserMenu}
-          >
-
-            <MenuItem key='logout' onClick={handleCloseUserMenu}>
-              <Typography sx={{ textAlign: 'center' }}>logout</Typography>
-            </MenuItem>
-
-          </Menu>
-        </Box> */}
-
-
+          ) : <Link color="inherit" href='/login' sx={{ textDecoration: 'none' }}>Login</Link>
+          }
+        </Box>
       </Toolbar>
     </AppBar>
   );

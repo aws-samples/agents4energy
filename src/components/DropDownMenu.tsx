@@ -26,6 +26,7 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ children, buttonText }: Dro
         aria-haspopup="true"
         aria-expanded={open ? 'true' : undefined}
         onClick={handleClick}
+        sx={{ flexShrink: 0 }}
       >
         {buttonText}
       </Button>
