@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown";
 
 import type { Schema } from '@/../amplify/data/resource';
 import { formatDate } from "@/utils/date-utils";
+import { invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
 
 import styles from "@/styles/chat-ui.module.scss";
 import React, { useState } from "react";
@@ -23,42 +24,69 @@ export interface ChatUIMessageProps {
 
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
+  const [glossaryBlurb, setGlossaryBlurb] = useState("")
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
+
+  async function getGlossary(content: string) {
+    const getGlossaryPrompt = `
+    Return a glossary for terms found in the text blurb below:
+
+    ${content}
+    `
+    setGlossaryBlurb("")
+    const newGlossaryBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
+    if (!newGlossaryBlurb) throw new Error("No glossary blurb returned")
+    setGlossaryBlurb(() => newGlossaryBlurb)
+  }
 
   return (
     <div>
       {props.message?.role != 'human' && (
         <Container>
-          {/* {props.message.content.length === 0 ? (
-            <Box>
-              <Spinner />
-            </Box>
-          ) : null} */}
-          {props.message.content.length > 0 &&
-            props.showCopyButton !== false ? (
-            <div className={styles.btn_chabot_message_copy}>
-              <Popover
-                size="medium"
-                position="top"
-                triggerType="custom"
-                dismissButton={false}
-                content={
-                  <StatusIndicator type="success">
-                    Copied to clipboard
-                  </StatusIndicator>
-                }
+          <div className={styles.btn_chabot_message_copy}>
+            <Popover
+              size="medium"
+              position="top"
+              triggerType="custom"
+              dismissButton={false}
+              content={
+                <StatusIndicator type="success">
+                  Copied to clipboard
+                </StatusIndicator>
+              }
+            >
+              <Button
+                variant="inline-icon"
+                iconName="copy"
+                onClick={() => {
+                  navigator.clipboard.writeText(props.message.content);
+                }}
+              />
+            </Popover>
+          </div>
+
+          <div className={styles.btn_chabot_message_copy}>
+            <Popover
+              size="medium"
+              position="top"
+              triggerType="custom"
+              dismissButton={false}
+              content={
+                <p>
+                  {glossaryBlurb ? glossaryBlurb : "Loading glossary..."}
+                </p>
+
+
+              }
+            >
+              <Button
+                onClick={() => getGlossary(props.message.content)}
               >
-                <Button
-                  variant="inline-icon"
-                  iconName="copy"
-                  onClick={() => {
-                    navigator.clipboard.writeText(props.message.content);
-                  }}
-                />
-              </Popover>
-            </div>
-          ) : null
-          }
+                Show Glossary
+              </Button>
+            </Popover>
+          </div>
+
           {props.message.tool_name ? (
             <div className={styles.btn_chabot_message_copy}>
               <Popover
@@ -67,15 +95,15 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 triggerType="custom"
                 dismissButton={false}
                 content={
-                  <StatusIndicator type="success"/>
+                  <StatusIndicator type="success" />
                 }
               >
                 <Button
                   onClick={() => {
                     setHideRows(prevState => !prevState);
                   }}
-                > 
-                {hideRows ? 'Show All Rows' : 'Hide Low Relevance Rows'} 
+                >
+                  {hideRows ? 'Show All Rows' : 'Hide Low Relevance Rows'}
                 </Button>
               </Popover>
             </div>
@@ -93,7 +121,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
                   //Get the value of the relevance score in each table row
                   const children = React.Children.toArray(props.children);
-                  
+
                   const relevanceScoreTd = children[children.length - 2]; // should be second from the last
 
                   if (!(React.isValidElement(relevanceScoreTd))) throw new Error("Invalid second from last <td> element");

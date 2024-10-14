@@ -1,13 +1,14 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
-import { data, invokeBedrockAgentFunction } from './data/resource';
+import { data, invokeBedrockAgentFunction, getStructuredOutputFromLangchainFunction } from './data/resource';
 // import { PolicyStatement } from "aws-cdk-lib/aws-iam";
 import * as iam from 'aws-cdk-lib/aws-iam';
 
 const backend = defineBackend({
   auth,
   data,
-  invokeBedrockAgentFunction
+  invokeBedrockAgentFunction,
+  getStructuredOutputFromLangchainFunction
 });
 
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
@@ -92,4 +93,15 @@ backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
     ],
   }
   )
+)
+
+backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    resources: [
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/*`,
+    ],
+    actions: ["bedrock:InvokeModel"],
+
+  })
 )

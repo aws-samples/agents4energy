@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect, useState } from 'react';
 import type { Schema } from '@/../amplify/data/resource';
-import { amplifyClient } from '@/utils/amplify-utils';
+import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useRouter } from 'next/navigation';
 
@@ -20,7 +20,8 @@ import {
     Card,
     CardContent,
     CardActions,
-    Button
+    Button,
+    CircularProgress
 } from '@mui/material';
 
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -30,22 +31,22 @@ import { withAuth } from '@/components/WithAuth';
 
 const drawerWidth = 240;
 
-type BedrockAnthropicBodyType = {
-    id: string;
-    type: string;
-    role: string;
-    model: string;
-    content: {
-        type: string;
-        text: string;
-    }[];
-    stop_reason: string;
-    stop_sequence: null;
-    usage: {
-        input_tokens: number;
-        output_tokens: number;
-    };
-};
+// type BedrockAnthropicBodyType = {
+//     id: string;
+//     type: string;
+//     role: string;
+//     model: string;
+//     content: {
+//         type: string;
+//         text: string;
+//     }[];
+//     stop_reason: string;
+//     stop_sequence: null;
+//     usage: {
+//         input_tokens: number;
+//         output_tokens: number;
+//     };
+// };
 
 type ListBedrockAgentsResponseType = {
     agentSummaries: {
@@ -76,88 +77,18 @@ type ListAgentIdsResponseType = {
     nextToken: string
 }
 
-// type InvokeBedrockAgentResponseType = {
-//     accessDeniedException?: Record<string, never>;
-//     badGatewayException?: Record<string, never>;
-//     chunk?: {
-//         attribution: {
-//             citations: Array<{
-//                 generatedResponsePart: {
-//                     textResponsePart: {
-//                         span: {
-//                             end: number;
-//                             start: number;
-//                         };
-//                         text: string;
-//                     };
-//                 };
-//                 retrievedReferences: Array<{
-//                     content: {
-//                         text: string;
-//                     };
-//                     location: {
-//                         confluenceLocation?: {
-//                             url: string;
-//                         };
-//                         s3Location?: {
-//                             uri: string;
-//                         };
-//                         salesforceLocation?: {
-//                             url: string;
-//                         };
-//                         sharePointLocation?: {
-//                             url: string;
-//                         };
-//                         type: string;
-//                         webLocation?: {
-//                             url: string;
-//                         };
-//                     };
-//                     metadata: Record<string, unknown>;
-//                 }>;
-//             }>;
-//         };
-//         bytes: Blob;
-//     };
-//     conflictException?: Record<string, never>;
-//     dependencyFailedException?: Record<string, never>;
-//     files?: {
-//         files: Array<{
-//             bytes: Blob;
-//             name: string;
-//             type: string;
-//         }>;
-//     };
-//     internalServerException?: Record<string, never>;
-//     resourceNotFoundException?: Record<string, never>;
-//     returnControl?: {
-//         invocationId: string;
-//         invocationInputs: Array<unknown>;
-//     };
-//     serviceQuotaExceededException?: Record<string, never>;
-//     throttlingException?: Record<string, never>;
-//     trace?: {
-//         agentAliasId: string;
-//         agentId: string;
-//         agentVersion: string;
-//         sessionId: string;
-//         trace: unknown;
-//     };
-//     validationException?: Record<string, never>;
-// };
-
-const invokeBedrockModelParseBodyGetText = async (prompt: string) => {
-    console.log('Prompt: ', prompt)
-    const response = await amplifyClient.queries.invokeBedrock({ prompt: prompt })
-    console.log('Bedrock Response: ', response.data)
-    if (!(response.data && response.data.body)) {
-        console.log('No response from bedrock after prompt: ', prompt)
-        return
-    }
-    const bedrockResponseBody = JSON.parse(response.data.body) as BedrockAnthropicBodyType
-    console.log('Bedrock Response Body: ', bedrockResponseBody)
-    return bedrockResponseBody.content.map(item => item.text).join('\n')
-}
+// export const invokeBedrockModelParseBodyGetText = async (prompt: string) => {
+//     console.log('Prompt: ', prompt)
+//     const response = await amplifyClient.queries.invokeBedrock({ prompt: prompt })
+//     console.log('Bedrock Response: ', response.data)
+//     if (!(response.data && response.data.body)) {
+//         console.log('No response from bedrock after prompt: ', prompt)
+//         return
+//     }
+//     const bedrockResponseBody = JSON.parse(response.data.body) as BedrockAnthropicBodyType
+//     console.log('Bedrock Response Body: ', bedrockResponseBody)
+//     return bedrockResponseBody.content.map(item => item.text).join('\n')
+// }
 
 const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
     console.log('Prompt: ', prompt)
@@ -174,13 +105,6 @@ const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: S
         console.log('No response from bedrock agent after prompt: ', prompt)
         return
     }
-    // const bedrockAgentResponseText = response.data
-    // const bedrockAgentResponseText = parseAgentResponse(response.data)
-    // const bedrockAgentResponseBody = new TextDecoder().decode(response.data.body)
-    // const bedrockAgentResponseBody = Buffer.from(response.data.body).toString('utf-8')
-    // const bedrockAgentResponseBody = Buffer.from(response.data.body).toString() as InvokeBedrockAgentResponseType
-    // const bedrockAgentResponseBody = JSON.parse(response.data.body) as InvokeBedrockAgentResponseType
-    // console.log('Bedrock Agent Response Text: ', bedrockAgentResponseText)
     return response.data
 }
 
@@ -211,27 +135,66 @@ const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr
     });
 })
 
+const getSuggestedPromptsOutputStructure = {
+    title: "outputStructure",
+    description: "Fill out these arguments",
+    type: "object",
+    properties: {
+        suggestedPrompts: {
+            type: 'array',
+            items: {
+                type: 'string'
+            },
+            description: `
+            Prompts to suggest to a user when interacting with a large language model
+            `
+        }
+    },
+    required: ['suggestedPrompts'],
+};
+
 function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["type"]>>([]);
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
     const [activeChatSession, setActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false);
     const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
 
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
 
+    
 
     // Set isLoading to false if the last message is from ai and has no tool call
     useEffect(() => {
-        // console.log("Messages: ", messages)
+        console.log("Messages: ", messages)
         if (
             messages.length &&
             messages[messages.length - 1].role === "ai" &&
-            messages[messages.length - 1].tool_calls === "[]"
-        ) setIsLoading(false)
+            (!messages[messages.length - 1].tool_calls || messages[messages.length - 1].tool_calls === "[]")
+        ) {
+            console.log('Ready for human response')
+            setIsLoading(false)
 
-    }, [messages])
+
+            async function fetchAndSetSuggestedPrompts() {
+                if (!activeChatSession || !activeChatSession.id) throw new Error("No active chat session")
+        
+                const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
+                    chatSessionId: activeChatSession?.id,
+                    lastMessageText: "Suggest three follow up prompts",
+                    outputStructure: JSON.stringify(getSuggestedPromptsOutputStructure)
+                })
+                console.log("Suggested Prompts Response: ", suggestedPromptsResponse)
+                if (!suggestedPromptsResponse.data) throw new Error("No suggested prompts in response")
+        
+                const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
+                setSuggestedPromptes(newSuggestedPrompts)
+            }
+            fetchAndSetSuggestedPrompts()
+        }
+    }, [messages, activeChatSession])
 
     //Set the chat session from params
     useEffect(() => {
@@ -346,7 +309,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         console.log('Response Text: ', responseText)
         if (!responseText) throw new Error("No response from agent");
         addChatMessage(responseText, "ai")
-        setIsLoading(false);
     }
 
 
@@ -431,12 +393,33 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 </Box>
             </Drawer>
             <div style={{ marginLeft: '260px', padding: '20px' }}>
-                <Toolbar />
+                {/* <Toolbar /> */}
                 <ChatUI
                     onSendMessage={addUserChatMessage}
                     messages={messages}
                     running={isLoading}
                 />
+                <Box sx={{ mt: 5 }}>
+                    {
+                        !isLoading ? (
+                            <Typography variant="body2">
+                                Suggested Follow Ups:
+                            </Typography>
+                        ) : (
+                            <CircularProgress/>
+                        )
+                    }
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    {!isLoading && suggestedPrompts.map((prompt) => (
+                        <div key={prompt}>
+                            <Button onClick={() => addUserChatMessage(prompt)} >
+                                {prompt}
+                            </Button>
+                        </div>
+                    ))
+                    }
+                </Box>
             </div>
         </div>
 

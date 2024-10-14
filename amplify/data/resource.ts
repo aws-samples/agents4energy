@@ -9,6 +9,14 @@ export const invokeBedrockAgentFunction = defineFunction({
   timeoutSeconds: 120
 });
 
+export const getStructuredOutputFromLangchainFunction = defineFunction({
+  // optionally specify a name for the Function (defaults to directory name)
+  name: 'get-structured-output',
+  // optionally specify a path to your handler (defaults to "./handler.ts")
+  entry: '../functions/getStructuredOutputFromLangchain.ts',
+  timeoutSeconds: 120
+});
+
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
 adding a new "isDone" field as a boolean. The authorization rule below
@@ -88,7 +96,16 @@ const schema = a.schema({
       a.handler.function(invokeBedrockAgentFunction)
       // a.handler.custom({ entry: "./invokeBedrockAgent.js", dataSource: "bedrockAgentRuntimeDS" })
     ),
-});
+  
+  invokeBedrockWithStructuredOutput: a
+    .query()
+    .arguments({ lastMessageText: a.string().required(), outputStructure: a.string().required(), chatSessionId: a.string().required() })
+    .returns(a.string())
+    .authorization(allow => allow.authenticated())
+    .handler(
+      a.handler.function(getStructuredOutputFromLangchainFunction)
+    ),
+}).authorization(allow => [allow.resource(getStructuredOutputFromLangchainFunction)]);;
 
 export type Schema = ClientSchema<typeof schema>;
 
