@@ -21,7 +21,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <PageContainer>
       <TopNavBar />
       <ContentContainer>
-        <Box>{children}</Box>
+        <Box  sx={{ mt: 10 }}>{children}</Box>
       </ContentContainer>
     </PageContainer>
   );

@@ -179,6 +179,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
 
             async function fetchAndSetSuggestedPrompts() {
+                setSuggestedPromptes([])
                 if (!activeChatSession || !activeChatSession.id) throw new Error("No active chat session")
         
                 const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
@@ -399,7 +400,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 />
                 <Box sx={{ mt: 5 }}>
                     {
-                        !isLoading ? (
+                        !isLoading && (suggestedPrompts.length || !messages.length) ? (
                             <Typography variant="body2">
                                 Suggested Follow Ups:
                             </Typography>

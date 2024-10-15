@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
-import { data, invokeBedrockAgentFunction, getStructuredOutputFromLangchainFunction } from './data/resource';
+import { data, invokeBedrockAgentFunction, getStructuredOutputFromLangchainFunction, productionAgentFunction } from './data/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
@@ -20,7 +20,8 @@ const backend = defineBackend({
   data,
   storage,
   invokeBedrockAgentFunction,
-  getStructuredOutputFromLangchainFunction
+  getStructuredOutputFromLangchainFunction,
+  productionAgentFunction
 });
 
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
