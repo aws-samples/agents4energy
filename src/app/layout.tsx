@@ -6,6 +6,7 @@ import ConfigureAmplify from '@/components/ConfigureAmplify';
 import Providers from '@/components/providers';
 
 import TopNavBar from '@/components/TopNavBar';
+import ClientLayout from '@/components/ClientLayout';
 
 import {
   Toolbar,
@@ -39,9 +40,12 @@ export default function RootLayout({
       >
         <Providers>
           <ConfigureAmplify/>
-          <TopNavBar/>
+          <ClientLayout>
+            {children}
+          </ClientLayout>
+          {/* <TopNavBar/>
           <Toolbar />
-          {children}
+          {children} */}
         </Providers>
       </body>
     </html>

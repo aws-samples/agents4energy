@@ -264,13 +264,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }, [])
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
+        setMessages([])
         amplifyClient.models.ChatSession.create(chatSession).then(({ data: newChatSession }) => {
             if (newChatSession) {
-                setActiveChatSession(newChatSession);
-                if (chatSession.firstMessage) {
-                    addUserChatMessage(chatSession.firstMessage);
-                }
-                // window.location.replace(`/chat/${newChatSession.id}`)
                 router.push(`/chat/${newChatSession.id}`)
 
             }
@@ -327,26 +323,28 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 <Toolbar />
                 <Typography sx={{ textAlign: 'center' }}>Chatting with {activeChatSession?.aiBotInfo?.aiBotName} Alias Id: {activeChatSession?.aiBotInfo?.aiBotAliasId}</Typography>
                 <Box sx={{ overflow: 'auto' }}>
-                    <DropdownMenu buttonText='New Chat Session'>
-                        <MenuItem
-                            key='FM'
-                            onClick={async () => {
-                                createChatSession({ aiBotInfo: { aiBotName: 'Foundation Model' } })
-                            }}>
-                            <Typography sx={{ textAlign: 'center' }}>Foundation Model</Typography>
-                        </MenuItem>
+                <DropdownMenu buttonText='New Chat Session'>
                         {
-                            bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")).map((agent) => (
-                                <MenuItem
-                                    key={agent.agentId}
-                                    onClick={async () => {
-                                        const agentAliasId = agent.agentId ? await getAgentAliasId(agent.agentId) : ""//If the agent is not a bedrock agent then don't get the alias ID
-                                        createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
-                                    }}
-                                >
-                                    <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
-                                </MenuItem>
-                            ))
+                            [
+                                ...[
+                                    {
+                                        agentName: "Foundation Model",
+                                        agentId: null
+                                    },
+                                ],
+                                ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
+                            ]
+                                .map((agent) => (
+                                    <MenuItem
+                                        key={agent.agentName}
+                                        onClick={async () => {
+                                            const agentAliasId = agent.agentId ? await getAgentAliasId(agent.agentId) : null//If the agent is not a bedrock agent then don't get the alias ID
+                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
+                                        }}
+                                    >
+                                        <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
+                                    </MenuItem>
+                                ))
                         }
                     </DropdownMenu>
 
