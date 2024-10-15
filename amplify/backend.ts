@@ -121,6 +121,8 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
   })
 )
 
+
+
 function applyTagsToRootStack(targetStack: cdk.Stack) {
   const rootStack = cdk.Stack.of(targetStack).nestedStackParent
   if (!rootStack) throw new Error('Root stack not found')
@@ -147,4 +149,22 @@ const productionAgent = productionAgentBuilder(customStack, {
   s3BucketName: backend.storage.resources.bucket.bucketName
 })
 
-backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', "")// productionAgent.stepFunctionArn)
+backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', productionAgent.stepFunctionArn)// productionAgent.stepFunctionArn)
+
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ["bedrock:InvokeModel"],
+    resources: [
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0`
+    ],
+  })
+)
+
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ["states:StartSyncExecution"],
+    resources: [productionAgent.stepFunctionArn],
+  })
+)

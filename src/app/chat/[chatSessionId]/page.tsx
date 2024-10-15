@@ -108,6 +108,15 @@ const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: S
     return response.data
 }
 
+const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
+    amplifyClient.queries.invokeProductionAgent({ input: prompt, chatSessionId: chatSession.id }).then(
+        (response) => {
+            console.log("bot response: ", response)
+            // if (response.data) addChatMessage(response.data, "AI", targetChatSessionId)
+            // else throw new Error("No response from bot");
+        }
+    )
+}
 
 const getAgentAliasId = async (agentId: string) => {
     const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
@@ -299,13 +308,30 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     async function sendMessageToChatBot(prompt: string) {
         setIsLoading(true);
-        const responseText = (activeChatSession?.aiBotInfo?.aiBotAliasId) ? await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
-            : (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') ? await invokeBedrockModelParseBodyGetText(prompt)
-                : 'defaultValue';
+        // const responseText = (activeChatSession?.aiBotInfo?.aiBotAliasId) ? await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
+        //     : (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') ? await invokeBedrockModelParseBodyGetText(prompt)
+        //     : (activeChatSession?.aiBotInfo?.aiBotName === 'Production Agent') ? await invokeProductionAgentParseBodyGetText(prompt, activeChatSession)
+        //     : 'No Agent Configured';
 
-        console.log('Response Text: ', responseText)
-        if (!responseText) throw new Error("No response from agent");
-        addChatMessage(responseText, "ai")
+        if (activeChatSession?.aiBotInfo?.aiBotAliasId) {
+            const responseText = await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
+            if (!responseText) throw new Error("No response from agent");
+            addChatMessage(responseText, "ai")
+        } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') {
+            const responseText = await invokeBedrockModelParseBodyGetText(prompt)
+            if (!responseText) throw new Error("No response from agent");
+            addChatMessage(responseText, "ai")
+        } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Production Agent') {
+            await invokeProductionAgent(prompt, activeChatSession)
+        } else {
+            throw new Error("No Agent Configured");
+        }
+
+        // console.log('Response Text: ', responseText)
+        // if (!responseText) throw new Error("No response from agent");
+        
+        
+        // addChatMessage(responseText, "ai")
     }
 
 
@@ -328,6 +354,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                         {
                             [
                                 ...[
+                                    {
+                                        agentName: "Production Agent",
+                                        agentId: null
+                                    },
                                     {
                                         agentName: "Foundation Model",
                                         agentId: null

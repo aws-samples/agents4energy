@@ -68,7 +68,7 @@ export const wellTableTool = tool(
 
         let columnNames = tableColumns.map(column => column.columnName)
 
-        const s3Prefix = `well-files/field=SanJuanEast/uwi=${wellApiNumber}/`;
+        const s3Prefix = `production-agent/well-files/field=SanJuanEast/uwi=${wellApiNumber}/`;
 
         const command = new StartSyncExecutionCommand({
             stateMachineArn: env.STEP_FUNCTION_ARN,
