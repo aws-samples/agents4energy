@@ -10,6 +10,8 @@ import * as cdk from 'aws-cdk-lib'
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
 
+import { productionAgentBuilder } from "./custom/productionAgent"
+
 const resourceTags = {
   Project: 'agents-for-energy',
   Environment: 'dev',
@@ -141,8 +143,8 @@ const fileDeployment = new s3Deployment.BucketDeployment(customStack, 'test-file
   // destinationKeyPrefix: '/'
 });
 
-// const productionAgent = productionAgentBuilder(customStack, {
-//   s3BucketName: backend.storage.resources.bucket.bucketName
-// })
+const productionAgent = productionAgentBuilder(customStack, {
+  s3BucketName: backend.storage.resources.bucket.bucketName
+})
 
-// backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', "")// productionAgent.stepFunctionArn)
+backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', "")// productionAgent.stepFunctionArn)
