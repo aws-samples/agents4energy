@@ -5,12 +5,12 @@ import "./globals.css";
 import ConfigureAmplify from '@/components/ConfigureAmplify';
 import Providers from '@/components/providers';
 
-import TopNavBar from '@/components/TopNavBar';
+// import TopNavBar from '@/components/TopNavBar';
 import ClientLayout from '@/components/ClientLayout';
 
-import {
-  Toolbar,
-} from '@mui/material';
+// import {
+//   Toolbar,
+// } from '@mui/material';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
