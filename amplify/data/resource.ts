@@ -36,7 +36,7 @@ const schema = a.schema({
   ChatSession: a
     .model({
       messages: a.hasMany("ChatMessage", "chatSessionId"),
-      firstMessage: a.string(),
+      firstMessageSummary: a.string(),
       aiBotInfo: a.customType({
         aiBotName: a.string(),
         aiBotId: a.string(),

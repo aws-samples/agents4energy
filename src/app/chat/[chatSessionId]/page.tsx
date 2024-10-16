@@ -31,23 +31,6 @@ import { withAuth } from '@/components/WithAuth';
 
 const drawerWidth = 240;
 
-// type BedrockAnthropicBodyType = {
-//     id: string;
-//     type: string;
-//     role: string;
-//     model: string;
-//     content: {
-//         type: string;
-//         text: string;
-//     }[];
-//     stop_reason: string;
-//     stop_sequence: null;
-//     usage: {
-//         input_tokens: number;
-//         output_tokens: number;
-//     };
-// };
-
 type ListBedrockAgentsResponseType = {
     agentSummaries: {
         agentId: string;
@@ -77,19 +60,6 @@ type ListAgentIdsResponseType = {
     nextToken: string
 }
 
-// export const invokeBedrockModelParseBodyGetText = async (prompt: string) => {
-//     console.log('Prompt: ', prompt)
-//     const response = await amplifyClient.queries.invokeBedrock({ prompt: prompt })
-//     console.log('Bedrock Response: ', response.data)
-//     if (!(response.data && response.data.body)) {
-//         console.log('No response from bedrock after prompt: ', prompt)
-//         return
-//     }
-//     const bedrockResponseBody = JSON.parse(response.data.body) as BedrockAnthropicBodyType
-//     console.log('Bedrock Response Body: ', bedrockResponseBody)
-//     return bedrockResponseBody.content.map(item => item.text).join('\n')
-// }
-
 const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
     console.log('Prompt: ', prompt)
     if (!chatSession.aiBotInfo?.aiBotAliasId) throw new Error('No Agent Alias ID found in invoke request')
@@ -108,12 +78,43 @@ const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: S
     return response.data
 }
 
+const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targetChatSession: Schema['ChatSession']['type']) => {
+    const outputStructure = {
+        title: "SummarizeMessageIntnet",
+        description: "What intent does the use have when sending this message?",
+        type: "object",
+        properties: {
+            summary: {
+                type: 'string',
+                description: `message intent title`,
+                maxLength: 20
+            }
+        },
+        required: ['summary'],
+    };
+
+    const structuredResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
+        chatSessionId: targetChatSession.id,
+        lastMessageText: "",
+        outputStructure: JSON.stringify(outputStructure)
+    })
+    console.log("Structured Output Response: ", structuredResponse)
+    if (structuredResponse.data) {
+        const messageIntentSummary = JSON.parse(structuredResponse.data).summary as string
+        await amplifyClient.models.ChatSession.update({
+            id: targetChatSession.id,
+            firstMessageSummary: messageIntentSummary
+        })
+    } else console.log('No structured output found in response: ', structuredResponse)
+
+
+    
+}
+
 const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
     amplifyClient.queries.invokeProductionAgent({ input: prompt, chatSessionId: chatSession.id }).then(
         (response) => {
             console.log("bot response: ", response)
-            // if (response.data) addChatMessage(response.data, "AI", targetChatSessionId)
-            // else throw new Error("No response from bot");
         }
     )
 }
@@ -200,10 +201,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     outputStructure: JSON.stringify(getSuggestedPromptsOutputStructure)
                 })
                 console.log("Suggested Prompts Response: ", suggestedPromptsResponse)
-                if (!suggestedPromptsResponse.data) throw new Error("No suggested prompts in response")
-
-                const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
-                setSuggestedPromptes(newSuggestedPrompts)
+                if (suggestedPromptsResponse.data) {
+                    const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
+                    setSuggestedPromptes(newSuggestedPrompts)
+                } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
             }
             fetchAndSetSuggestedPrompts()
         }
@@ -305,6 +306,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     async function addUserChatMessage(body: string) {
+        if (!messages.length) {
+            console.log("This is the initial message. Getting summary for chat session")
+            if (!activeChatSession) throw new Error("No active chat session")            
+            setChatSessionFirstMessageSummary(body, activeChatSession)
+        }
         await addChatMessage(body, "human")
         sendMessageToChatBot(body);
     }
@@ -351,7 +357,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 }}
             >
                 <Toolbar />
-                <Typography sx={{ textAlign: 'center' }}>Chatting with {activeChatSession?.aiBotInfo?.aiBotName} Alias Id: {activeChatSession?.aiBotInfo?.aiBotAliasId}</Typography>
+                {/* <Typography sx={{ textAlign: 'center' }}>Chatting with {activeChatSession?.aiBotInfo?.aiBotName} Alias Id: {activeChatSession?.aiBotInfo?.aiBotAliasId}</Typography> */}
                 <Box sx={{ overflow: 'auto' }}>
                     <DropdownMenu buttonText='New Chat Session'>
                         {
@@ -395,7 +401,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                             <Card key={session.id} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
                                 <CardContent>
                                     <Typography variant="h6" component="div" noWrap>
-                                        {session.firstMessage?.slice(0, 50)}
+                                        {session.firstMessageSummary?.slice(0, 50)}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
                                         {formatDate(session.createdAt)}
@@ -425,12 +431,19 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 </Box>
             </Drawer>
             <div style={{ marginLeft: '260px', padding: '20px' }}>
-                {/* <Toolbar /> */}
-                <ChatUI
-                    onSendMessage={addUserChatMessage}
-                    messages={messages}
-                    running={isLoading}
-                />
+                <Toolbar/>
+                <Box>
+                    <Typography variant="h4" gutterBottom>
+                        Chat with {activeChatSession?.aiBotInfo?.aiBotName}
+                    </Typography>
+                </Box>
+                <Box>
+                    <ChatUI
+                        onSendMessage={addUserChatMessage}
+                        messages={messages}
+                        running={isLoading}
+                    />
+                </Box>
                 <Box sx={{ mt: 5 }}>
                     {
                         !isLoading && (suggestedPrompts.length || !messages.length) ? (

@@ -2,7 +2,8 @@
 
 .chat_container {
   margin-bottom: -40px;
-  min-height: calc(100vh - 96px);
+  // min-height: calc(100vh - 200px); //96px
+  // max-height: calc(20vh); //96px
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -10,21 +11,21 @@
 
 @media (min-width: 466px) {
   .chat_container {
-    min-height: calc(100vh - 104px);
+    min-height: calc(100vh - 300px);
   }
 }
 
-@media (min-width: 689px) {
-  .chat_container {
-    min-height: calc(100vh - 60px);
-  }
-}
+// @media (min-width: 689px) {
+//   .chat_container {
+//     min-height: calc(100vh - 60px);
+//   }
+// }
 
-@media (min-width: 913px) {
-  .chat_container {
-    min-height: calc(100vh - 68px);
-  }
-}
+// @media (min-width: 913px) {
+//   .chat_container {
+//     min-height: calc(100vh - 68px);
+//   }
+// }
 
 .welcome_text {
   color: awsui.$color-text-body-default;
