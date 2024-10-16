@@ -11,6 +11,8 @@ import * as APITypes from "../graphql/API";
 import { listChatMessageByChatSessionIdAndCreatedAt } from "../graphql/queries"
 import { calculatorTool, wellTableTool } from './toolBox';
 
+// console.log("Amplify environment: ", env)
+
 Amplify.configure(
     {
         API: {
