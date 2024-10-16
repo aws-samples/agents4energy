@@ -144,9 +144,10 @@ const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr
     });
 })
 
+//https://json-schema.org/understanding-json-schema/reference/array
 const getSuggestedPromptsOutputStructure = {
-    title: "outputStructure",
-    description: "Fill out these arguments",
+    title: "RecommendNextPrompt",
+    description: "Help the user chose the next prompt to send.",
     type: "object",
     properties: {
         suggestedPrompts: {
@@ -154,6 +155,8 @@ const getSuggestedPromptsOutputStructure = {
             items: {
                 type: 'string'
             },
+            minItems: 3,
+            maxItems: 3,
             description: `
             Prompts to suggest to a user when interacting with a large language model
             `
@@ -173,7 +176,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
 
-    
+
 
     // Set isLoading to false if the last message is from ai and has no tool call
     useEffect(() => {
@@ -190,7 +193,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             async function fetchAndSetSuggestedPrompts() {
                 setSuggestedPromptes([])
                 if (!activeChatSession || !activeChatSession.id) throw new Error("No active chat session")
-        
+
                 const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
                     chatSessionId: activeChatSession?.id,
                     lastMessageText: "Suggest three follow up prompts",
@@ -198,7 +201,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 })
                 console.log("Suggested Prompts Response: ", suggestedPromptsResponse)
                 if (!suggestedPromptsResponse.data) throw new Error("No suggested prompts in response")
-        
+
                 const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
                 setSuggestedPromptes(newSuggestedPrompts)
             }
@@ -329,8 +332,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         // console.log('Response Text: ', responseText)
         // if (!responseText) throw new Error("No response from agent");
-        
-        
+
+
         // addChatMessage(responseText, "ai")
     }
 
@@ -350,7 +353,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 <Toolbar />
                 <Typography sx={{ textAlign: 'center' }}>Chatting with {activeChatSession?.aiBotInfo?.aiBotName} Alias Id: {activeChatSession?.aiBotInfo?.aiBotAliasId}</Typography>
                 <Box sx={{ overflow: 'auto' }}>
-                <DropdownMenu buttonText='New Chat Session'>
+                    <DropdownMenu buttonText='New Chat Session'>
                         {
                             [
                                 ...[
@@ -435,7 +438,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                 Suggested Follow Ups:
                             </Typography>
                         ) : (
-                            <CircularProgress/>
+                            <CircularProgress />
                         )
                     }
                 </Box>

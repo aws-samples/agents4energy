@@ -26,7 +26,6 @@ const getUserAttributes = async () => {
   }
 };
 
-
 const TopNavBar = () => {
   const [userAttributes, setUserAttributes] = useState<FetchUserAttributesOutput | null>();
   const { user, signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
@@ -73,6 +72,13 @@ const TopNavBar = () => {
 
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+
+          <Link color="inherit" href='/files' sx={{ textDecoration: 'none' }}>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              Files
+            </Typography>
+          </Link>
+
           <Link color="inherit" href='/chat' sx={{ textDecoration: 'none' }}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               Chat
@@ -83,7 +89,7 @@ const TopNavBar = () => {
 
             <Box sx={{ flexGrow: 0 }}>
               <Tooltip title="Open settings">
-                <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
+                <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }} color="inherit">
                   <Typography sx={{ textAlign: 'center' }}>{userAttributes.email}</Typography>
                 </IconButton>
               </Tooltip>

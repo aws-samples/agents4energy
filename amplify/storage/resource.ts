@@ -1,9 +1,9 @@
 import { defineStorage } from '@aws-amplify/backend';
 
 export const storage = defineStorage({
-  name: 'wellFileDrive',
+  name: 'fileDrive',
   access: (allow) => ({
-    'well-files/*': [
+    'production-agent/*': [
       allow.authenticated.to(['read','write', 'delete']),
     ],
   })
