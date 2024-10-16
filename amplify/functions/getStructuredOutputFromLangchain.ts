@@ -134,7 +134,6 @@ async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => a
             new AIMessage({ content: JSON.stringify(response.parsed) }),
             new HumanMessage({ content: `Data validation error: ${validationReslut.errors.join('\n')}. Please try again.` })
         );
-
         response = await model.invoke(messages)
     }
 
@@ -143,7 +142,7 @@ async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => a
     return response
 }
 
-export const handler: Schema["invokeBedrockWithStructuredOutput"]["functionHandler"] = async (event, context) => {
+export const handler: Schema["invokeBedrockWithStructuredOutput"]["functionHandler"] = async (event) => {
 
     const outputStructure = JSON.parse(event.arguments.outputStructure)
     console.log('target output structure:\n', JSON.stringify(outputStructure, null, 2))
