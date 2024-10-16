@@ -15,7 +15,7 @@ import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/ampli
 
 import styles from "@/styles/chat-ui.module.scss";
 import React, { useState } from "react";
-import { Message } from "@aws-amplify/ui-react";
+// import { Message } from "@aws-amplify/ui-react";
 
 export interface ChatUIMessageProps {
   message: Schema["ChatMessage"]["type"];
