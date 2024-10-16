@@ -8,10 +8,6 @@ import Providers from '@/components/providers';
 // import TopNavBar from '@/components/TopNavBar';
 import ClientLayout from '@/components/ClientLayout';
 
-// import {
-//   Toolbar,
-// } from '@mui/material';
-
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",

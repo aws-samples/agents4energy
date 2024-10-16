@@ -1,9 +1,8 @@
 import {
-  // Box,
   Button,
   Container,
   Popover,
-  // Spinner,
+  Spinner,
   StatusIndicator
 } from "@cloudscape-design/components";
 
@@ -12,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 
 import type { Schema } from '@/../amplify/data/resource';
 import { formatDate } from "@/utils/date-utils";
-import { invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
+import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
 
 import styles from "@/styles/chat-ui.module.scss";
 import React, { useState } from "react";
@@ -22,9 +21,29 @@ export interface ChatUIMessageProps {
   showCopyButton?: boolean;
 }
 
+//https://json-schema.org/understanding-json-schema/reference/array
+const getDataQualityCheckSchema = {
+  title: "DataQualityCheck",
+  description: "Check the data given by AI in this message history",
+  type: "object",
+  properties: {
+    dataChecks: {
+      type: 'array',
+      items: {
+        type: 'string'
+      },
+      minItems: 0,
+      maxItems: 5,
+      description: "Identify any data quality issues in the AI messages"
+    }
+  },
+  required: ['dataChecks'],
+};
+
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
   const [glossaryBlurb, setGlossaryBlurb] = useState("")
+  const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
   async function getGlossary(content: string) {
@@ -34,9 +53,34 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     ${content}
     `
     setGlossaryBlurb("")
-    const newGlossaryBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
-    if (!newGlossaryBlurb) throw new Error("No glossary blurb returned")
-    setGlossaryBlurb(() => newGlossaryBlurb)
+    const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
+    if (!newBlurb) throw new Error("No glossary blurb returned")
+    setGlossaryBlurb(() => newBlurb)
+  }
+
+  async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
+    setDataQualityBlurb("")
+
+    if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
+
+    const dataQualityCheckResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
+      chatSessionId: message.chatSessionId,
+      lastMessageText: "Suggest three follow up prompts",
+      outputStructure: JSON.stringify(getDataQualityCheckSchema)
+    })
+    console.log("Data Quality Check Response: ", dataQualityCheckResponse)
+    if (dataQualityCheckResponse.data) {
+      const newDataQualityChecks = JSON.parse(dataQualityCheckResponse.data).dataChecks as string[]
+      if (newDataQualityChecks.length) {
+        setDataQualityBlurb(() => newDataQualityChecks.join('\n\n'))
+      } else {
+        setDataQualityBlurb(() => "No data quality issues identified")
+      }
+      
+
+    } else console.log('No suggested prompts found in response: ', dataQualityCheckResponse)
+
+    
   }
 
   return (
@@ -65,6 +109,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             </Popover>
           </div>
 
+
           <div className={styles.btn_chabot_message_copy}>
             <Popover
               size="medium"
@@ -73,10 +118,28 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               dismissButton={false}
               content={
                 <p>
-                  {glossaryBlurb ? glossaryBlurb : "Loading glossary..."}
+                  {dataQualityBlurb ? dataQualityBlurb : <Spinner />}
                 </p>
+              }
+            >
+              <Button
+                onClick={() => getDataQualityCheck(props.message)}
+              >
+                Data Quality Check
+              </Button>
+            </Popover>
+          </div>
 
-
+          <div className={styles.btn_chabot_message_copy}>
+            <Popover
+              size="medium"
+              position="top"
+              triggerType="custom"
+              dismissButton={false}
+              content={
+                <p>
+                  {glossaryBlurb ? glossaryBlurb : <Spinner />}
+                </p>
               }
             >
               <Button

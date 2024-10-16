@@ -200,10 +200,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     outputStructure: JSON.stringify(getSuggestedPromptsOutputStructure)
                 })
                 console.log("Suggested Prompts Response: ", suggestedPromptsResponse)
-                if (!suggestedPromptsResponse.data) throw new Error("No suggested prompts in response")
-
-                const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
-                setSuggestedPromptes(newSuggestedPrompts)
+                if (suggestedPromptsResponse.data) {
+                    const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
+                    setSuggestedPromptes(newSuggestedPrompts)
+                } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
             }
             fetchAndSetSuggestedPrompts()
         }
@@ -425,12 +425,13 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 </Box>
             </Drawer>
             <div style={{ marginLeft: '260px', padding: '20px' }}>
-                {/* <Toolbar /> */}
-                <ChatUI
-                    onSendMessage={addUserChatMessage}
-                    messages={messages}
-                    running={isLoading}
-                />
+                <Box>
+                    <ChatUI
+                        onSendMessage={addUserChatMessage}
+                        messages={messages}
+                        running={isLoading}
+                    />
+                </Box>
                 <Box sx={{ mt: 5 }}>
                     {
                         !isLoading && (suggestedPrompts.length || !messages.length) ? (
