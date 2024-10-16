@@ -24,7 +24,7 @@ export interface ChatUIMessageProps {
 //https://json-schema.org/understanding-json-schema/reference/array
 const getDataQualityCheckSchema = {
   title: "DataQualityCheck",
-  description: "Check the data given by AI in this message history",
+  description: "Identify any inaccurate data",
   type: "object",
   properties: {
     dataChecks: {
@@ -34,7 +34,7 @@ const getDataQualityCheckSchema = {
       },
       minItems: 0,
       maxItems: 5,
-      description: "Identify any data quality issues in the AI messages"
+      description: "Identified issues"
     }
   },
   required: ['dataChecks'],
@@ -65,7 +65,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
     const dataQualityCheckResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
       chatSessionId: message.chatSessionId,
-      lastMessageText: "Suggest three follow up prompts",
+      lastMessageText: "What data quality issues can you identify in the messages above?",
       outputStructure: JSON.stringify(getDataQualityCheckSchema)
     })
     console.log("Data Quality Check Response: ", dataQualityCheckResponse)

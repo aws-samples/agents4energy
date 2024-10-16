@@ -6,8 +6,8 @@ import TopNavBar from '@/components/TopNavBar';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Box>
-      <Box sx={{ flexGrow: 1 }}>
+    <Box height="100vh">
+      <Box>
         <TopNavBar />
       </Box>
       <Box sx={{ mt: 10 }}>{children}</Box>

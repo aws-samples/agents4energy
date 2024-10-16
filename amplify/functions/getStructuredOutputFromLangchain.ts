@@ -125,18 +125,17 @@ async function getSortedMessages(chatSessionId: string, latestHumanMessageText: 
 async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => any; }, response: { raw: BaseMessage; parsed: Record<string, any>;}, targetJsonSchema: JsonSchema, messages: BaseMessage[]) {
     for (let attempt = 0; attempt < 3; attempt++) {
         const validationReslut = validate(response.parsed, targetJsonSchema);
-        console.log("Data validation result: ", validationReslut.valid);
-        if (validationReslut.valid) {
-            break;
-        }
+        console.log(`Data validation result (${attempt}): `, validationReslut.valid);
+        if (validationReslut.valid) break
+
         console.log("Data validation error:", validationReslut.errors.join('\n'));
+        console.log('Model response which caused error: \n', response);
         messages.push(
             new AIMessage({ content: JSON.stringify(response.parsed) }),
-            new HumanMessage({ content: `The data extracted from the image is not valid. Data validation error: ${validationReslut.errors.join('\n')}. Please try again.` })
+            new HumanMessage({ content: `Data validation error: ${validationReslut.errors.join('\n')}. Please try again.` })
         );
 
         response = await model.invoke(messages)
-        console.log('model response: \r', response);
     }
 
     if (!response.parsed) throw new Error("No parsed response from model");
@@ -147,7 +146,7 @@ async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => a
 export const handler: Schema["invokeBedrockWithStructuredOutput"]["functionHandler"] = async (event, context) => {
 
     const outputStructure = JSON.parse(event.arguments.outputStructure)
-    console.log('target output structure: ', outputStructure)
+    console.log('target output structure:\n', JSON.stringify(outputStructure, null, 2))
 
     const sortedLangchainMessages = await getSortedMessages(event.arguments.chatSessionId, event.arguments.lastMessageText)
     

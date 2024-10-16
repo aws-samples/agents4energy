@@ -425,6 +425,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 </Box>
             </Drawer>
             <div style={{ marginLeft: '260px', padding: '20px' }}>
+                <Toolbar/>
+                <Box>
+                    <Typography variant="h4" gutterBottom>
+                        Chat with {activeChatSession?.aiBotInfo?.aiBotName}
+                    </Typography>
+                </Box>
                 <Box>
                     <ChatUI
                         onSendMessage={addUserChatMessage}
