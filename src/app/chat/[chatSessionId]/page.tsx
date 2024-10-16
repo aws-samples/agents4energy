@@ -108,6 +108,15 @@ const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: S
     return response.data
 }
 
+const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
+    amplifyClient.queries.invokeProductionAgent({ input: prompt, chatSessionId: chatSession.id }).then(
+        (response) => {
+            console.log("bot response: ", response)
+            // if (response.data) addChatMessage(response.data, "AI", targetChatSessionId)
+            // else throw new Error("No response from bot");
+        }
+    )
+}
 
 const getAgentAliasId = async (agentId: string) => {
     const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
@@ -135,9 +144,10 @@ const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr
     });
 })
 
+//https://json-schema.org/understanding-json-schema/reference/array
 const getSuggestedPromptsOutputStructure = {
-    title: "outputStructure",
-    description: "Fill out these arguments",
+    title: "RecommendNextPrompt",
+    description: "Help the user chose the next prompt to send.",
     type: "object",
     properties: {
         suggestedPrompts: {
@@ -145,6 +155,8 @@ const getSuggestedPromptsOutputStructure = {
             items: {
                 type: 'string'
             },
+            minItems: 3,
+            maxItems: 3,
             description: `
             Prompts to suggest to a user when interacting with a large language model
             `
@@ -164,7 +176,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
 
-    
+
 
     // Set isLoading to false if the last message is from ai and has no tool call
     useEffect(() => {
@@ -179,8 +191,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
 
             async function fetchAndSetSuggestedPrompts() {
+                setSuggestedPromptes([])
                 if (!activeChatSession || !activeChatSession.id) throw new Error("No active chat session")
-        
+
                 const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
                     chatSessionId: activeChatSession?.id,
                     lastMessageText: "Suggest three follow up prompts",
@@ -188,7 +201,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 })
                 console.log("Suggested Prompts Response: ", suggestedPromptsResponse)
                 if (!suggestedPromptsResponse.data) throw new Error("No suggested prompts in response")
-        
+
                 const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
                 setSuggestedPromptes(newSuggestedPrompts)
             }
@@ -264,13 +277,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }, [])
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
+        setMessages([])
         amplifyClient.models.ChatSession.create(chatSession).then(({ data: newChatSession }) => {
             if (newChatSession) {
-                setActiveChatSession(newChatSession);
-                if (chatSession.firstMessage) {
-                    addUserChatMessage(chatSession.firstMessage);
-                }
-                // window.location.replace(`/chat/${newChatSession.id}`)
                 router.push(`/chat/${newChatSession.id}`)
 
             }
@@ -302,13 +311,30 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     async function sendMessageToChatBot(prompt: string) {
         setIsLoading(true);
-        const responseText = (activeChatSession?.aiBotInfo?.aiBotAliasId) ? await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
-            : (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') ? await invokeBedrockModelParseBodyGetText(prompt)
-                : 'defaultValue';
+        // const responseText = (activeChatSession?.aiBotInfo?.aiBotAliasId) ? await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
+        //     : (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') ? await invokeBedrockModelParseBodyGetText(prompt)
+        //     : (activeChatSession?.aiBotInfo?.aiBotName === 'Production Agent') ? await invokeProductionAgentParseBodyGetText(prompt, activeChatSession)
+        //     : 'No Agent Configured';
 
-        console.log('Response Text: ', responseText)
-        if (!responseText) throw new Error("No response from agent");
-        addChatMessage(responseText, "ai")
+        if (activeChatSession?.aiBotInfo?.aiBotAliasId) {
+            const responseText = await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
+            if (!responseText) throw new Error("No response from agent");
+            addChatMessage(responseText, "ai")
+        } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') {
+            const responseText = await invokeBedrockModelParseBodyGetText(prompt)
+            if (!responseText) throw new Error("No response from agent");
+            addChatMessage(responseText, "ai")
+        } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Production Agent') {
+            await invokeProductionAgent(prompt, activeChatSession)
+        } else {
+            throw new Error("No Agent Configured");
+        }
+
+        // console.log('Response Text: ', responseText)
+        // if (!responseText) throw new Error("No response from agent");
+
+
+        // addChatMessage(responseText, "ai")
     }
 
 
@@ -328,25 +354,31 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 <Typography sx={{ textAlign: 'center' }}>Chatting with {activeChatSession?.aiBotInfo?.aiBotName} Alias Id: {activeChatSession?.aiBotInfo?.aiBotAliasId}</Typography>
                 <Box sx={{ overflow: 'auto' }}>
                     <DropdownMenu buttonText='New Chat Session'>
-                        <MenuItem
-                            key='FM'
-                            onClick={async () => {
-                                createChatSession({ aiBotInfo: { aiBotName: 'Foundation Model' } })
-                            }}>
-                            <Typography sx={{ textAlign: 'center' }}>Foundation Model</Typography>
-                        </MenuItem>
                         {
-                            bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")).map((agent) => (
-                                <MenuItem
-                                    key={agent.agentId}
-                                    onClick={async () => {
-                                        const agentAliasId = agent.agentId ? await getAgentAliasId(agent.agentId) : ""//If the agent is not a bedrock agent then don't get the alias ID
-                                        createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
-                                    }}
-                                >
-                                    <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
-                                </MenuItem>
-                            ))
+                            [
+                                ...[
+                                    {
+                                        agentName: "Production Agent",
+                                        agentId: null
+                                    },
+                                    {
+                                        agentName: "Foundation Model",
+                                        agentId: null
+                                    },
+                                ],
+                                ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
+                            ]
+                                .map((agent) => (
+                                    <MenuItem
+                                        key={agent.agentName}
+                                        onClick={async () => {
+                                            const agentAliasId = agent.agentId ? await getAgentAliasId(agent.agentId) : null//If the agent is not a bedrock agent then don't get the alias ID
+                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
+                                        }}
+                                    >
+                                        <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
+                                    </MenuItem>
+                                ))
                         }
                     </DropdownMenu>
 
@@ -401,12 +433,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 />
                 <Box sx={{ mt: 5 }}>
                     {
-                        !isLoading ? (
+                        !isLoading && (suggestedPrompts.length || !messages.length) ? (
                             <Typography variant="body2">
                                 Suggested Follow Ups:
                             </Typography>
                         ) : (
-                            <CircularProgress/>
+                            <CircularProgress />
                         )
                     }
                 </Box>

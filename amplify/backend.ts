@@ -1,14 +1,29 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
-import { data, invokeBedrockAgentFunction, getStructuredOutputFromLangchainFunction } from './data/resource';
-// import { PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { data, invokeBedrockAgentFunction, getStructuredOutputFromLangchainFunction, productionAgentFunction } from './data/resource';
+import { storage } from './storage/resource';
+
+import * as cdk from 'aws-cdk-lib'
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
+
+import { productionAgentBuilder } from "./custom/productionAgent"
+
+const resourceTags = {
+  Project: 'agents-for-energy',
+  Environment: 'dev',
+}
 
 const backend = defineBackend({
   auth,
   data,
+  storage,
   invokeBedrockAgentFunction,
-  getStructuredOutputFromLangchainFunction
+  getStructuredOutputFromLangchainFunction,
+  productionAgentFunction
 });
 
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
@@ -103,5 +118,53 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
     ],
     actions: ["bedrock:InvokeModel"],
 
+  })
+)
+
+
+
+function applyTagsToRootStack(targetStack: cdk.Stack) {
+  const rootStack = cdk.Stack.of(targetStack).nestedStackParent
+  if (!rootStack) throw new Error('Root stack not found')
+  //Apply tags to all the nested stacks
+  Object.entries(resourceTags).map(([key, value]) => {
+    cdk.Tags.of(rootStack).add(key, value)
+  })
+  cdk.Tags.of(rootStack).add('rootStackName', rootStack.stackName)
+}
+
+const customStack = backend.createStack('customStack')
+applyTagsToRootStack(customStack)
+
+//Deploy the test data to the s3 bucket
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, '..');
+const fileDeployment = new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
+  sources: [s3Deployment.Source.asset(path.join(rootDir, 'testData'))],
+  destinationBucket: backend.storage.resources.bucket,
+  // destinationKeyPrefix: '/'
+});
+
+const productionAgent = productionAgentBuilder(customStack, {
+  s3BucketName: backend.storage.resources.bucket.bucketName
+})
+
+backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', productionAgent.stepFunctionArn)// productionAgent.stepFunctionArn)
+
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ["bedrock:InvokeModel"],
+    resources: [
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0`
+    ],
+  })
+)
+
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ["states:StartSyncExecution"],
+    resources: [productionAgent.stepFunctionArn],
   })
 )

@@ -17,12 +17,16 @@ export const getStructuredOutputFromLangchainFunction = defineFunction({
   timeoutSeconds: 120
 });
 
-/*== STEP 1 ===============================================================
-The section below creates a Todo database table with a "content" field. Try
-adding a new "isDone" field as a boolean. The authorization rule below
-specifies that any unauthenticated user can "create", "read", "update", 
-and "delete" any "Todo" records.
-=========================================================================*/
+export const productionAgentFunction = defineFunction({
+  name: "production-agent-function",
+  entry: '../functions/productionAgentFunction/index.ts',
+  timeoutSeconds: 900,
+  environment: {
+    // MODEL_ID: 'anthropic.claude-3-5-sonnet-20240620-v1:0'
+    MODEL_ID: 'anthropic.claude-3-sonnet-20240229-v1:0'
+  }
+});
+
 const schema = a.schema({
   BedrockResponse: a.customType({
     body: a.string(),
@@ -41,6 +45,7 @@ const schema = a.schema({
       })
     })
     .authorization((allow) => [allow.owner(), allow.authenticated()]), //The allow.authenticated() allows other users to view chat sessions.
+  // TODO: let authenticated only read
 
   ChatMessage: a
     .model({
@@ -58,8 +63,6 @@ const schema = a.schema({
       index("chatSessionId").sortKeys(["createdAt"])
     ])
     .authorization((allow) => [allow.owner(), allow.authenticated()]),
-
-
 
   invokeBedrock: a
     .query()
@@ -86,7 +89,7 @@ const schema = a.schema({
     .handler(
       a.handler.custom({ entry: "./listBedrockAgentAliasIds.js", dataSource: "bedrockAgentDS" })
     ),
-  
+
   invokeBedrockAgent: a
     .query()
     .arguments({ prompt: a.string().required(), agentId: a.string().required(), agentAliasId: a.string().required(), sessionId: a.string().required() })
@@ -94,9 +97,8 @@ const schema = a.schema({
     .authorization(allow => allow.authenticated())
     .handler(
       a.handler.function(invokeBedrockAgentFunction)
-      // a.handler.custom({ entry: "./invokeBedrockAgent.js", dataSource: "bedrockAgentRuntimeDS" })
     ),
-  
+
   invokeBedrockWithStructuredOutput: a
     .query()
     .arguments({ lastMessageText: a.string().required(), outputStructure: a.string().required(), chatSessionId: a.string().required() })
@@ -105,7 +107,31 @@ const schema = a.schema({
     .handler(
       a.handler.function(getStructuredOutputFromLangchainFunction)
     ),
-}).authorization(allow => [allow.resource(getStructuredOutputFromLangchainFunction)]);;
+
+  invokeProductionAgent: a
+    .query()
+    .arguments({
+      input: a.string().required(),
+      chatSessionId: a.string(),
+    })
+    .returns(a.json())
+    .handler(a.handler.function(productionAgentFunction))
+    .authorization((allow) => [allow.authenticated()]),
+
+  getInfoFromPdf: a
+    .query()
+    .arguments({
+      s3Key: a.string().required(),
+      tableColumns: a.json().required(),
+      dataToExclude: a.json(),
+      dataToInclude: a.json()
+    })
+    .returns(a.json())
+    
+}).authorization(allow => [
+  allow.resource(getStructuredOutputFromLangchainFunction),
+  allow.resource(productionAgentFunction)
+]);;
 
 export type Schema = ClientSchema<typeof schema>;
 
