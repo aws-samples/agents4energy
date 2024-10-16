@@ -15,6 +15,7 @@ import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/ampli
 
 import styles from "@/styles/chat-ui.module.scss";
 import React, { useState } from "react";
+import { Message } from "@aws-amplify/ui-react";
 
 export interface ChatUIMessageProps {
   message: Schema["ChatMessage"]["type"];
@@ -40,22 +41,27 @@ const getDataQualityCheckSchema = {
   required: ['dataChecks'],
 };
 
+
+
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
-  const [glossaryBlurb, setGlossaryBlurb] = useState("")
+  const [glossaryBlurbs, setGlossaryBlurbs] = useState<{[key: string]: string}>({})
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
-  async function getGlossary(content: string) {
+  async function getGlossary(message: Schema["ChatMessage"]["type"]) {
+    if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
+
+    if (message.chatSessionId in glossaryBlurbs) return
+
     const getGlossaryPrompt = `
     Return a glossary for terms found in the text blurb below:
 
-    ${content}
+    ${message.content}
     `
-    setGlossaryBlurb("")
     const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
     if (!newBlurb) throw new Error("No glossary blurb returned")
-    setGlossaryBlurb(() => newBlurb)
+    setGlossaryBlurbs((prevGlossaryBlurbs) => ({...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb})) //TODO fix this
   }
 
   async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
@@ -138,12 +144,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               dismissButton={false}
               content={
                 <p>
-                  {glossaryBlurb ? glossaryBlurb : <Spinner />}
+                  {props.message.chatSessionId && glossaryBlurbs[props.message.chatSessionId] ? glossaryBlurbs[props.message.chatSessionId] : <Spinner />}
                 </p>
               }
             >
               <Button
-                onClick={() => getGlossary(props.message.content)}
+                onClick={() => getGlossary(props.message)}
               >
                 Show Glossary
               </Button>
