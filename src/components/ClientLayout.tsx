@@ -10,7 +10,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <Box>
         <TopNavBar />
       </Box>
-      <Box sx={{ mt: 10 }}>{children}</Box>
+      <Box sx={{ mt: 8 }}>{children}</Box>
     </Box>
   );
 }
