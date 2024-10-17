@@ -27,6 +27,12 @@ export const productionAgentFunction = defineFunction({
   }
 });
 
+// export const convertPdfToImagesAndAddMessagesFunction = defineFunction({
+//   name: "convert-pdf-to-image-function",
+//   entry: '../functions/convertPdfToImages/index.ts',
+//   timeoutSeconds: 900,
+// });
+
 const schema = a.schema({
   BedrockResponse: a.customType({
     body: a.string(),
@@ -52,6 +58,7 @@ const schema = a.schema({
       chatSessionId: a.id(),
       session: a.belongsTo("ChatSession", "chatSessionId"),
       content: a.string().required(),
+      contentBlocks: a.json(),
       role: a.enum(["human", "ai", "tool"]),
       owner: a.string(),
       createdAt: a.datetime(),
@@ -126,11 +133,21 @@ const schema = a.schema({
       dataToExclude: a.json(),
       dataToInclude: a.json()
     })
+    .returns(a.json()),
+  
+  convertPdfToImagesAndAddMessages: a
+    .query()
+    .arguments({
+      s3Key: a.string().required(),
+      toolCallId: a.string().required(),
+      chatSessionId: a.string().required(),
+    })
     .returns(a.json())
-    
+
 }).authorization(allow => [
   allow.resource(getStructuredOutputFromLangchainFunction),
-  allow.resource(productionAgentFunction)
+  allow.resource(productionAgentFunction),
+  // allow.resource(convertPdfToImagesAndAddMessagesFunction)
 ]);;
 
 export type Schema = ClientSchema<typeof schema>;

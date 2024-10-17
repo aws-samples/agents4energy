@@ -15,13 +15,14 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
   createChatMessage(condition: $condition, input: $input) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -51,7 +52,7 @@ export const createChatSession = /* GraphQL */ `mutation CreateChatSession(
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken
@@ -73,13 +74,14 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
   deleteChatMessage(condition: $condition, input: $input) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -109,7 +111,7 @@ export const deleteChatSession = /* GraphQL */ `mutation DeleteChatSession(
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken
@@ -131,13 +133,14 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
   updateChatMessage(condition: $condition, input: $input) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -167,7 +170,7 @@ export const updateChatSession = /* GraphQL */ `mutation UpdateChatSession(
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken

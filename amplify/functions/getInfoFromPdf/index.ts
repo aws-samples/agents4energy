@@ -7,7 +7,6 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { convertPdfToPngs } from './convertPdfToPng'
 
 import { validate } from 'jsonschema';
-import m from 'gm';
 
 interface ColumnInfo {
     columnName: string;

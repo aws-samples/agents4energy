@@ -3,7 +3,13 @@ import { fileURLToPath } from 'url';
 
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
-import { data, invokeBedrockAgentFunction, getStructuredOutputFromLangchainFunction, productionAgentFunction } from './data/resource';
+import { 
+  data, 
+  invokeBedrockAgentFunction, 
+  getStructuredOutputFromLangchainFunction, 
+  productionAgentFunction,
+  // convertPdfToImagesAndAddMessagesFunction
+ } from './data/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
@@ -23,7 +29,8 @@ const backend = defineBackend({
   storage,
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
-  productionAgentFunction
+  productionAgentFunction,
+  // convertPdfToImagesAndAddMessagesFunction
 });
 
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
@@ -145,11 +152,12 @@ const fileDeployment = new s3Deployment.BucketDeployment(customStack, 'test-file
   // destinationKeyPrefix: '/'
 });
 
-const productionAgent = productionAgentBuilder(customStack, {
+const { queryImagesStateMachineArn, ghostScriptLayer, imageMagickLayer} = productionAgentBuilder(customStack, {
   s3BucketName: backend.storage.resources.bucket.bucketName
 })
 
-backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', productionAgent.stepFunctionArn)// productionAgent.stepFunctionArn)
+backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)// productionAgent.stepFunctionArn)
+backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)// productionAgent.stepFunctionArn)
 
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
@@ -165,6 +173,21 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["states:StartSyncExecution"],
-    resources: [productionAgent.stepFunctionArn],
+    resources: [queryImagesStateMachineArn],
   })
 )
+
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ["s3:GetObject"],
+    resources: [
+        `arn:aws:s3:::${backend.storage.resources.bucket.bucketName}/*`
+    ],
+}),
+)
+
+//Set the lambda layers so the function can convert pdfs into images
+backend.productionAgentFunction.resources.cfnResources.cfnFunction.layers = [
+  ghostScriptLayer.layerVersionArn,
+  imageMagickLayer.layerVersionArn
+]

@@ -16,7 +16,6 @@ interface ProductionAgentProps {
     s3BucketName: string,
 }
 
-
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
@@ -163,7 +162,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
 
     return {
-        stepFunctionArn: queryImagesStateMachine.stateMachineArn
+        queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,
+        imageMagickLayer: imageMagickLayer,
+        ghostScriptLayer: ghostScriptLayer
     };
-
 }

@@ -6,6 +6,7 @@ export type ChatMessage = {
   __typename: "ChatMessage",
   chatSessionId?: string | null,
   content: string,
+  contentBlocks?: string | null,
   createdAt?: string | null,
   id: string,
   owner?: string | null,
@@ -28,7 +29,7 @@ export type ChatSession = {
   __typename: "ChatSession",
   aiBotInfo?: ChatSessionAiBotInfo | null,
   createdAt: string,
-  firstMessage?: string | null,
+  firstMessageSummary?: string | null,
   id: string,
   messages?: ModelChatMessageConnection | null,
   owner?: string | null,
@@ -69,6 +70,7 @@ export type ModelChatMessageFilterInput = {
   and?: Array< ModelChatMessageFilterInput | null > | null,
   chatSessionId?: ModelIDInput | null,
   content?: ModelStringInput | null,
+  contentBlocks?: ModelStringInput | null,
   createdAt?: ModelStringInput | null,
   id?: ModelIDInput | null,
   not?: ModelChatMessageFilterInput | null,
@@ -151,7 +153,7 @@ export enum ModelSortDirection {
 export type ModelChatSessionFilterInput = {
   and?: Array< ModelChatSessionFilterInput | null > | null,
   createdAt?: ModelStringInput | null,
-  firstMessage?: ModelStringInput | null,
+  firstMessageSummary?: ModelStringInput | null,
   id?: ModelIDInput | null,
   not?: ModelChatSessionFilterInput | null,
   or?: Array< ModelChatSessionFilterInput | null > | null,
@@ -169,6 +171,7 @@ export type ModelChatMessageConditionInput = {
   and?: Array< ModelChatMessageConditionInput | null > | null,
   chatSessionId?: ModelIDInput | null,
   content?: ModelStringInput | null,
+  contentBlocks?: ModelStringInput | null,
   createdAt?: ModelStringInput | null,
   not?: ModelChatMessageConditionInput | null,
   or?: Array< ModelChatMessageConditionInput | null > | null,
@@ -183,6 +186,7 @@ export type ModelChatMessageConditionInput = {
 export type CreateChatMessageInput = {
   chatSessionId?: string | null,
   content: string,
+  contentBlocks?: string | null,
   createdAt?: string | null,
   id?: string | null,
   owner?: string | null,
@@ -195,7 +199,7 @@ export type CreateChatMessageInput = {
 export type ModelChatSessionConditionInput = {
   and?: Array< ModelChatSessionConditionInput | null > | null,
   createdAt?: ModelStringInput | null,
-  firstMessage?: ModelStringInput | null,
+  firstMessageSummary?: ModelStringInput | null,
   not?: ModelChatSessionConditionInput | null,
   or?: Array< ModelChatSessionConditionInput | null > | null,
   owner?: ModelStringInput | null,
@@ -204,7 +208,7 @@ export type ModelChatSessionConditionInput = {
 
 export type CreateChatSessionInput = {
   aiBotInfo?: ChatSessionAiBotInfoInput | null,
-  firstMessage?: string | null,
+  firstMessageSummary?: string | null,
   id?: string | null,
 };
 
@@ -226,6 +230,7 @@ export type DeleteChatSessionInput = {
 export type UpdateChatMessageInput = {
   chatSessionId?: string | null,
   content?: string | null,
+  contentBlocks?: string | null,
   createdAt?: string | null,
   id: string,
   owner?: string | null,
@@ -237,7 +242,7 @@ export type UpdateChatMessageInput = {
 
 export type UpdateChatSessionInput = {
   aiBotInfo?: ChatSessionAiBotInfoInput | null,
-  firstMessage?: string | null,
+  firstMessageSummary?: string | null,
   id: string,
 };
 
@@ -245,6 +250,7 @@ export type ModelSubscriptionChatMessageFilterInput = {
   and?: Array< ModelSubscriptionChatMessageFilterInput | null > | null,
   chatSessionId?: ModelSubscriptionIDInput | null,
   content?: ModelSubscriptionStringInput | null,
+  contentBlocks?: ModelSubscriptionStringInput | null,
   createdAt?: ModelSubscriptionStringInput | null,
   id?: ModelSubscriptionIDInput | null,
   or?: Array< ModelSubscriptionChatMessageFilterInput | null > | null,
@@ -289,11 +295,21 @@ export type ModelSubscriptionStringInput = {
 export type ModelSubscriptionChatSessionFilterInput = {
   and?: Array< ModelSubscriptionChatSessionFilterInput | null > | null,
   createdAt?: ModelSubscriptionStringInput | null,
-  firstMessage?: ModelSubscriptionStringInput | null,
+  firstMessageSummary?: ModelSubscriptionStringInput | null,
   id?: ModelSubscriptionIDInput | null,
   or?: Array< ModelSubscriptionChatSessionFilterInput | null > | null,
   owner?: ModelStringInput | null,
   updatedAt?: ModelSubscriptionStringInput | null,
+};
+
+export type ConvertPdfToImagesAndAddMessagesQueryVariables = {
+  chatSessionId: string,
+  s3Key: string,
+  toolCallId: string,
+};
+
+export type ConvertPdfToImagesAndAddMessagesQuery = {
+  convertPdfToImagesAndAddMessages?: string | null,
 };
 
 export type GetChatMessageQueryVariables = {
@@ -305,6 +321,7 @@ export type GetChatMessageQuery = {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
     content: string,
+    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -312,7 +329,7 @@ export type GetChatMessageQuery = {
     session?:  {
       __typename: "ChatSession",
       createdAt: string,
-      firstMessage?: string | null,
+      firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
       updatedAt: string,
@@ -339,7 +356,7 @@ export type GetChatSessionQuery = {
       aiBotVersion?: string | null,
     } | null,
     createdAt: string,
-    firstMessage?: string | null,
+    firstMessageSummary?: string | null,
     id: string,
     messages?:  {
       __typename: "ModelChatMessageConnection",
@@ -348,6 +365,17 @@ export type GetChatSessionQuery = {
     owner?: string | null,
     updatedAt: string,
   } | null,
+};
+
+export type GetInfoFromPdfQueryVariables = {
+  dataToExclude?: string | null,
+  dataToInclude?: string | null,
+  s3Key: string,
+  tableColumns: string,
+};
+
+export type GetInfoFromPdfQuery = {
+  getInfoFromPdf?: string | null,
 };
 
 export type InvokeBedrockQueryVariables = {
@@ -381,6 +409,15 @@ export type InvokeBedrockWithStructuredOutputQueryVariables = {
 
 export type InvokeBedrockWithStructuredOutputQuery = {
   invokeBedrockWithStructuredOutput?: string | null,
+};
+
+export type InvokeProductionAgentQueryVariables = {
+  chatSessionId?: string | null,
+  input: string,
+};
+
+export type InvokeProductionAgentQuery = {
+  invokeProductionAgent?: string | null,
 };
 
 export type ListBedrockAgentAliasIdsQueryVariables = {
@@ -422,6 +459,7 @@ export type ListChatMessageByChatSessionIdAndCreatedAtQuery = {
       __typename: "ChatMessage",
       chatSessionId?: string | null,
       content: string,
+      contentBlocks?: string | null,
       createdAt?: string | null,
       id: string,
       owner?: string | null,
@@ -448,6 +486,7 @@ export type ListChatMessagesQuery = {
       __typename: "ChatMessage",
       chatSessionId?: string | null,
       content: string,
+      contentBlocks?: string | null,
       createdAt?: string | null,
       id: string,
       owner?: string | null,
@@ -473,7 +512,7 @@ export type ListChatSessionsQuery = {
     items:  Array< {
       __typename: "ChatSession",
       createdAt: string,
-      firstMessage?: string | null,
+      firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
       updatedAt: string,
@@ -492,6 +531,7 @@ export type CreateChatMessageMutation = {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
     content: string,
+    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -499,7 +539,7 @@ export type CreateChatMessageMutation = {
     session?:  {
       __typename: "ChatSession",
       createdAt: string,
-      firstMessage?: string | null,
+      firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
       updatedAt: string,
@@ -527,7 +567,7 @@ export type CreateChatSessionMutation = {
       aiBotVersion?: string | null,
     } | null,
     createdAt: string,
-    firstMessage?: string | null,
+    firstMessageSummary?: string | null,
     id: string,
     messages?:  {
       __typename: "ModelChatMessageConnection",
@@ -548,6 +588,7 @@ export type DeleteChatMessageMutation = {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
     content: string,
+    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -555,7 +596,7 @@ export type DeleteChatMessageMutation = {
     session?:  {
       __typename: "ChatSession",
       createdAt: string,
-      firstMessage?: string | null,
+      firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
       updatedAt: string,
@@ -583,7 +624,7 @@ export type DeleteChatSessionMutation = {
       aiBotVersion?: string | null,
     } | null,
     createdAt: string,
-    firstMessage?: string | null,
+    firstMessageSummary?: string | null,
     id: string,
     messages?:  {
       __typename: "ModelChatMessageConnection",
@@ -604,6 +645,7 @@ export type UpdateChatMessageMutation = {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
     content: string,
+    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -611,7 +653,7 @@ export type UpdateChatMessageMutation = {
     session?:  {
       __typename: "ChatSession",
       createdAt: string,
-      firstMessage?: string | null,
+      firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
       updatedAt: string,
@@ -639,7 +681,7 @@ export type UpdateChatSessionMutation = {
       aiBotVersion?: string | null,
     } | null,
     createdAt: string,
-    firstMessage?: string | null,
+    firstMessageSummary?: string | null,
     id: string,
     messages?:  {
       __typename: "ModelChatMessageConnection",
@@ -660,6 +702,7 @@ export type OnCreateChatMessageSubscription = {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
     content: string,
+    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -667,7 +710,7 @@ export type OnCreateChatMessageSubscription = {
     session?:  {
       __typename: "ChatSession",
       createdAt: string,
-      firstMessage?: string | null,
+      firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
       updatedAt: string,
@@ -695,7 +738,7 @@ export type OnCreateChatSessionSubscription = {
       aiBotVersion?: string | null,
     } | null,
     createdAt: string,
-    firstMessage?: string | null,
+    firstMessageSummary?: string | null,
     id: string,
     messages?:  {
       __typename: "ModelChatMessageConnection",
@@ -716,6 +759,7 @@ export type OnDeleteChatMessageSubscription = {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
     content: string,
+    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -723,7 +767,7 @@ export type OnDeleteChatMessageSubscription = {
     session?:  {
       __typename: "ChatSession",
       createdAt: string,
-      firstMessage?: string | null,
+      firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
       updatedAt: string,
@@ -751,7 +795,7 @@ export type OnDeleteChatSessionSubscription = {
       aiBotVersion?: string | null,
     } | null,
     createdAt: string,
-    firstMessage?: string | null,
+    firstMessageSummary?: string | null,
     id: string,
     messages?:  {
       __typename: "ModelChatMessageConnection",
@@ -772,6 +816,7 @@ export type OnUpdateChatMessageSubscription = {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
     content: string,
+    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -779,7 +824,7 @@ export type OnUpdateChatMessageSubscription = {
     session?:  {
       __typename: "ChatSession",
       createdAt: string,
-      firstMessage?: string | null,
+      firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
       updatedAt: string,
@@ -807,7 +852,7 @@ export type OnUpdateChatSessionSubscription = {
       aiBotVersion?: string | null,
     } | null,
     createdAt: string,
-    firstMessage?: string | null,
+    firstMessageSummary?: string | null,
     id: string,
     messages?:  {
       __typename: "ModelChatMessageConnection",

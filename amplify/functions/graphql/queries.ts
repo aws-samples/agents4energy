@@ -8,17 +8,33 @@ type GeneratedQuery<InputType, OutputType> = string & {
   __generatedQueryOutput: OutputType;
 };
 
+export const convertPdfToImagesAndAddMessages = /* GraphQL */ `query ConvertPdfToImagesAndAddMessages(
+  $chatSessionId: String!
+  $s3Key: String!
+  $toolCallId: String!
+) {
+  convertPdfToImagesAndAddMessages(
+    chatSessionId: $chatSessionId
+    s3Key: $s3Key
+    toolCallId: $toolCallId
+  )
+}
+` as GeneratedQuery<
+  APITypes.ConvertPdfToImagesAndAddMessagesQueryVariables,
+  APITypes.ConvertPdfToImagesAndAddMessagesQuery
+>;
 export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
   getChatMessage(id: $id) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -45,7 +61,7 @@ export const getChatSession = /* GraphQL */ `query GetChatSession($id: ID!) {
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken
@@ -59,6 +75,23 @@ export const getChatSession = /* GraphQL */ `query GetChatSession($id: ID!) {
 ` as GeneratedQuery<
   APITypes.GetChatSessionQueryVariables,
   APITypes.GetChatSessionQuery
+>;
+export const getInfoFromPdf = /* GraphQL */ `query GetInfoFromPdf(
+  $dataToExclude: AWSJSON
+  $dataToInclude: AWSJSON
+  $s3Key: String!
+  $tableColumns: AWSJSON!
+) {
+  getInfoFromPdf(
+    dataToExclude: $dataToExclude
+    dataToInclude: $dataToInclude
+    s3Key: $s3Key
+    tableColumns: $tableColumns
+  )
+}
+` as GeneratedQuery<
+  APITypes.GetInfoFromPdfQueryVariables,
+  APITypes.GetInfoFromPdfQuery
 >;
 export const invokeBedrock = /* GraphQL */ `query InvokeBedrock($prompt: String) {
   invokeBedrock(prompt: $prompt) {
@@ -103,6 +136,13 @@ export const invokeBedrockWithStructuredOutput = /* GraphQL */ `query InvokeBedr
   APITypes.InvokeBedrockWithStructuredOutputQueryVariables,
   APITypes.InvokeBedrockWithStructuredOutputQuery
 >;
+export const invokeProductionAgent = /* GraphQL */ `query InvokeProductionAgent($chatSessionId: String, $input: String!) {
+  invokeProductionAgent(chatSessionId: $chatSessionId, input: $input)
+}
+` as GeneratedQuery<
+  APITypes.InvokeProductionAgentQueryVariables,
+  APITypes.InvokeProductionAgentQuery
+>;
 export const listBedrockAgentAliasIds = /* GraphQL */ `query ListBedrockAgentAliasIds($agentId: String) {
   listBedrockAgentAliasIds(agentId: $agentId) {
     body
@@ -144,6 +184,7 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
     items {
       chatSessionId
       content
+      contentBlocks
       createdAt
       id
       owner
@@ -171,6 +212,7 @@ export const listChatMessages = /* GraphQL */ `query ListChatMessages(
     items {
       chatSessionId
       content
+      contentBlocks
       createdAt
       id
       owner
@@ -197,7 +239,7 @@ export const listChatSessions = /* GraphQL */ `query ListChatSessions(
   listChatSessions(filter: $filter, limit: $limit, nextToken: $nextToken) {
     items {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt

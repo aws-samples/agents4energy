@@ -2,6 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
 import { env } from '$amplify/env/production-agent-function'; // replace with your function name
+import { convertPdfToB64Strings } from '../utils/pdfUtils'
 
 const calculatorSchema = z.object({
     operation: z
@@ -156,3 +157,51 @@ export const wellTableTool = tool(
         schema: wellTableSchema,
     }
 );
+
+
+const convertPdfToImageSchema = z.object({
+    s3Key: z.string().describe("The S3 key of the PDF file to convert."),
+});
+
+export const buildConvertPdfToImageTool = (props: {s3BucketName: string}) => tool(
+    async ({ s3Key }) => {
+        const pdfImageStrings = await convertPdfToB64Strings({
+            s3BucketName: props.s3BucketName,
+            s3Key: s3Key,
+        })
+        const imageMessaggeContentBlocks = pdfImageStrings.map((imageB64String) => {
+            return {
+                type: "image_url",
+                image_url: {
+                    url: `data:image/png;base64,${imageB64String}`,
+                },
+            }
+        })
+        return imageMessaggeContentBlocks
+    },
+    {
+        name: "convertPdfToImage",
+        description: "Can convert a pdf stored in s3 into image messages",
+        schema: convertPdfToImageSchema,
+    }
+);
+
+// export const buildConvertPdfToImageTool = (amplifyClientWrapper: typeof generateAmplifyClientWrapper, maxImagesPerMessage = 20) => tool(
+//     async ({ s3Key }) => {
+//         const pdfImageStrings = await convertPdfToB64Strings(s3Key)
+//         const imageMessaggeContentBlocks = pdfImageStrings.map((imageB64String) => {
+//             return {
+//                 type: "image_url",
+//                 image_url: {
+//                     url: `data:image/png;base64,${imageB64String}`,
+//                 },
+//             }
+//         })
+//         return imageMessaggeContentBlocks
+//     },
+//     {
+//         name: "convertPdfToImage",
+//         description: "Can convert a pdf stored in s3 into image messages",
+//         schema: convertPdfToImageSchema,
+//     }
+// );
