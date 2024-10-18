@@ -8,20 +8,12 @@ type GeneratedQuery<InputType, OutputType> = string & {
   __generatedQueryOutput: OutputType;
 };
 
-export const convertPdfToImagesAndAddMessages = /* GraphQL */ `query ConvertPdfToImagesAndAddMessages(
-  $chatSessionId: String!
-  $s3Key: String!
-  $toolCallId: String!
-) {
-  convertPdfToImagesAndAddMessages(
-    chatSessionId: $chatSessionId
-    s3Key: $s3Key
-    toolCallId: $toolCallId
-  )
+export const convertPdfToImages = /* GraphQL */ `query ConvertPdfToImages($s3Key: String!) {
+  convertPdfToImages(s3Key: $s3Key)
 }
 ` as GeneratedQuery<
-  APITypes.ConvertPdfToImagesAndAddMessagesQueryVariables,
-  APITypes.ConvertPdfToImagesAndAddMessagesQuery
+  APITypes.ConvertPdfToImagesQueryVariables,
+  APITypes.ConvertPdfToImagesQuery
 >;
 export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
   getChatMessage(id: $id) {

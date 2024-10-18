@@ -302,14 +302,12 @@ export type ModelSubscriptionChatSessionFilterInput = {
   updatedAt?: ModelSubscriptionStringInput | null,
 };
 
-export type ConvertPdfToImagesAndAddMessagesQueryVariables = {
-  chatSessionId: string,
+export type ConvertPdfToImagesQueryVariables = {
   s3Key: string,
-  toolCallId: string,
 };
 
-export type ConvertPdfToImagesAndAddMessagesQuery = {
-  convertPdfToImagesAndAddMessages?: string | null,
+export type ConvertPdfToImagesQuery = {
+  convertPdfToImages?: string | null,
 };
 
 export type GetChatMessageQueryVariables = {

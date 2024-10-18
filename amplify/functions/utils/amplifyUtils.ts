@@ -1,10 +1,12 @@
 import { Amplify } from 'aws-amplify';
-import { generateClient, Client } from 'aws-amplify/data';
+import { generateClient } from 'aws-amplify/data';
 import * as APITypes from "../graphql/API";
 import { listChatMessageByChatSessionIdAndCreatedAt } from "../graphql/queries"
 import { Schema } from '../../data/resource';
 
 import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText, MessageContentImageUrl } from "@langchain/core/messages";
+
+import { convertPdfToImages, getInfoFromPdf, listBedrockAgents } from '../graphql/queries'
 
 export function generateAmplifyClientWrapper(env: any) {
     Amplify.configure(
@@ -22,6 +24,9 @@ export function generateAmplifyClientWrapper(env: any) {
                 credentialsProvider: {
                     getCredentialsAndIdentityId: async () => ({
                         credentials: {
+                            // accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+                            // secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+                            // sessionToken: process.env.AWS_SESSION_TOKEN || "",
                             accessKeyId: env.AWS_ACCESS_KEY_ID,
                             secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
                             sessionToken: env.AWS_SESSION_TOKEN,
@@ -75,6 +80,8 @@ export function generateAmplifyClientWrapper(env: any) {
 
         if (message instanceof ToolMessage) {
             messageTextContent += `Tool Response (${message.name}): \n\n`
+            console.log('Tool message: ', message)
+            console.log('Tool message content type: ', typeof message.content)
         }
 
         if (typeof message.content === 'string') {
@@ -100,7 +107,7 @@ export function generateAmplifyClientWrapper(env: any) {
         let input: APITypes.CreateChatMessageInput = {
             chatSessionId: props.chatSessionId,
             content: messageTextContent || "AI Message:\n",
-            contentBlocks: JSON.stringify(props.message.content),
+            // contentBlocks: JSON.stringify(props.message.content), //The images are too big for DDB error:  ValidationException: The model returned the following errors: Input is too long for requested model.
             owner: props.owner,
             tool_calls: "[]",
             tool_call_id: "",
@@ -119,6 +126,8 @@ export function generateAmplifyClientWrapper(env: any) {
                 tool_name: props.message.name || 'no tool name supplied'
             }
         }
+
+        console.log('Publishing mesage with input: ', input)
 
         await amplifyClient.graphql({
             query: createChatMessage,
@@ -166,20 +175,20 @@ export function generateAmplifyClientWrapper(env: any) {
                     content: message.content,
                 })
             } else if (message.role === 'ai') {
-                if (!message.contentBlocks) throw new Error(`No contentBlocks in message: ${message}`);
+                // if (!message.contentBlocks) throw new Error(`No contentBlocks in message: ${message}`);
                 return new AIMessage({
-                    // content: [{
-                    //     type: 'text',
-                    //     text: message.content
-                    // }],
-                    content: JSON.parse(message.contentBlocks),
+                    content: [{
+                        type: 'text',
+                        text: message.content
+                    }],
+                    // content: JSON.parse(message.contentBlocks),
                     tool_calls: JSON.parse(message.tool_calls || '[]')
                 })
             } else {
-                if (!message.contentBlocks) throw new Error(`No contentBlocks in message: ${message}`);
+                // if (!message.contentBlocks) throw new Error(`No contentBlocks in message: ${message}`);
                 return new ToolMessage({
-                    // content: message.content,
-                    content: JSON.parse(message.contentBlocks),
+                    content: message.content,
+                    // content: JSON.parse(message.contentBlocks),
                     tool_call_id: message.tool_call_id || "",
                     name: message.tool_name || ""
                 })
@@ -205,10 +214,22 @@ export function generateAmplifyClientWrapper(env: any) {
         return messages
     }
 
+    async function testFunction(props: {chatSessionId: string, latestHumanMessageText: string }) {
+        const convertPdfToImagesResponse = await amplifyClient.graphql({
+            query: convertPdfToImages,
+            variables: {
+                s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf"
+            }
+        })
+        return JSON.parse(convertPdfToImagesResponse.data.convertPdfToImages || "").imageMessaggeContentBlocks
+    }
+    
+
     return {
         amplifyClient: amplifyClient,
         getChatMessageHistory: getChatMessageHistory,
-        publishMessage: publishMessage
+        publishMessage: publishMessage,
+        testFunction: testFunction
     };
 
 }

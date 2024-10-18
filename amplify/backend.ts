@@ -3,13 +3,13 @@ import { fileURLToPath } from 'url';
 
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
-import { 
-  data, 
-  invokeBedrockAgentFunction, 
-  getStructuredOutputFromLangchainFunction, 
+import {
+  data,
+  invokeBedrockAgentFunction,
+  getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
   // convertPdfToImagesAndAddMessagesFunction
- } from './data/resource';
+} from './data/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
@@ -128,8 +128,6 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
   })
 )
 
-
-
 function applyTagsToRootStack(targetStack: cdk.Stack) {
   const rootStack = cdk.Stack.of(targetStack).nestedStackParent
   if (!rootStack) throw new Error('Root stack not found')
@@ -152,7 +150,7 @@ const fileDeployment = new s3Deployment.BucketDeployment(customStack, 'test-file
   // destinationKeyPrefix: '/'
 });
 
-const { queryImagesStateMachineArn, ghostScriptLayer, imageMagickLayer} = productionAgentBuilder(customStack, {
+const { queryImagesStateMachineArn, ghostScriptLayer, imageMagickLayer, getInfoFromPdfFunction, convertPdfToImagesFunction } = productionAgentBuilder(customStack, {
   s3BucketName: backend.storage.resources.bucket.bucketName
 })
 
@@ -181,13 +179,47 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["s3:GetObject"],
     resources: [
-        `arn:aws:s3:::${backend.storage.resources.bucket.bucketName}/*`
+      `arn:aws:s3:::${backend.storage.resources.bucket.bucketName}/*`
     ],
-}),
+  }),
 )
 
-//Set the lambda layers so the function can convert pdfs into images
-backend.productionAgentFunction.resources.cfnResources.cfnFunction.layers = [
-  ghostScriptLayer.layerVersionArn,
-  imageMagickLayer.layerVersionArn
-]
+//Create data sources and resolvers for the lambdas created in the production agent stack
+const convertPdfToImageDS = backend.data.addLambdaDataSource(
+  'convertPdfToImageDS',
+  getInfoFromPdfFunction
+)
+
+convertPdfToImageDS.createResolver(
+  'getInfoFromPdfResolver',
+  {
+    typeName: 'Query',
+    fieldName: 'getInfoFromPdf'
+  }
+)
+
+const convertPdfToImagesFunctionDS = backend.data.addLambdaDataSource(
+  'convertPdfToImagesFunctionDS',
+  convertPdfToImagesFunction
+)
+
+convertPdfToImagesFunctionDS.createResolver(
+  'convertPdfToImageFunctionResolver',
+  {
+    typeName: 'Query',
+    fieldName: 'convertPdfToImages',
+  }
+)
+
+
+
+// //Grant the productionAgentFunction access to these new queries
+// backend.data.resources.graphqlApi.grantQuery(backend.productionAgentFunction.resources.lambda)
+
+//Give the invokeProducitonAgent function access to call these resolvers
+
+// //Set the lambda layers so the function can convert pdfs into images
+// backend.productionAgentFunction.resources.cfnResources.cfnFunction.layers = [
+//   ghostScriptLayer.layerVersionArn,
+//   imageMagickLayer.layerVersionArn
+// ]

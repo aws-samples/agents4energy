@@ -24,7 +24,8 @@ export const productionAgentFunction = defineFunction({
   environment: {
     // MODEL_ID: 'anthropic.claude-3-5-sonnet-20240620-v1:0'
     MODEL_ID: 'anthropic.claude-3-sonnet-20240229-v1:0'
-  }
+  },
+  runtime: 20
 });
 
 // export const convertPdfToImagesAndAddMessagesFunction = defineFunction({
@@ -83,7 +84,7 @@ const schema = a.schema({
   listBedrockAgents: a
     .query()
     .returns(a.ref("BedrockResponse"))
-    .authorization(allow => allow.authenticated())
+    .authorization(allow => [allow.authenticated()])
     .handler(
       a.handler.custom({ entry: "./listBedrockAgents.js", dataSource: "bedrockAgentDS" })
     ),
@@ -134,15 +135,20 @@ const schema = a.schema({
       dataToInclude: a.json()
     })
     .returns(a.json()),
-  
-  convertPdfToImagesAndAddMessages: a
+  // .authorization(allow => allow.authenticated())
+  // .handler(
+  //   a.handler.
+  // ),
+
+  convertPdfToImages: a
     .query()
     .arguments({
-      s3Key: a.string().required(),
-      toolCallId: a.string().required(),
-      chatSessionId: a.string().required(),
+      s3Key: a.string().required()
     })
     .returns(a.json())
+    // .authorization(allow => [allow.authenticated()])
+  ,
+  // .authorization(allow => allow.authenticated()),
 
 }).authorization(allow => [
   allow.resource(getStructuredOutputFromLangchainFunction),

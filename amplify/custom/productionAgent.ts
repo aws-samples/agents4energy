@@ -97,6 +97,27 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         layers: [imageMagickLayer, ghostScriptLayer]
     });
 
+    const convertPdfToImagesFunction = new NodejsFunction(scope, 'ConvertPdfToImageFunction', {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        entry: path.join(__dirname, '..', 'functions', 'convertPdfToImages', 'index.ts'),
+        bundling: {
+            format: OutputFormat.CJS,
+            loader: {
+                '.node': 'file',
+            },
+            bundleAwsSDK: true,
+            minify: true,
+            sourceMap: true,
+        },
+        timeout: cdk.Duration.minutes(15),
+        memorySize: 3000,
+        role: queryReportsLambdaRole,
+        environment: {
+            'DATA_BUCKET_NAME': props.s3BucketName,
+        },
+        layers: [imageMagickLayer, ghostScriptLayer]
+    });
+
     // Create a Step Functions state machine
     const queryImagesStateMachine = new sfn.StateMachine(scope, 'QueryReportImagesStateMachine', {
         timeout: cdk.Duration.minutes(15),
@@ -164,6 +185,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     return {
         queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,
         imageMagickLayer: imageMagickLayer,
-        ghostScriptLayer: ghostScriptLayer
+        ghostScriptLayer: ghostScriptLayer,
+        getInfoFromPdfFunction: queryReportImageLambda,
+        convertPdfToImagesFunction: convertPdfToImagesFunction
     };
 }
