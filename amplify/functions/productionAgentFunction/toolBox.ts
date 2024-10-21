@@ -68,7 +68,7 @@ export const convertPdfToJsonTool = tool(
     },
     {
         name: "convertPdfToYaml",
-        description: "Can convert a pdf stored in s3 into a YAML object. Use it to see the contents of a pdf file.",
+        description: "Can convert a pdf stored in s3 into a YAML object. Use it to get details about a specific file.",
         schema: convertPdfToYamlSchema,
     }
 );
@@ -192,7 +192,7 @@ export const wellTableTool = tool(
     },
     {
         name: "wellTableTool",
-        description: "Can extract tabular information about a well",
+        description: "This tool produces tabular information about a well.",
         schema: wellTableSchema,
     }
 );
