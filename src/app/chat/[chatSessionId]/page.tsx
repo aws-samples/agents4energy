@@ -186,11 +186,13 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 if (chatSession) {
                     setActiveChatSession(chatSession)
 
-                    if (
-                        chatSession.aiBotInfo && 
-                        chatSession.aiBotInfo.aiBotId && 
-                        chatSession.aiBotInfo.aiBotId in defaultAgents
-                    ) setSuggestedPromptes(defaultAgents[chatSession.aiBotInfo.aiBotId].samplePrompts)
+                    console.log('Loaded chat session. Ai Bot Info:\n', chatSession.aiBotInfo)
+
+                    // if (
+                    //     chatSession.aiBotInfo && 
+                    //     chatSession.aiBotInfo.aiBotId && 
+                    //     chatSession.aiBotInfo.aiBotId in defaultAgents
+                    // ) setSuggestedPromptes(defaultAgents[chatSession.aiBotInfo.aiBotId].samplePrompts)
 
                 } else {
                     console.log(`Chat session ${params.chatSessionId} not found`)
@@ -244,7 +246,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     // List the user's chat sessions
     useEffect(() => {
-        console.log("user: ", user)
         if (user) {
             amplifyClient.models.ChatSession.observeQuery({
                 filter: {
@@ -396,7 +397,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                         key={agent.agentName}
                                         onClick={async () => {
                                             // const agentAliasId = agent.agentId ? await getAgentAliasId(agent.agentId) : null//If the agent is not a bedrock agent then don't get the alias ID
-                                            const agentAliasId = agent.agentId && !(agent.agentId || "" in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
+                                            const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
                                             createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
                                         }}
                                     >
