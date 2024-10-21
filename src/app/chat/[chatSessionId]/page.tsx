@@ -186,7 +186,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 if (chatSession) {
                     setActiveChatSession(chatSession)
 
-                    console.log('Loaded chat session. Ai Bot Info:\n', chatSession.aiBotInfo)
+                    console.log('Loaded chat session. Ai Bot Info:', chatSession.aiBotInfo)
 
                     // if (
                     //     chatSession.aiBotInfo && 
