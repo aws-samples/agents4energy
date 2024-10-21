@@ -150,13 +150,15 @@ const fileDeployment = new s3Deployment.BucketDeployment(customStack, 'test-file
   // destinationKeyPrefix: '/'
 });
 
-const { queryImagesStateMachineArn, ghostScriptLayer, imageMagickLayer, getInfoFromPdfFunction, convertPdfToImagesFunction } = productionAgentBuilder(customStack, {
+const { queryImagesStateMachineArn, ghostScriptLayer, imageMagickLayer, getInfoFromPdfFunction, convertPdfToYAMLFunction } = productionAgentBuilder(customStack, {
   s3BucketName: backend.storage.resources.bucket.bucketName
 })
 
-backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)// productionAgent.stepFunctionArn)
-backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)// productionAgent.stepFunctionArn)
+backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
+backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
+backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_YAML_LAMBDA_ARN', convertPdfToYAMLFunction.functionArn)
 
+convertPdfToYAMLFunction
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["bedrock:InvokeModel"],
@@ -184,6 +186,15 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   }),
 )
 
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ["lambda:InvokeFunction"],
+    resources: [
+      convertPdfToYAMLFunction.functionArn
+    ],
+  }),
+)
+
 //Create data sources and resolvers for the lambdas created in the production agent stack
 const convertPdfToImageDS = backend.data.addLambdaDataSource(
   'convertPdfToImageDS',
@@ -198,25 +209,21 @@ convertPdfToImageDS.createResolver(
   }
 )
 
-const convertPdfToImagesFunctionDS = backend.data.addLambdaDataSource(
+const convertPdfToYAMLFunctionDS = backend.data.addLambdaDataSource(
   'convertPdfToImagesFunctionDS',
-  convertPdfToImagesFunction
+  convertPdfToYAMLFunction
 )
 
-convertPdfToImagesFunctionDS.createResolver(
-  'convertPdfToImageFunctionResolver',
+convertPdfToYAMLFunctionDS.createResolver(
+  'convertPdfToYAMLFunctionResolver',
   {
     typeName: 'Query',
-    fieldName: 'convertPdfToImages',
+    fieldName: 'convertPdfToYAML',
   }
 )
 
 
-
-// //Grant the productionAgentFunction access to these new queries
-// backend.data.resources.graphqlApi.grantQuery(backend.productionAgentFunction.resources.lambda)
-
-//Give the invokeProducitonAgent function access to call these resolvers
+// if (backend.productionAgentFunction.resources.lambda.role) convertPdfToYAMLFunction.grantInvoke(backend.productionAgentFunction.resources.lambda.role)
 
 // //Set the lambda layers so the function can convert pdfs into images
 // backend.productionAgentFunction.resources.cfnResources.cfnFunction.layers = [

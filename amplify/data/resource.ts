@@ -1,4 +1,5 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { DerivedCombinedSchema } from '@aws-amplify/data-schema-types'; 
 import { defineFunction } from '@aws-amplify/backend';
 
 export const invokeBedrockAgentFunction = defineFunction({
@@ -35,6 +36,7 @@ export const productionAgentFunction = defineFunction({
 // });
 
 const schema = a.schema({
+
   BedrockResponse: a.customType({
     body: a.string(),
     error: a.string(),
@@ -140,7 +142,7 @@ const schema = a.schema({
   //   a.handler.
   // ),
 
-  convertPdfToImages: a
+  convertPdfToYAML: a
     .query()
     .arguments({
       s3Key: a.string().required()
@@ -150,16 +152,18 @@ const schema = a.schema({
   ,
   // .authorization(allow => allow.authenticated()),
 
+
 }).authorization(allow => [
   allow.resource(getStructuredOutputFromLangchainFunction),
   allow.resource(productionAgentFunction),
   // allow.resource(convertPdfToImagesAndAddMessagesFunction)
-]);;
+]);
 
 export type Schema = ClientSchema<typeof schema>;
 
+// https://aws-amplify.github.io/amplify-backend/functions/_aws_amplify_backend.defineData.html
 export const data = defineData({
-  schema,
+  schema: {schemas: [schema]},
   authorizationModes: {
     defaultAuthorizationMode: 'userPool',
     apiKeyAuthorizationMode: {

@@ -4,15 +4,13 @@ import { env } from '$amplify/env/production-agent-function';
 import { ChatBedrockConverse } from "@langchain/aws";
 import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { calculatorTool, wellTableTool, convertPdfToImageTool } from './toolBox';
+import { calculatorTool, wellTableTool, convertPdfToJsonTool } from './toolBox';
 import { generateAmplifyClientWrapper } from '../utils/amplifyUtils'
-
-import { convertPdfToImages, getInfoFromPdf, listBedrockAgents } from '../graphql/queries'
 
 const amplifyClientWrapper = generateAmplifyClientWrapper(env)
 
 // Define the tools for the agent to use
-const agentTools = [calculatorTool, wellTableTool, convertPdfToImageTool];
+const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool];
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
 
@@ -27,33 +25,6 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
     try {
         
-        // console.log("test get images of pdf")
-
-        // const convertPdfToImagesResponse = await amplifyClientWrapper.testFunction({
-        //     chatSessionId: event.arguments.chatSessionId,
-        //     latestHumanMessageText: event.arguments.input
-        // })
-        // console.log('convertPdfToImagesResponse: ', convertPdfToImagesResponse)
-
-        // // const convertPdfToImagesResponse = await amplifyClientWrapper.amplifyClient.graphql({
-        // //     query: listBedrockAgents,
-        // //     variables: {
-        // //         s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf",
-        // //         tableColumns: "[{\"columnName\": \"date\", \"columnDescription\":\"Date of the operation\"}]",
-        // //         dataToExclude:"[\"astronauts\"]",
-        // //         dataToInclude: "[\"ops\"]"
-        // //     }
-        // // })
-
-        // // const convertPdfToImagesResponse = await amplifyClientWrapper.amplifyClient.graphql({
-        // //     query: convertPdfToImages,
-        // //     variables: {
-        // //         s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf"
-        // //     }
-        // // })
-        
-        // console.log('convertPdfToImagesResponse: ', convertPdfToImagesResponse)
-
         const messages = await amplifyClientWrapper.getChatMessageHistory({
             chatSessionId: event.arguments.chatSessionId,
             latestHumanMessageText: event.arguments.input
@@ -90,24 +61,6 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                     message: newMessage
                 })
             }
-
-            // Maybe its ok to just pass the image from the tool to the agent without persisting the image in the message?
-            // //If the message is a tool message with a s3Key, convert it to an image and add it to the tool message
-            // agent.getState({})
-            // agent.updateState({},{
-
-            // })
-            // //If the message is a tool message with a s3Key, convert it to an image and add it to the tool message
-            // if (newMessage instanceof ToolMessage && newMessage.content.s3Key) {
-            //     const convertPdfToImagesResponse = await amplifyClientWrapper.amplifyClient.graphql({
-            //         query: convertPdfToImages,
-            //         variables: {
-            //             s3Key: newMessage.content.s3Key
-            //         }
-            //     })
-            //     console.log('convertPdfToImagesResponse: ', convertPdfToImagesResponse)
-            //     newMessage.content.images = convertPdfToImagesResponse.data.convertPdfToImages
-            // }
             
         }
         return "Invocation Successful!";

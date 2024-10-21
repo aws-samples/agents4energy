@@ -97,9 +97,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         layers: [imageMagickLayer, ghostScriptLayer]
     });
 
-    const convertPdfToImagesFunction = new NodejsFunction(scope, 'ConvertPdfToImageFunction', {
+    const convertPdfToYAMLFunction = new NodejsFunction(scope, 'ConvertPdfToImageFunction', {
         runtime: lambda.Runtime.NODEJS_20_X,
-        entry: path.join(__dirname, '..', 'functions', 'convertPdfToImages', 'index.ts'),
+        entry: path.join(__dirname, '..', 'functions', 'convertPdfToYAML', 'index.ts'),
         bundling: {
             format: OutputFormat.CJS,
             loader: {
@@ -187,6 +187,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         imageMagickLayer: imageMagickLayer,
         ghostScriptLayer: ghostScriptLayer,
         getInfoFromPdfFunction: queryReportImageLambda,
-        convertPdfToImagesFunction: convertPdfToImagesFunction
+        convertPdfToYAMLFunction: convertPdfToYAMLFunction
     };
 }

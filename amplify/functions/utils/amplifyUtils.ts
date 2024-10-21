@@ -8,6 +8,35 @@ import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText, 
 
 import { convertPdfToImages, getInfoFromPdf, listBedrockAgents } from '../graphql/queries'
 
+export function getLangChainMessageTextContent(message: HumanMessage | AIMessage | ToolMessage): string | void {
+    // console.log('message type: ', message._getType())
+    // console.log('Content type: ', typeof message.content)
+    // console.log('(message.content[0] as MessageContentText).text', (message.content[0] as MessageContentText).text)
+
+    let messageTextContent: string = ''
+
+
+    // if (message instanceof ToolMessage) {
+    //     messageTextContent += `Tool Response (${message.name}): \n\n`
+    //     console.log('Tool message: ', message)
+    //     console.log('Tool message content type: ', typeof message.content)
+    // }
+
+    if (typeof message.content === 'string') {
+        messageTextContent += message.content
+        // } else if ((message.content[0] as MessageContentText).text !== undefined) {
+        //     messageTextContent += (message.content[0] as MessageContentText).text
+    } else {
+        message.content.forEach((contentBlock) => {
+            if ((contentBlock as MessageContentText).text !== undefined) messageTextContent += (contentBlock as MessageContentText).text + '\n'
+            // else if ((contentBlock as MessageContentImageUrl).image_url !== undefined) messageContent += message.content.text !== undefined
+        })
+    }
+
+    return messageTextContent
+
+}
+
 export function generateAmplifyClientWrapper(env: any) {
     Amplify.configure(
         {
@@ -70,34 +99,7 @@ export function generateAmplifyClientWrapper(env: any) {
         APITypes.CreateChatMessageMutation
     >;
 
-    function getLangChainMessageTextContent(message: HumanMessage | AIMessage | ToolMessage): string | void {
-        // console.log('message type: ', message._getType())
-        // console.log('Content type: ', typeof message.content)
-        // console.log('(message.content[0] as MessageContentText).text', (message.content[0] as MessageContentText).text)
-
-        let messageTextContent: string = ''
-
-
-        if (message instanceof ToolMessage) {
-            messageTextContent += `Tool Response (${message.name}): \n\n`
-            console.log('Tool message: ', message)
-            console.log('Tool message content type: ', typeof message.content)
-        }
-
-        if (typeof message.content === 'string') {
-            messageTextContent += message.content
-            // } else if ((message.content[0] as MessageContentText).text !== undefined) {
-            //     messageTextContent += (message.content[0] as MessageContentText).text
-        } else {
-            message.content.forEach((contentBlock) => {
-                if ((contentBlock as MessageContentText).text !== undefined) messageTextContent += (contentBlock as MessageContentText).text + '\n'
-                // else if ((contentBlock as MessageContentImageUrl).image_url !== undefined) messageContent += message.content.text !== undefined
-            })
-        }
-
-        return messageTextContent
-
-    }
+    
 
     type PublishMessagePropsType = {chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage }
     async function publishMessage(props: PublishMessagePropsType) {

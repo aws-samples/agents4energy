@@ -1,11 +1,15 @@
 // import { Client } from 'aws-amplify/data';
+import { LambdaClient, InvokeCommand, InvokeCommandInput } from "@aws-sdk/client-lambda";
+
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
 import { env } from '$amplify/env/production-agent-function';
-// import { convertPdfToB64Strings } from '../utils/pdfUtils'
+
+import { convertPdfToB64Strings } from '../utils/pdfUtils'
 import { generateAmplifyClientWrapper } from '../utils/amplifyUtils'
 import { convertPdfToImages } from '../graphql/queries'
+
 
 const amplifyClientWrapper = generateAmplifyClientWrapper(env)
 
@@ -39,31 +43,33 @@ export const calculatorTool = tool(
     }
 );
 
-const convertPdfToImageSchema = z.object({
+const convertPdfToYamlSchema = z.object({
     s3Key: z.string().describe("The S3 key of the PDF file to convert."),
 });
 
-export const convertPdfToImageTool = tool(
+export const convertPdfToJsonTool = tool(
     async ({ s3Key }) => {
-        console.log(`Converting s3 key ${s3Key} into content blocks`)
+        const lambdaClient = new LambdaClient();
+        const params: InvokeCommandInput = {
+            FunctionName: env.CONVERT_PDF_TO_YAML_LAMBDA_ARN,
+            Payload: JSON.stringify({ arguments: {s3Key: s3Key} }),
+        };
+        const response = await lambdaClient.send(new InvokeCommand(params));
+        if (!response.Payload) throw new Error("No payload returned from Lambda")
 
-        const convertPdfToImagesResponse = await amplifyClientWrapper.amplifyClient.graphql({
-            query: convertPdfToImages,
-            variables: {
-                s3Key: s3Key
-            }
-        })
+        const jsonContent = JSON.parse(Buffer.from(response.Payload).toString())
+        console.log('Json Content: ', jsonContent)
 
-        console.log(`Converting s3 key ${s3Key} into content blocks response: `, convertPdfToImagesResponse)
+        // console.log(`Converting s3 key ${s3Key} into content blocks`)
+        
+        // const pdfImageBuffers = await convertPdfToB64Strings({s3BucketName: env.DATA_BUCKET_NAME, s3Key: s3Key})
 
-        const imageMessaggeContentBlocks = JSON.parse(convertPdfToImagesResponse.data.convertPdfToImages || "").imageMessaggeContentBlocks
-
-        return imageMessaggeContentBlocks
+        return jsonContent
     },
     {
-        name: "convertPdfToImage",
-        description: "Can convert a pdf stored in s3 into image messages. Use it to see the contents of a pdf file.",
-        schema: convertPdfToImageSchema,
+        name: "convertPdfToYaml",
+        description: "Can convert a pdf stored in s3 into a YAML object. Use it to see the contents of a pdf file.",
+        schema: convertPdfToYamlSchema,
     }
 );
 
@@ -127,7 +133,7 @@ export const wellTableTool = tool(
 
         //Add in the source and relevanceScore columns
         columnNames.push('includeScore')
-        columnNames.push('source')
+        columnNames.push('s3Key')
 
         // const numColumns = columnNames.length
         const tableRows = []
@@ -153,7 +159,7 @@ export const wellTableTool = tool(
                     const newRow: string[] = []
 
                     columnNames.forEach((key) => {
-                        if (key === 'source') {
+                        if (key === 's3Key') {
                             //Add the link the the s3 source
                             newRow.push(`[${s3ObjectResult.document_source_s3_key}](/files/${s3ObjectResult.document_source_s3_key})`)
                         }
