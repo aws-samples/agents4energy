@@ -3,17 +3,13 @@ import { DerivedCombinedSchema } from '@aws-amplify/data-schema-types';
 import { defineFunction } from '@aws-amplify/backend';
 
 export const invokeBedrockAgentFunction = defineFunction({
-  // optionally specify a name for the Function (defaults to directory name)
   name: 'invoke-bedrock-agent',
-  // optionally specify a path to your handler (defaults to "./handler.ts")
   entry: '../functions/invokeBedrockAgent.ts',
   timeoutSeconds: 120
 });
 
 export const getStructuredOutputFromLangchainFunction = defineFunction({
-  // optionally specify a name for the Function (defaults to directory name)
   name: 'get-structured-output',
-  // optionally specify a path to your handler (defaults to "./handler.ts")
   entry: '../functions/getStructuredOutputFromLangchain.ts',
   timeoutSeconds: 120
 });
@@ -42,6 +38,11 @@ const schema = a.schema({
     error: a.string(),
   }),
 
+  BedrockAgentResponse: a.customType({
+    completion: a.string(),
+    orchestrationTrace: a.string()
+  }),
+
   ChatSession: a
     .model({
       messages: a.hasMany("ChatMessage", "chatSessionId"),
@@ -62,6 +63,7 @@ const schema = a.schema({
       session: a.belongsTo("ChatSession", "chatSessionId"),
       content: a.string().required(),
       contentBlocks: a.json(),
+      trace: a.string(),
       role: a.enum(["human", "ai", "tool"]),
       owner: a.string(),
       createdAt: a.datetime(),
@@ -102,8 +104,8 @@ const schema = a.schema({
 
   invokeBedrockAgent: a
     .query()
-    .arguments({ prompt: a.string().required(), agentId: a.string().required(), agentAliasId: a.string().required(), sessionId: a.string().required() })
-    .returns(a.string())
+    .arguments({ prompt: a.string().required(), agentId: a.string().required(), agentAliasId: a.string().required(), chatSessionId: a.string().required() })
+    .returns(a.ref("BedrockAgentResponse"))
     .authorization(allow => allow.authenticated())
     .handler(
       a.handler.function(invokeBedrockAgentFunction)
@@ -156,7 +158,7 @@ const schema = a.schema({
 }).authorization(allow => [
   allow.resource(getStructuredOutputFromLangchainFunction),
   allow.resource(productionAgentFunction),
-  // allow.resource(convertPdfToImagesAndAddMessagesFunction)
+  allow.resource(invokeBedrockAgentFunction)
 ]);
 
 export type Schema = ClientSchema<typeof schema>;

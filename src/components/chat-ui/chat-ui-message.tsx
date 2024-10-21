@@ -185,6 +185,25 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             </div>
           ) : null
           }
+
+          {props.message.trace ? (
+            <div className={styles.btn_chabot_message_copy}>
+              <Popover
+                size="medium"
+                position="top"
+                triggerType="custom"
+                dismissButton={false}
+                content={
+                  <p>{props.message.trace}</p>
+                }
+              >
+                <Button>
+                  Chain Of Thought
+                </Button>
+              </Popover>
+            </div>
+          ) : null
+          }
           <>
             <strong>{formatDate(props.message.createdAt)}</strong>
             {props.message.tool_call_id ? (
@@ -195,10 +214,9 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             }
             {isValidJSON(props.message.content) ? (
               <div>
-                <strong>JSON:</strong>
                 <pre>{JSON.stringify(JSON.parse(props.message.content), null, 2)}</pre>
               </div>
-              
+
             ) : (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}

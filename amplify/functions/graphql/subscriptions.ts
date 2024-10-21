@@ -31,6 +31,7 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -90,6 +91,7 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -149,6 +151,7 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }

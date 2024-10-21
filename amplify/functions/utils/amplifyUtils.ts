@@ -6,7 +6,36 @@ import { Schema } from '../../data/resource';
 
 import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText, MessageContentImageUrl } from "@langchain/core/messages";
 
-import { convertPdfToImages, getInfoFromPdf, listBedrockAgents } from '../graphql/queries'
+// import { getInfoFromPdf, listBedrockAgents } from '../graphql/queries'
+
+// Create a GraphQL query for messages in the chat session
+type GeneratedMutation<InputType, OutputType> = string & {
+    __generatedMutationInput: InputType;
+    __generatedMutationOutput: OutputType;
+};
+export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
+$condition: ModelChatMessageConditionInput
+$input: CreateChatMessageInput!
+) {
+createChatMessage(condition: $condition, input: $input) {
+  role
+  chatSessionId
+  content
+  createdAt
+  id
+  owner
+  tool_call_id
+  tool_calls
+  tool_name
+  updatedAt
+  trace
+  __typename
+}
+}
+` as GeneratedMutation<
+    APITypes.CreateChatMessageMutationVariables,
+    APITypes.CreateChatMessageMutation
+>;
 
 export function getLangChainMessageTextContent(message: HumanMessage | AIMessage | ToolMessage): string | void {
     // console.log('message type: ', message._getType())
@@ -71,33 +100,7 @@ export function generateAmplifyClientWrapper(env: any) {
 
     const amplifyClient = generateClient<Schema>()
 
-    // Create a GraphQL query for messages in the chat session
-    type GeneratedMutation<InputType, OutputType> = string & {
-        __generatedMutationInput: InputType;
-        __generatedMutationOutput: OutputType;
-    };
-    const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
-    $condition: ModelChatMessageConditionInput
-    $input: CreateChatMessageInput!
-  ) {
-    createChatMessage(condition: $condition, input: $input) {
-      role
-      chatSessionId
-      content
-      createdAt
-      id
-      owner
-      tool_call_id
-      tool_calls
-      tool_name
-      updatedAt
-      __typename
-    }
-  }
-  ` as GeneratedMutation<
-        APITypes.CreateChatMessageMutationVariables,
-        APITypes.CreateChatMessageMutation
-    >;
+    
 
     
 
@@ -216,22 +219,21 @@ export function generateAmplifyClientWrapper(env: any) {
         return messages
     }
 
-    async function testFunction(props: {chatSessionId: string, latestHumanMessageText: string }) {
-        const convertPdfToImagesResponse = await amplifyClient.graphql({
-            query: convertPdfToImages,
-            variables: {
-                s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf"
-            }
-        })
-        return JSON.parse(convertPdfToImagesResponse.data.convertPdfToImages || "").imageMessaggeContentBlocks
-    }
+    // async function testFunction(props: {chatSessionId: string, latestHumanMessageText: string }) {
+    //     const convertPdfToImagesResponse = await amplifyClient.graphql({
+    //         query: convertPdfToImages,
+    //         variables: {
+    //             s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf"
+    //         }
+    //     })
+    //     return JSON.parse(convertPdfToImagesResponse.data.convertPdfToImages || "").imageMessaggeContentBlocks
+    // }
     
 
     return {
         amplifyClient: amplifyClient,
         getChatMessageHistory: getChatMessageHistory,
-        publishMessage: publishMessage,
-        testFunction: testFunction
+        publishMessage: publishMessage
     };
 
 }

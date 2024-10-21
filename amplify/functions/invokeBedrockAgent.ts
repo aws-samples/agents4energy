@@ -1,16 +1,29 @@
+
 import type { Schema } from "../data/resource"
+import * as APITypes from "./graphql/API";
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
+import { generateAmplifyClientWrapper, createChatMessage } from './utils/amplifyUtils'
+import { env } from '$amplify/env/invoke-bedrock-agent';
+
+const amplifyClientWrapper = generateAmplifyClientWrapper(env)
 
 const client = new BedrockAgentRuntimeClient();
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const handler: Schema["invokeBedrockAgent"]["functionHandler"] = async (event) => {
+    if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
+    if (!event.identity) throw new Error("Event does not contain identity");
+    if (!('sub' in event.identity)) throw new Error("Event does not contain user");
+
+    console.log('Amplify Env: ', env)
+
     const params = {
         agentId: event.arguments.agentId,
         agentAliasId: event.arguments.agentAliasId,
-        sessionId: event.arguments.sessionId,
+        sessionId: event.arguments.chatSessionId,
         inputText: event.arguments.prompt,
+        enableTrace: true,
     };
 
     const command = new InvokeAgentCommand(params);
@@ -29,16 +42,52 @@ export const handler: Schema["invokeBedrockAgent"]["functionHandler"] = async (e
             console.log("Agent Response:", response.completion)
 
             let completion = '';
+            let orchestrationTraceRationale = '';
             for await (let chunkEvent of response.completion) {
-                const chunk = chunkEvent.chunk;
+                const { chunk, trace } = chunkEvent;
                 if (chunk) {
                     const decodedResponse = new TextDecoder("utf-8").decode(chunk.bytes);
                     completion += decodedResponse;
                 }
+
+                if (trace && trace.trace && trace.trace.orchestrationTrace && trace.trace.orchestrationTrace.rationale)  {
+                    orchestrationTraceRationale += trace.trace.orchestrationTrace.rationale.text
+                    console.log('orchestrationTraceRationale: ', orchestrationTraceRationale)
+                }
+
+                if (trace && trace.trace) console.log('trace: ', trace)
+
+                // if (trace && trace.trace)  {
+                //     console.log('trace.trace: ', trace.trace)
+                //     orchestrationTraceRationale += JSON.stringify(trace.trace)
+                // }
+
+                
             }
 
-            console.log('Parsed event stream completion: ', completion);
-            return completion;
+            console.log('Parsed event stream completion: ', completion, ' and trace: ', orchestrationTraceRationale);
+
+            await amplifyClientWrapper.amplifyClient.graphql({
+                query: createChatMessage,
+                variables: {
+                    input: {
+                        chatSessionId: event.arguments.chatSessionId,
+                        content: completion,
+                        owner: event.identity.sub,
+                        trace: orchestrationTraceRationale,
+                        role: APITypes.ChatMessageRole.ai
+                    },
+                },
+            }).then((response) => {
+                console.log('createChatMessage response: ', response)
+            }).catch((error) => {
+                console.error('createChatMessage error: ', error)
+            })
+
+            return {
+                completion: completion,
+                orchestrationTrace: orchestrationTraceRationale
+            };
 
         } catch (error: any) {
             console.error(`Attempt ${retries + 1} failed:`, error);

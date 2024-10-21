@@ -31,6 +31,7 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -90,6 +91,7 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -149,6 +151,7 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }

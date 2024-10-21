@@ -15,6 +15,7 @@ export type ChatMessage = {
   tool_call_id?: string | null,
   tool_calls?: string | null,
   tool_name?: string | null,
+  trace?: string | null,
   updatedAt: string,
 };
 
@@ -56,6 +57,12 @@ export type BedrockResponse = {
   error?: string | null,
 };
 
+export type BedrockAgentResponse = {
+  __typename: "BedrockAgentResponse",
+  completion?: string | null,
+  orchestrationTrace?: string | null,
+};
+
 export type ModelStringKeyConditionInput = {
   beginsWith?: string | null,
   between?: Array< string | null > | null,
@@ -80,6 +87,7 @@ export type ModelChatMessageFilterInput = {
   tool_call_id?: ModelStringInput | null,
   tool_calls?: ModelStringInput | null,
   tool_name?: ModelStringInput | null,
+  trace?: ModelStringInput | null,
   updatedAt?: ModelStringInput | null,
 };
 
@@ -180,6 +188,7 @@ export type ModelChatMessageConditionInput = {
   tool_call_id?: ModelStringInput | null,
   tool_calls?: ModelStringInput | null,
   tool_name?: ModelStringInput | null,
+  trace?: ModelStringInput | null,
   updatedAt?: ModelStringInput | null,
 };
 
@@ -194,6 +203,7 @@ export type CreateChatMessageInput = {
   tool_call_id?: string | null,
   tool_calls?: string | null,
   tool_name?: string | null,
+  trace?: string | null,
 };
 
 export type ModelChatSessionConditionInput = {
@@ -238,6 +248,7 @@ export type UpdateChatMessageInput = {
   tool_call_id?: string | null,
   tool_calls?: string | null,
   tool_name?: string | null,
+  trace?: string | null,
 };
 
 export type UpdateChatSessionInput = {
@@ -259,6 +270,7 @@ export type ModelSubscriptionChatMessageFilterInput = {
   tool_call_id?: ModelSubscriptionStringInput | null,
   tool_calls?: ModelSubscriptionStringInput | null,
   tool_name?: ModelSubscriptionStringInput | null,
+  trace?: ModelSubscriptionStringInput | null,
   updatedAt?: ModelSubscriptionStringInput | null,
 };
 
@@ -302,12 +314,12 @@ export type ModelSubscriptionChatSessionFilterInput = {
   updatedAt?: ModelSubscriptionStringInput | null,
 };
 
-export type ConvertPdfToImagesQueryVariables = {
+export type ConvertPdfToYAMLQueryVariables = {
   s3Key: string,
 };
 
-export type ConvertPdfToImagesQuery = {
-  convertPdfToImages?: string | null,
+export type ConvertPdfToYAMLQuery = {
+  convertPdfToYAML?: string | null,
 };
 
 export type GetChatMessageQueryVariables = {
@@ -335,6 +347,7 @@ export type GetChatMessageQuery = {
     tool_call_id?: string | null,
     tool_calls?: string | null,
     tool_name?: string | null,
+    trace?: string | null,
     updatedAt: string,
   } | null,
 };
@@ -391,12 +404,16 @@ export type InvokeBedrockQuery = {
 export type InvokeBedrockAgentQueryVariables = {
   agentAliasId: string,
   agentId: string,
+  chatSessionId: string,
   prompt: string,
-  sessionId: string,
 };
 
 export type InvokeBedrockAgentQuery = {
-  invokeBedrockAgent?: string | null,
+  invokeBedrockAgent?:  {
+    __typename: "BedrockAgentResponse",
+    completion?: string | null,
+    orchestrationTrace?: string | null,
+  } | null,
 };
 
 export type InvokeBedrockWithStructuredOutputQueryVariables = {
@@ -465,6 +482,7 @@ export type ListChatMessageByChatSessionIdAndCreatedAtQuery = {
       tool_call_id?: string | null,
       tool_calls?: string | null,
       tool_name?: string | null,
+      trace?: string | null,
       updatedAt: string,
     } | null >,
     nextToken?: string | null,
@@ -492,6 +510,7 @@ export type ListChatMessagesQuery = {
       tool_call_id?: string | null,
       tool_calls?: string | null,
       tool_name?: string | null,
+      trace?: string | null,
       updatedAt: string,
     } | null >,
     nextToken?: string | null,
@@ -545,6 +564,7 @@ export type CreateChatMessageMutation = {
     tool_call_id?: string | null,
     tool_calls?: string | null,
     tool_name?: string | null,
+    trace?: string | null,
     updatedAt: string,
   } | null,
 };
@@ -602,6 +622,7 @@ export type DeleteChatMessageMutation = {
     tool_call_id?: string | null,
     tool_calls?: string | null,
     tool_name?: string | null,
+    trace?: string | null,
     updatedAt: string,
   } | null,
 };
@@ -659,6 +680,7 @@ export type UpdateChatMessageMutation = {
     tool_call_id?: string | null,
     tool_calls?: string | null,
     tool_name?: string | null,
+    trace?: string | null,
     updatedAt: string,
   } | null,
 };
@@ -716,6 +738,7 @@ export type OnCreateChatMessageSubscription = {
     tool_call_id?: string | null,
     tool_calls?: string | null,
     tool_name?: string | null,
+    trace?: string | null,
     updatedAt: string,
   } | null,
 };
@@ -773,6 +796,7 @@ export type OnDeleteChatMessageSubscription = {
     tool_call_id?: string | null,
     tool_calls?: string | null,
     tool_name?: string | null,
+    trace?: string | null,
     updatedAt: string,
   } | null,
 };
@@ -830,6 +854,7 @@ export type OnUpdateChatMessageSubscription = {
     tool_call_id?: string | null,
     tool_calls?: string | null,
     tool_name?: string | null,
+    trace?: string | null,
     updatedAt: string,
   } | null,
 };

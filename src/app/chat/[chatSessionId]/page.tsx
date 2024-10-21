@@ -62,7 +62,7 @@ type ListAgentIdsResponseType = {
     nextToken: string
 }
 
-const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
+const invokeBedrockAgentParseBodyGetTextAndTrace = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
     console.log('Prompt: ', prompt)
     if (!chatSession.aiBotInfo?.aiBotAliasId) throw new Error('No Agent Alias ID found in invoke request')
     if (!chatSession.aiBotInfo?.aiBotId) throw new Error('No Agent ID found in invoke request')
@@ -70,14 +70,17 @@ const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: S
         prompt: prompt,
         agentId: chatSession.aiBotInfo?.aiBotId,
         agentAliasId: chatSession.aiBotInfo?.aiBotAliasId,
-        sessionId: chatSession.id
+        chatSessionId: chatSession.id
     })
     console.log('Bedrock Agent Response: ', response.data)
     if (!(response.data)) {
         console.log('No response from bedrock agent after prompt: ', prompt)
         return
     }
-    return response.data
+    return {
+        text: response.data.completion,
+        trace: response.data.orchestrationTrace
+    }
 }
 
 const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targetChatSession: Schema['ChatSession']['type']) => {
@@ -206,6 +209,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     // Set isLoading to false if the last message is from ai and has no tool call
     useEffect(() => {
         console.log("Messages: ", messages)
+
+        //Set the default prompts if this is the first message
         if (
             !messages.length && //No messages currently in the chat
             activeChatSession &&
@@ -221,7 +226,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         ) {
             console.log('Ready for human response')
             setIsLoading(false)
-
 
             async function fetchAndSetSuggestedPrompts() {
                 setSuggestedPromptes([])
@@ -311,13 +315,14 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
     }
 
-    function addChatMessage(body: string, role: "human" | "ai" | "tool") {
+    function addChatMessage(props: {body: string, role: "human" | "ai" | "tool", trace?: string}) {
         const targetChatSessionId = activeChatSession?.id;
 
         if (targetChatSessionId) {
             return amplifyClient.models.ChatMessage.create({
-                content: body,
-                role: role,
+                content: props.body,
+                trace: props.trace,
+                role: props.role,
                 chatSessionId: targetChatSessionId
             })
         }
@@ -329,7 +334,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             if (!activeChatSession) throw new Error("No active chat session")
             setChatSessionFirstMessageSummary(body, activeChatSession)
         }
-        await addChatMessage(body, "human")
+        await addChatMessage({body: body, role: "human"})
         sendMessageToChatBot(body);
     }
 
@@ -341,13 +346,17 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         //     : 'No Agent Configured';
 
         if (activeChatSession?.aiBotInfo?.aiBotAliasId) {
-            const responseText = await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
-            if (!responseText) throw new Error("No response from agent");
-            addChatMessage(responseText, "ai")
+            const response = await invokeBedrockAgentParseBodyGetTextAndTrace(prompt, activeChatSession)
+            if (!response) throw new Error("No response from agent");
+            // Agent function now adds messages directly
+            // const { text, trace } = response
+            // if (!text ) throw new Error("No text in response from agent");
+            // if (!trace ) throw new Error("No text in response from agent");
+            // addChatMessage({body: text, trace: trace, role: "ai"})
         } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') {
             const responseText = await invokeBedrockModelParseBodyGetText(prompt)
             if (!responseText) throw new Error("No response from agent");
-            addChatMessage(responseText, "ai")
+            addChatMessage({body: responseText, role: "ai"})
         } else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.ProductionAgent.name) {
             await invokeProductionAgent(prompt, activeChatSession)
         } else {

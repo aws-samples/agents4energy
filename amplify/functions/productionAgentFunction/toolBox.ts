@@ -8,7 +8,7 @@ import { env } from '$amplify/env/production-agent-function';
 
 import { convertPdfToB64Strings } from '../utils/pdfUtils'
 import { generateAmplifyClientWrapper } from '../utils/amplifyUtils'
-import { convertPdfToImages } from '../graphql/queries'
+// import { convertPdfToImages } from '../graphql/queries'
 
 
 const amplifyClientWrapper = generateAmplifyClientWrapper(env)

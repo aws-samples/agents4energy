@@ -8,12 +8,12 @@ type GeneratedQuery<InputType, OutputType> = string & {
   __generatedQueryOutput: OutputType;
 };
 
-export const convertPdfToImages = /* GraphQL */ `query ConvertPdfToImages($s3Key: String!) {
-  convertPdfToImages(s3Key: $s3Key)
+export const convertPdfToYAML = /* GraphQL */ `query ConvertPdfToYAML($s3Key: String!) {
+  convertPdfToYAML(s3Key: $s3Key)
 }
 ` as GeneratedQuery<
-  APITypes.ConvertPdfToImagesQueryVariables,
-  APITypes.ConvertPdfToImagesQuery
+  APITypes.ConvertPdfToYAMLQueryVariables,
+  APITypes.ConvertPdfToYAMLQuery
 >;
 export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
   getChatMessage(id: $id) {
@@ -35,6 +35,7 @@ export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -99,15 +100,19 @@ export const invokeBedrock = /* GraphQL */ `query InvokeBedrock($prompt: String)
 export const invokeBedrockAgent = /* GraphQL */ `query InvokeBedrockAgent(
   $agentAliasId: String!
   $agentId: String!
+  $chatSessionId: String!
   $prompt: String!
-  $sessionId: String!
 ) {
   invokeBedrockAgent(
     agentAliasId: $agentAliasId
     agentId: $agentId
+    chatSessionId: $chatSessionId
     prompt: $prompt
-    sessionId: $sessionId
-  )
+  ) {
+    completion
+    orchestrationTrace
+    __typename
+  }
 }
 ` as GeneratedQuery<
   APITypes.InvokeBedrockAgentQueryVariables,
@@ -184,6 +189,7 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
       tool_call_id
       tool_calls
       tool_name
+      trace
       updatedAt
       __typename
     }
@@ -212,6 +218,7 @@ export const listChatMessages = /* GraphQL */ `query ListChatMessages(
       tool_call_id
       tool_calls
       tool_name
+      trace
       updatedAt
       __typename
     }
