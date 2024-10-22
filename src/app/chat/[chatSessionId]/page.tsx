@@ -214,15 +214,17 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         if (
             !messages.length && //No messages currently in the chat
             activeChatSession &&
-            activeChatSession.aiBotInfo && 
-            activeChatSession.aiBotInfo.aiBotId && 
+            activeChatSession.aiBotInfo &&
+            activeChatSession.aiBotInfo.aiBotId &&
             activeChatSession.aiBotInfo.aiBotId in defaultAgents
         ) setSuggestedPromptes(defaultAgents[activeChatSession.aiBotInfo.aiBotId].samplePrompts)
 
+        //If there are no messages, or the last message is an AI message with no tool calls, prepare for a human message
         if (
             messages.length &&
             messages[messages.length - 1].role === "ai" &&
             (!messages[messages.length - 1].tool_calls || messages[messages.length - 1].tool_calls === "[]")
+
         ) {
             console.log('Ready for human response')
             setIsLoading(false)
@@ -243,7 +245,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
             }
             fetchAndSetSuggestedPrompts()
-        }
+        } else if (messages.length) setIsLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
+
     }, [messages, activeChatSession])
 
 
@@ -315,7 +318,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
     }
 
-    function addChatMessage(props: {body: string, role: "human" | "ai" | "tool", trace?: string}) {
+    function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string }) {
         const targetChatSessionId = activeChatSession?.id;
 
         if (targetChatSessionId) {
@@ -334,7 +337,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             if (!activeChatSession) throw new Error("No active chat session")
             setChatSessionFirstMessageSummary(body, activeChatSession)
         }
-        await addChatMessage({body: body, role: "human"})
+        await addChatMessage({ body: body, role: "human" })
         sendMessageToChatBot(body);
     }
 
@@ -356,7 +359,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') {
             const responseText = await invokeBedrockModelParseBodyGetText(prompt)
             if (!responseText) throw new Error("No response from agent");
-            addChatMessage({body: responseText, role: "ai"})
+            addChatMessage({ body: responseText, role: "ai" })
         } else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.ProductionAgent.name) {
             await invokeProductionAgent(prompt, activeChatSession)
         } else {

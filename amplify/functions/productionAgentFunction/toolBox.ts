@@ -43,7 +43,7 @@ export const calculatorTool = tool(
     }
 );
 
-const convertPdfToYamlSchema = z.object({
+const convertPdfToJsonSchema = z.object({
     s3Key: z.string().describe("The S3 key of the PDF file to convert."),
 });
 
@@ -67,20 +67,19 @@ export const convertPdfToJsonTool = tool(
         return jsonContent
     },
     {
-        name: "convertPdfToYaml",
-        description: "Can convert a pdf stored in s3 into a YAML object. Use it to get details about a specific file.",
-        schema: convertPdfToYamlSchema,
+        name: "convertPdfToJson",
+        description: "Can convert a pdf stored in s3 into a JSON object. Use it to get details about a specific file.",
+        schema: convertPdfToJsonSchema,
     }
 );
 
 const wellTableSchema = z.object({
-    // tablePurpose: z.string().describe("The purpose for which the user is making this table"),
     dataToExclude: z.string().describe("List of criteria to exclude data from the table"),
     dataToInclude: z.string().describe("List of criteria to include data in the table"),
     tableColumns: z.array(z.object({
         columnName: z.string().describe('The name of a column'),
-        columnDescription: z.string().describe('A description of the information which this column contains. Be sure never to use the " character'),
-    })).describe("Information about the desired columns of the table"),
+        columnDescription: z.string().describe('A description of the information which this column contains.'),
+    })).describe("The column name and description for each column of the table."),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
 });
 
