@@ -15,7 +15,6 @@ import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/ampli
 
 import styles from "@/styles/chat-ui.module.scss";
 import React, { useState } from "react";
-import { Box } from "@mui/material";
 // import { Message } from "@aws-amplify/ui-react";
 
 export interface ChatUIMessageProps {
@@ -214,16 +213,15 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             ) : null
             }
             {isValidJSON(props.message.content) ? (
-                <pre
-                  style={{ //Wrap long lines
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word',
-                  }}
-
-                >
-                  {JSON.stringify(JSON.parse(props.message.content), null, 2)}
-                </pre>
+              <pre
+                style={{ //Wrap long lines
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word',
+                }}
+              >
+                {JSON.stringify(JSON.parse(props.message.content), null, 2)}
+              </pre>
 
             ) : (
               <ReactMarkdown
