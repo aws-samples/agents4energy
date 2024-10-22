@@ -26,7 +26,7 @@ function trimToJsonContent(input: string): string {
 
 
 
-export const handler: Schema["convertPdfToYAML"]["functionHandler"] = async (event, context) => {
+export const handler: Schema["convertPdfToJson"]["functionHandler"] = async (event, context) => {
 
     // throw new Error("This function is not implemented yet");
     // console.log('event: ', event)

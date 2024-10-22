@@ -150,15 +150,14 @@ const fileDeployment = new s3Deployment.BucketDeployment(customStack, 'test-file
   // destinationKeyPrefix: '/'
 });
 
-const { queryImagesStateMachineArn, ghostScriptLayer, imageMagickLayer, getInfoFromPdfFunction, convertPdfToYAMLFunction } = productionAgentBuilder(customStack, {
+const { queryImagesStateMachineArn, ghostScriptLayer, imageMagickLayer, getInfoFromPdfFunction, convertPdfToJsonFunction } = productionAgentBuilder(customStack, {
   s3BucketName: backend.storage.resources.bucket.bucketName
 })
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
-backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_YAML_LAMBDA_ARN', convertPdfToYAMLFunction.functionArn)
+backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_JSON_LAMBDA_ARN', convertPdfToJsonFunction.functionArn)
 
-convertPdfToYAMLFunction
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["bedrock:InvokeModel"],
@@ -190,7 +189,7 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["lambda:InvokeFunction"],
     resources: [
-      convertPdfToYAMLFunction.functionArn
+      convertPdfToJsonFunction.functionArn
     ],
   }),
 )
@@ -209,16 +208,16 @@ convertPdfToImageDS.createResolver(
   }
 )
 
-const convertPdfToYAMLFunctionDS = backend.data.addLambdaDataSource(
+const convertPdfToJsonFunctionDS = backend.data.addLambdaDataSource(
   'convertPdfToImagesFunctionDS',
-  convertPdfToYAMLFunction
+  convertPdfToJsonFunction
 )
 
-convertPdfToYAMLFunctionDS.createResolver(
-  'convertPdfToYAMLFunctionResolver',
+convertPdfToJsonFunctionDS.createResolver(
+  'convertPdfToJsonFunctionResolver',
   {
     typeName: 'Query',
-    fieldName: 'convertPdfToYAML',
+    fieldName: 'convertPdfToJson',
   }
 )
 

@@ -144,7 +144,7 @@ const schema = a.schema({
   //   a.handler.
   // ),
 
-  convertPdfToYAML: a
+  convertPdfToJson: a
     .query()
     .arguments({
       s3Key: a.string().required()

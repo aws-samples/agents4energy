@@ -45,6 +45,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                             `arn:aws:s3:::${props.s3BucketName}/*`
                         ],
                     }),
+                    new iam.PolicyStatement({
+                        actions: ["s3:ListBucket"],
+                        resources: [
+                            `arn:aws:s3:::${props.s3BucketName}`
+                        ],
+                    }),
                 ]
             })
         }
@@ -97,9 +103,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         layers: [imageMagickLayer, ghostScriptLayer]
     });
 
-    const convertPdfToYAMLFunction = new NodejsFunction(scope, 'ConvertPdfToImageFunction', {
+    const convertPdfToJsonFunction = new NodejsFunction(scope, 'ConvertPdfToJsonFunction', {
         runtime: lambda.Runtime.NODEJS_20_X,
-        entry: path.join(__dirname, '..', 'functions', 'convertPdfToYAML', 'index.ts'),
+        entry: path.join(__dirname, '..', 'functions', 'convertPdfToJson', 'index.ts'),
         bundling: {
             format: OutputFormat.CJS,
             loader: {
@@ -187,6 +193,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         imageMagickLayer: imageMagickLayer,
         ghostScriptLayer: ghostScriptLayer,
         getInfoFromPdfFunction: queryReportImageLambda,
-        convertPdfToYAMLFunction: convertPdfToYAMLFunction
+        convertPdfToJsonFunction: convertPdfToJsonFunction
     };
 }

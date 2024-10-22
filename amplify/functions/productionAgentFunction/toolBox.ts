@@ -11,7 +11,7 @@ import { generateAmplifyClientWrapper } from '../utils/amplifyUtils'
 // import { convertPdfToImages } from '../graphql/queries'
 
 
-const amplifyClientWrapper = generateAmplifyClientWrapper(env)
+// const amplifyClientWrapper = generateAmplifyClientWrapper(env)
 
 const calculatorSchema = z.object({
     operation: z
@@ -51,7 +51,7 @@ export const convertPdfToJsonTool = tool(
     async ({ s3Key }) => {
         const lambdaClient = new LambdaClient();
         const params: InvokeCommandInput = {
-            FunctionName: env.CONVERT_PDF_TO_YAML_LAMBDA_ARN,
+            FunctionName: env.CONVERT_PDF_TO_JSON_LAMBDA_ARN,
             Payload: JSON.stringify({ arguments: {s3Key: s3Key} }),
         };
         const response = await lambdaClient.send(new InvokeCommand(params));
@@ -74,8 +74,8 @@ export const convertPdfToJsonTool = tool(
 );
 
 const wellTableSchema = z.object({
-    dataToExclude: z.string().describe("List of criteria to exclude data from the table"),
-    dataToInclude: z.string().describe("List of criteria to include data in the table"),
+    dataToExclude: z.string().optional().describe("List of criteria to exclude data from the table"),
+    dataToInclude: z.string().optional().describe("List of criteria to include data in the table"),
     tableColumns: z.array(z.object({
         columnName: z.string().describe('The name of a column'),
         columnDescription: z.string().describe('A description of the information which this column contains.'),
@@ -113,8 +113,8 @@ export const wellTableTool = tool(
             stateMachineArn: env.STEP_FUNCTION_ARN,
             input: JSON.stringify({
                 tableColumns: tableColumns,
-                dataToInclude: dataToInclude,
-                dataToExclude: dataToExclude,
+                dataToInclude: dataToInclude || "[]",
+                dataToExclude: dataToExclude || "[]",
                 s3Prefix: s3Prefix,
             })
         });
