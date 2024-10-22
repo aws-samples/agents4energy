@@ -392,16 +392,17 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     <DropdownMenu buttonText='New Chat Session'>
                         {
                             [
-                                ...[
-                                    {
-                                        agentName: defaultAgents.ProductionAgent.name,
-                                        agentId: 'ProductionAgent'
-                                    },
-                                    {
-                                        agentName: "Foundation Model",
-                                        agentId: "FoundationModel"
-                                    },
-                                ],
+                                // ...[
+                                //     {
+                                //         agentName: defaultAgents.ProductionAgent.name,
+                                //         agentId: 'ProductionAgent'
+                                //     },
+                                //     {
+                                //         agentName: "Foundation Model",
+                                //         agentId: "FoundationModel"
+                                //     },
+                                // ],
+                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({agentId: agentId, agentName: agentInfo.name})),
                                 ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
                             ]
                                 .map((agent) => (
