@@ -229,8 +229,8 @@ export const handler: Schema["getInfoFromPdf"]["functionHandler"] = async (event
                     minimum: 0,
                     maximum: 10,
                     description: `
-                    If the JSON object contains information related to [${event.arguments.dataToExclude}], give a score of 1
-                    Give a score of 10 if JSON object contains information related to ${event.arguments.dataToInclude}
+                    If the JSON object contains information related to [${event.arguments.dataToExclude}], give a score of 1.
+                    If not, give a score of 10 if JSON object contains information related to [${event.arguments.dataToInclude}].
                     Most scores should be around 5. Reserve 10 for exceptional cases.
                     `
                     // Give a low score if the JSON object has any information related to ${event.arguments.dataToExclude}.

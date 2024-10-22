@@ -113,7 +113,7 @@ export const wellTableTool = tool(
             stateMachineArn: env.STEP_FUNCTION_ARN,
             input: JSON.stringify({
                 tableColumns: tableColumns,
-                dataToInclude: dataToInclude || "[]",
+                dataToInclude: dataToInclude || "[anything]",
                 dataToExclude: dataToExclude || "[]",
                 s3Prefix: s3Prefix,
             })
