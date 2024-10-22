@@ -86,13 +86,13 @@ const invokeBedrockAgentParseBodyGetTextAndTrace = async (prompt: string, chatSe
 const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targetChatSession: Schema['ChatSession']['type']) => {
     const outputStructure = {
         title: "SummarizeMessageIntnet",
-        description: "What intent does the use have when sending this message?",
+        description: "Summarize the intent of the user's message?",
         type: "object",
         properties: {
             summary: {
                 type: 'string',
-                description: `message intent title`,
-                maxLength: 20
+                description: `Message intent summary in 20 characters or fewer.`,
+                // maxLength: 20
             }
         },
         required: ['summary'],
@@ -100,7 +100,7 @@ const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targe
 
     const structuredResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
         chatSessionId: targetChatSession.id,
-        lastMessageText: "",
+        lastMessageText: firstMessageBody,
         outputStructure: JSON.stringify(outputStructure)
     })
     console.log("Structured Output Response: ", structuredResponse)
