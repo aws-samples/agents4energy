@@ -1,7 +1,17 @@
+// import { Client } from 'aws-amplify/data';
+import { LambdaClient, InvokeCommand, InvokeCommandInput } from "@aws-sdk/client-lambda";
+
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
-import { env } from '$amplify/env/production-agent-function'; // replace with your function name
+import { env } from '$amplify/env/production-agent-function';
+
+import { convertPdfToB64Strings } from '../utils/pdfUtils'
+import { generateAmplifyClientWrapper } from '../utils/amplifyUtils'
+// import { convertPdfToImages } from '../graphql/queries'
+
+
+// const amplifyClientWrapper = generateAmplifyClientWrapper(env)
 
 const calculatorSchema = z.object({
     operation: z
@@ -33,14 +43,43 @@ export const calculatorTool = tool(
     }
 );
 
+const convertPdfToJsonSchema = z.object({
+    s3Key: z.string().describe("The S3 key of the PDF file to convert."),
+});
+
+export const convertPdfToJsonTool = tool(
+    async ({ s3Key }) => {
+        const lambdaClient = new LambdaClient();
+        const params: InvokeCommandInput = {
+            FunctionName: env.CONVERT_PDF_TO_JSON_LAMBDA_ARN,
+            Payload: JSON.stringify({ arguments: {s3Key: s3Key} }),
+        };
+        const response = await lambdaClient.send(new InvokeCommand(params));
+        if (!response.Payload) throw new Error("No payload returned from Lambda")
+
+        const jsonContent = JSON.parse(Buffer.from(response.Payload).toString())
+        console.log('Json Content: ', jsonContent)
+
+        // console.log(`Converting s3 key ${s3Key} into content blocks`)
+        
+        // const pdfImageBuffers = await convertPdfToB64Strings({s3BucketName: env.DATA_BUCKET_NAME, s3Key: s3Key})
+
+        return jsonContent
+    },
+    {
+        name: "convertPdfToJson",
+        description: "Can convert a pdf stored in s3 into a JSON object. Use it to get details about a specific file.",
+        schema: convertPdfToJsonSchema,
+    }
+);
+
 const wellTableSchema = z.object({
-    // tablePurpose: z.string().describe("The purpose for which the user is making this table"),
-    dataToExclude: z.string().describe("List of criteria to exclude data from the table"),
-    dataToInclude: z.string().describe("List of criteria to include data in the table"),
+    dataToExclude: z.string().optional().describe("List of criteria to exclude data from the table"),
+    dataToInclude: z.string().optional().describe("List of criteria to include data in the table"),
     tableColumns: z.array(z.object({
         columnName: z.string().describe('The name of a column'),
-        columnDescription: z.string().describe('A description of the information which this column contains. Be sure never to use the " character'),
-    })).describe("Information about the desired columns of the table"),
+        columnDescription: z.string().describe('A description of the information which this column contains.'),
+    })).describe("The column name and description for each column of the table."),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
 });
 
@@ -74,8 +113,8 @@ export const wellTableTool = tool(
             stateMachineArn: env.STEP_FUNCTION_ARN,
             input: JSON.stringify({
                 tableColumns: tableColumns,
-                dataToInclude: dataToInclude,
-                dataToExclude: dataToExclude,
+                dataToInclude: dataToInclude || "[anything]",
+                dataToExclude: dataToExclude || "[]",
                 s3Prefix: s3Prefix,
             })
         });
@@ -93,7 +132,7 @@ export const wellTableTool = tool(
 
         //Add in the source and relevanceScore columns
         columnNames.push('includeScore')
-        columnNames.push('source')
+        columnNames.push('s3Key')
 
         // const numColumns = columnNames.length
         const tableRows = []
@@ -119,7 +158,7 @@ export const wellTableTool = tool(
                     const newRow: string[] = []
 
                     columnNames.forEach((key) => {
-                        if (key === 'source') {
+                        if (key === 's3Key') {
                             //Add the link the the s3 source
                             newRow.push(`[${s3ObjectResult.document_source_s3_key}](/files/${s3ObjectResult.document_source_s3_key})`)
                         }
@@ -152,7 +191,8 @@ export const wellTableTool = tool(
     },
     {
         name: "wellTableTool",
-        description: "Can extract tabular information about a well",
+        description: "This tool produces tabular information about a well.",
         schema: wellTableSchema,
     }
 );
+

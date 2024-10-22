@@ -1,6 +1,6 @@
 import gm from 'gm';
 import { PDFDocument } from 'pdf-lib';
-
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
 const imageMagick = gm.subClass({ imageMagick: true });
 
@@ -50,5 +50,37 @@ export async function convertPdfToPngs(body: Buffer): Promise<Buffer[]> {
     } catch (error) {
         console.error(JSON.stringify(error));
         throw new Error('Failed to convert PDF to images');
+    }
+}
+
+export async function convertPdfToB64Strings(props: {s3Key: string, s3BucketName: string},): Promise<string[]> {
+    // Initialize S3 client
+    const s3Client = new S3Client();
+
+    try {
+        // Fetch PDF from S3
+        const getObjectParams = {
+            Bucket: props.s3BucketName,
+            Key: props.s3Key,
+        };
+        const { Body } = await s3Client.send(new GetObjectCommand(getObjectParams));
+        if (!Body) throw new Error('Failed to fetch PDF from S3');
+
+        // Load PDF document
+        const pdfBytes = await Body.transformToByteArray();
+        // console.log("pdf Bytes: ", pdfBytes)
+
+        const pngBuffers = await convertPdfToPngs(Buffer.from(pdfBytes))
+
+        const pngB64Strings = pngBuffers.map((pngBuffer) => {
+            return pngBuffer.toString('base64');
+        })
+        // console.log("png Strings: ", pngB64Strings)
+
+        return pngB64Strings
+
+    } catch (error) {
+        console.error('Error processing PDF:', error);
+        throw error;
     }
 }

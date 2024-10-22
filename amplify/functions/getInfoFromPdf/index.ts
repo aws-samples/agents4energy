@@ -4,10 +4,10 @@ import { ChatBedrockConverse } from "@langchain/aws";
 import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
-import { convertPdfToPngs } from './convertPdfToPng'
+// import { convertPdfToPngs } from './convertPdfToPng'
+import { convertPdfToB64Strings } from '../utils/pdfUtils'
 
 import { validate } from 'jsonschema';
-import m from 'gm';
 
 interface ColumnInfo {
     columnName: string;
@@ -92,37 +92,6 @@ function createJsonSchema(columnList: Column[]): JsonSchema {
     };
 }
 
-async function convertPdfToB64Strings(s3Key: string,): Promise<string[]> {
-    // Initialize S3 client
-    const s3Client = new S3Client();
-
-    try {
-        // Fetch PDF from S3
-        const getObjectParams = {
-            Bucket: process.env.DATA_BUCKET_NAME,
-            Key: s3Key,
-        };
-        const { Body } = await s3Client.send(new GetObjectCommand(getObjectParams));
-        if (!Body) throw new Error('Failed to fetch PDF from S3');
-
-        // Load PDF document
-        const pdfBytes = await Body.transformToByteArray();
-        // console.log("pdf Bytes: ", pdfBytes)
-
-        const pngBuffers = await convertPdfToPngs(Buffer.from(pdfBytes))
-
-        const pngB64Strings = pngBuffers.map((pngBuffer) => {
-            return pngBuffer.toString('base64');
-        })
-        // console.log("png Strings: ", pngB64Strings)
-
-        return pngB64Strings
-
-    } catch (error) {
-        console.error('Error processing PDF:', error);
-        throw error;
-    }
-}
 
 async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => any; }, response: { raw: BaseMessage; parsed: Record<string, any>;}, targetJsonSchema: JsonSchema, messages: BaseMessage[]) {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -155,6 +124,8 @@ export const handler: Schema["getInfoFromPdf"]["functionHandler"] = async (event
 
     // If event.aruments.tableColumns is not an array throw an error
     if (!Array.isArray(event.arguments.tableColumns)) throw new Error("tableColumns must be an array of TableColumn type");
+    if (!process.env.DATA_BUCKET_NAME) throw new Error("DATA_BUCKET_NAME does not exist in env vars");
+
     const columnInfoArray: ColumnInfo[] = event.arguments.tableColumns
 
     const columnInfoArrayLowercaseNameMap = Object.fromEntries(
@@ -170,7 +141,10 @@ export const handler: Schema["getInfoFromPdf"]["functionHandler"] = async (event
 
     const tableRowOutputFomat = createJsonSchema(columnInfoArray)
 
-    const pdfImageBuffers = await convertPdfToB64Strings(event.arguments.s3Key)
+    const pdfImageBuffers = await convertPdfToB64Strings({
+        s3BucketName: process.env.DATA_BUCKET_NAME,
+        s3Key: event.arguments.s3Key
+    })
     const imageMessaggeContentBlocks = pdfImageBuffers.map((imageB64String) => {
         return {
             type: "image_url",
@@ -255,8 +229,8 @@ export const handler: Schema["getInfoFromPdf"]["functionHandler"] = async (event
                     minimum: 0,
                     maximum: 10,
                     description: `
-                    If the JSON object contains information related to [${event.arguments.dataToExclude}], give a score of 1
-                    Give a score of 10 if JSON object contains information related to ${event.arguments.dataToInclude}
+                    If the JSON object contains information related to [${event.arguments.dataToExclude}], give a score of 1.
+                    If not, give a score of 10 if JSON object contains information related to [${event.arguments.dataToInclude}].
                     Most scores should be around 5. Reserve 10 for exceptional cases.
                     `
                     // Give a low score if the JSON object has any information related to ${event.arguments.dataToExclude}.

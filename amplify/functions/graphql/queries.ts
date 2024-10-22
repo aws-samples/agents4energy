@@ -8,17 +8,25 @@ type GeneratedQuery<InputType, OutputType> = string & {
   __generatedQueryOutput: OutputType;
 };
 
+export const convertPdfToYAML = /* GraphQL */ `query ConvertPdfToYAML($s3Key: String!) {
+  convertPdfToYAML(s3Key: $s3Key)
+}
+` as GeneratedQuery<
+  APITypes.ConvertPdfToYAMLQueryVariables,
+  APITypes.ConvertPdfToYAMLQuery
+>;
 export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
   getChatMessage(id: $id) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -27,6 +35,7 @@ export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -45,7 +54,7 @@ export const getChatSession = /* GraphQL */ `query GetChatSession($id: ID!) {
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken
@@ -59,6 +68,23 @@ export const getChatSession = /* GraphQL */ `query GetChatSession($id: ID!) {
 ` as GeneratedQuery<
   APITypes.GetChatSessionQueryVariables,
   APITypes.GetChatSessionQuery
+>;
+export const getInfoFromPdf = /* GraphQL */ `query GetInfoFromPdf(
+  $dataToExclude: AWSJSON
+  $dataToInclude: AWSJSON
+  $s3Key: String!
+  $tableColumns: AWSJSON!
+) {
+  getInfoFromPdf(
+    dataToExclude: $dataToExclude
+    dataToInclude: $dataToInclude
+    s3Key: $s3Key
+    tableColumns: $tableColumns
+  )
+}
+` as GeneratedQuery<
+  APITypes.GetInfoFromPdfQueryVariables,
+  APITypes.GetInfoFromPdfQuery
 >;
 export const invokeBedrock = /* GraphQL */ `query InvokeBedrock($prompt: String) {
   invokeBedrock(prompt: $prompt) {
@@ -74,15 +100,19 @@ export const invokeBedrock = /* GraphQL */ `query InvokeBedrock($prompt: String)
 export const invokeBedrockAgent = /* GraphQL */ `query InvokeBedrockAgent(
   $agentAliasId: String!
   $agentId: String!
+  $chatSessionId: String!
   $prompt: String!
-  $sessionId: String!
 ) {
   invokeBedrockAgent(
     agentAliasId: $agentAliasId
     agentId: $agentId
+    chatSessionId: $chatSessionId
     prompt: $prompt
-    sessionId: $sessionId
-  )
+  ) {
+    completion
+    orchestrationTrace
+    __typename
+  }
 }
 ` as GeneratedQuery<
   APITypes.InvokeBedrockAgentQueryVariables,
@@ -102,6 +132,13 @@ export const invokeBedrockWithStructuredOutput = /* GraphQL */ `query InvokeBedr
 ` as GeneratedQuery<
   APITypes.InvokeBedrockWithStructuredOutputQueryVariables,
   APITypes.InvokeBedrockWithStructuredOutputQuery
+>;
+export const invokeProductionAgent = /* GraphQL */ `query InvokeProductionAgent($chatSessionId: String, $input: String!) {
+  invokeProductionAgent(chatSessionId: $chatSessionId, input: $input)
+}
+` as GeneratedQuery<
+  APITypes.InvokeProductionAgentQueryVariables,
+  APITypes.InvokeProductionAgentQuery
 >;
 export const listBedrockAgentAliasIds = /* GraphQL */ `query ListBedrockAgentAliasIds($agentId: String) {
   listBedrockAgentAliasIds(agentId: $agentId) {
@@ -144,6 +181,7 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
     items {
       chatSessionId
       content
+      contentBlocks
       createdAt
       id
       owner
@@ -151,6 +189,7 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
       tool_call_id
       tool_calls
       tool_name
+      trace
       updatedAt
       __typename
     }
@@ -171,6 +210,7 @@ export const listChatMessages = /* GraphQL */ `query ListChatMessages(
     items {
       chatSessionId
       content
+      contentBlocks
       createdAt
       id
       owner
@@ -178,6 +218,7 @@ export const listChatMessages = /* GraphQL */ `query ListChatMessages(
       tool_call_id
       tool_calls
       tool_name
+      trace
       updatedAt
       __typename
     }
@@ -197,7 +238,7 @@ export const listChatSessions = /* GraphQL */ `query ListChatSessions(
   listChatSessions(filter: $filter, limit: $limit, nextToken: $nextToken) {
     items {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt

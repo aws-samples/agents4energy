@@ -15,13 +15,14 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
   createChatMessage(condition: $condition, input: $input) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -30,6 +31,7 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -51,7 +53,7 @@ export const createChatSession = /* GraphQL */ `mutation CreateChatSession(
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken
@@ -73,13 +75,14 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
   deleteChatMessage(condition: $condition, input: $input) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -88,6 +91,7 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -109,7 +113,7 @@ export const deleteChatSession = /* GraphQL */ `mutation DeleteChatSession(
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken
@@ -131,13 +135,14 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
   updateChatMessage(condition: $condition, input: $input) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -146,6 +151,7 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -167,7 +173,7 @@ export const updateChatSession = /* GraphQL */ `mutation UpdateChatSession(
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken

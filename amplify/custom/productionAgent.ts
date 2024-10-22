@@ -16,7 +16,6 @@ interface ProductionAgentProps {
     s3BucketName: string,
 }
 
-
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
@@ -44,6 +43,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                         actions: ["s3:GetObject"],
                         resources: [
                             `arn:aws:s3:::${props.s3BucketName}/*`
+                        ],
+                    }),
+                    new iam.PolicyStatement({
+                        actions: ["s3:ListBucket"],
+                        resources: [
+                            `arn:aws:s3:::${props.s3BucketName}`
                         ],
                     }),
                 ]
@@ -94,6 +99,27 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             'DATA_BUCKET_NAME': props.s3BucketName,
             // 'MODEL_ID': 'anthropic.claude-3-sonnet-20240229-v1:0',
             'MODEL_ID': 'anthropic.claude-3-haiku-20240307-v1:0',
+        },
+        layers: [imageMagickLayer, ghostScriptLayer]
+    });
+
+    const convertPdfToJsonFunction = new NodejsFunction(scope, 'ConvertPdfToJsonFunction', {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        entry: path.join(__dirname, '..', 'functions', 'convertPdfToJson', 'index.ts'),
+        bundling: {
+            format: OutputFormat.CJS,
+            loader: {
+                '.node': 'file',
+            },
+            bundleAwsSDK: true,
+            minify: true,
+            sourceMap: true,
+        },
+        timeout: cdk.Duration.minutes(15),
+        memorySize: 3000,
+        role: queryReportsLambdaRole,
+        environment: {
+            'DATA_BUCKET_NAME': props.s3BucketName,
         },
         layers: [imageMagickLayer, ghostScriptLayer]
     });
@@ -163,7 +189,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
 
     return {
-        stepFunctionArn: queryImagesStateMachine.stateMachineArn
+        queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,
+        imageMagickLayer: imageMagickLayer,
+        ghostScriptLayer: ghostScriptLayer,
+        getInfoFromPdfFunction: queryReportImageLambda,
+        convertPdfToJsonFunction: convertPdfToJsonFunction
     };
-
 }

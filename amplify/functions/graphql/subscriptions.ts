@@ -15,13 +15,14 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
   onCreateChatMessage(filter: $filter, owner: $owner) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -30,6 +31,7 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -51,7 +53,7 @@ export const onCreateChatSession = /* GraphQL */ `subscription OnCreateChatSessi
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken
@@ -73,13 +75,14 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
   onDeleteChatMessage(filter: $filter, owner: $owner) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -88,6 +91,7 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -109,7 +113,7 @@ export const onDeleteChatSession = /* GraphQL */ `subscription OnDeleteChatSessi
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken
@@ -131,13 +135,14 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
   onUpdateChatMessage(filter: $filter, owner: $owner) {
     chatSessionId
     content
+    contentBlocks
     createdAt
     id
     owner
     role
     session {
       createdAt
-      firstMessage
+      firstMessageSummary
       id
       owner
       updatedAt
@@ -146,6 +151,7 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
     tool_call_id
     tool_calls
     tool_name
+    trace
     updatedAt
     __typename
   }
@@ -167,7 +173,7 @@ export const onUpdateChatSession = /* GraphQL */ `subscription OnUpdateChatSessi
       __typename
     }
     createdAt
-    firstMessage
+    firstMessageSummary
     id
     messages {
       nextToken

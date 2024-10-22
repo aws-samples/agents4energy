@@ -1,18 +1,15 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { DerivedCombinedSchema } from '@aws-amplify/data-schema-types'; 
 import { defineFunction } from '@aws-amplify/backend';
 
 export const invokeBedrockAgentFunction = defineFunction({
-  // optionally specify a name for the Function (defaults to directory name)
   name: 'invoke-bedrock-agent',
-  // optionally specify a path to your handler (defaults to "./handler.ts")
   entry: '../functions/invokeBedrockAgent.ts',
   timeoutSeconds: 120
 });
 
 export const getStructuredOutputFromLangchainFunction = defineFunction({
-  // optionally specify a name for the Function (defaults to directory name)
   name: 'get-structured-output',
-  // optionally specify a path to your handler (defaults to "./handler.ts")
   entry: '../functions/getStructuredOutputFromLangchain.ts',
   timeoutSeconds: 120
 });
@@ -24,13 +21,26 @@ export const productionAgentFunction = defineFunction({
   environment: {
     // MODEL_ID: 'anthropic.claude-3-5-sonnet-20240620-v1:0'
     MODEL_ID: 'anthropic.claude-3-sonnet-20240229-v1:0'
-  }
+  },
+  runtime: 20
 });
 
+// export const convertPdfToImagesAndAddMessagesFunction = defineFunction({
+//   name: "convert-pdf-to-image-function",
+//   entry: '../functions/convertPdfToImages/index.ts',
+//   timeoutSeconds: 900,
+// });
+
 const schema = a.schema({
+
   BedrockResponse: a.customType({
     body: a.string(),
     error: a.string(),
+  }),
+
+  BedrockAgentResponse: a.customType({
+    completion: a.string(),
+    orchestrationTrace: a.string()
   }),
 
   ChatSession: a
@@ -52,6 +62,8 @@ const schema = a.schema({
       chatSessionId: a.id(),
       session: a.belongsTo("ChatSession", "chatSessionId"),
       content: a.string().required(),
+      contentBlocks: a.json(),
+      trace: a.string(),
       role: a.enum(["human", "ai", "tool"]),
       owner: a.string(),
       createdAt: a.datetime(),
@@ -76,7 +88,7 @@ const schema = a.schema({
   listBedrockAgents: a
     .query()
     .returns(a.ref("BedrockResponse"))
-    .authorization(allow => allow.authenticated())
+    .authorization(allow => [allow.authenticated()])
     .handler(
       a.handler.custom({ entry: "./listBedrockAgents.js", dataSource: "bedrockAgentDS" })
     ),
@@ -92,8 +104,8 @@ const schema = a.schema({
 
   invokeBedrockAgent: a
     .query()
-    .arguments({ prompt: a.string().required(), agentId: a.string().required(), agentAliasId: a.string().required(), sessionId: a.string().required() })
-    .returns(a.string())
+    .arguments({ prompt: a.string().required(), agentId: a.string().required(), agentAliasId: a.string().required(), chatSessionId: a.string().required() })
+    .returns(a.ref("BedrockAgentResponse"))
     .authorization(allow => allow.authenticated())
     .handler(
       a.handler.function(invokeBedrockAgentFunction)
@@ -126,17 +138,34 @@ const schema = a.schema({
       dataToExclude: a.json(),
       dataToInclude: a.json()
     })
+    .returns(a.json()),
+  // .authorization(allow => allow.authenticated())
+  // .handler(
+  //   a.handler.
+  // ),
+
+  convertPdfToJson: a
+    .query()
+    .arguments({
+      s3Key: a.string().required()
+    })
     .returns(a.json())
-    
+    // .authorization(allow => [allow.authenticated()])
+  ,
+  // .authorization(allow => allow.authenticated()),
+
+
 }).authorization(allow => [
   allow.resource(getStructuredOutputFromLangchainFunction),
-  allow.resource(productionAgentFunction)
-]);;
+  allow.resource(productionAgentFunction),
+  allow.resource(invokeBedrockAgentFunction)
+]);
 
 export type Schema = ClientSchema<typeof schema>;
 
+// https://aws-amplify.github.io/amplify-backend/functions/_aws_amplify_backend.defineData.html
 export const data = defineData({
-  schema,
+  schema: {schemas: [schema]},
   authorizationModes: {
     defaultAuthorizationMode: 'userPool',
     apiKeyAuthorizationMode: {

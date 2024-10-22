@@ -41,11 +41,18 @@ const getDataQualityCheckSchema = {
   required: ['dataChecks'],
 };
 
-
+function isValidJSON(str: string): boolean {
+  try {
+    JSON.parse(str);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
-  const [glossaryBlurbs, setGlossaryBlurbs] = useState<{[key: string]: string}>({})
+  const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
@@ -61,7 +68,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     `
     const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
     if (!newBlurb) throw new Error("No glossary blurb returned")
-    setGlossaryBlurbs((prevGlossaryBlurbs) => ({...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb})) //TODO fix this
+    setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
   }
 
   async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
@@ -82,11 +89,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
       } else {
         setDataQualityBlurb(() => "No data quality issues identified")
       }
-      
+
 
     } else console.log('No suggested prompts found in response: ', dataQualityCheckResponse)
 
-    
+
   }
 
   return (
@@ -178,40 +185,80 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             </div>
           ) : null
           }
+
+          {props.message.trace ? (
+            <div className={styles.btn_chabot_message_copy}>
+              <Popover
+                size="medium"
+                position="top"
+                triggerType="custom"
+                dismissButton={false}
+                content={
+                  <p>{props.message.trace}</p>
+                }
+              >
+                <Button>
+                  Chain Of Thought
+                </Button>
+              </Popover>
+            </div>
+          ) : null
+          }
           <>
             <strong>{formatDate(props.message.createdAt)}</strong>
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                table: ({ ...props }) => (
-                  <table className={styles.markdownTable} {...props} />
-                ),
-                tr: ({ ...props }) => {
+            {props.message.tool_call_id ? (
+              <div>
+                <p>Tool Name: {props.message.tool_name}</p>
+              </div>
+            ) : null
+            }
+            {isValidJSON(props.message.content) ? (
+              <div>
+                <pre>{JSON.stringify(JSON.parse(props.message.content), null, 2)}</pre>
+              </div>
 
-                  //Get the value of the relevance score in each table row
-                  const children = React.Children.toArray(props.children);
+            ) : (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  table: ({ ...props }) => (
+                    <table className={styles.markdownTable} {...props} />
+                  ),
+                  tr: ({ ...props }) => {
 
-                  const relevanceScoreTd = children[children.length - 2]; // should be second from the last
+                    //Get the value of the relevance score in each table row
+                    const children = React.Children.toArray(props.children);
 
-                  if (!(React.isValidElement(relevanceScoreTd))) throw new Error("Invalid second from last <td> element");
+                    const relevanceScoreTd = children[children.length - 2]; // should be second from the last
 
-                  const relevanceScoreTdValue = relevanceScoreTd?.props?.children || '10'; // Here you can impliment conditional hiding of rows
+                    if (!(React.isValidElement(relevanceScoreTd))) throw new Error("Invalid second from last <td> element");
 
-                  // console.log("relevanceScore <td> value:", relevanceScoreTdValue); // This will log the value
+                    const relevanceScoreTdValue = relevanceScoreTd?.props?.children || '10'; // Here you can impliment conditional hiding of rows
 
-                  //Hide rows with a low relevanceScore
-                  if (hideRows && parseInt(relevanceScoreTdValue) < 4) return <tr className={styles.hiddenRow} {...props} />
+                    // console.log("relevanceScore <td> value:", relevanceScoreTdValue); // This will log the value
 
-                  // Add a 📄 to the second from the last child in props
-                  // children.splice(children.length - 2, 0, ' ���');
-                  // children[children.length - 2].props?.children = 'hello'
+                    //Hide rows with a low relevanceScore
+                    if (hideRows && parseInt(relevanceScoreTdValue) < 4) return <tr className={styles.hiddenRow} {...props} />
 
-                  else return <tr {...props} />
-                },
-              }}
-            >
-              {props.message.content}
-            </ReactMarkdown>
+                    // Add a 📄 to the second from the last child in props
+                    // children.splice(children.length - 2, 0, ' ���');
+                    // children[children.length - 2].props?.children = 'hello'
+
+                    else return <tr {...props} />
+                  },
+                }}
+              >
+                {props.message.content}
+              </ReactMarkdown>
+            )
+            }
+
+            {props.message.tool_call_id ? (
+              <div>
+                <p>Tool Call Id: {props.message.tool_call_id}</p>
+              </div>
+            ) : null
+            }
             {props.message.tool_calls && typeof props.message.tool_calls === 'string' && JSON.parse(props.message.tool_calls).length > 0 ? (
               <div>
                 <strong>Tool Calls:</strong>
@@ -219,12 +266,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               </div>
             ) : null
             }
-            {props.message.tool_call_id ? (
-              <div>
-                <p>Tool Call Id: {props.message.tool_call_id}</p>
-              </div>
-            ) : null
-            }
+
           </>
         </Container>
       )}

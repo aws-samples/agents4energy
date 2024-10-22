@@ -8,6 +8,8 @@ import { useRouter } from 'next/navigation';
 import { formatDate } from "@/utils/date-utils";
 import DropdownMenu from '@/components/DropDownMenu';
 
+import { defaultAgents } from '@/utils/config'
+
 import '@aws-amplify/ui-react/styles.css'
 
 import {
@@ -60,7 +62,7 @@ type ListAgentIdsResponseType = {
     nextToken: string
 }
 
-const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
+const invokeBedrockAgentParseBodyGetTextAndTrace = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
     console.log('Prompt: ', prompt)
     if (!chatSession.aiBotInfo?.aiBotAliasId) throw new Error('No Agent Alias ID found in invoke request')
     if (!chatSession.aiBotInfo?.aiBotId) throw new Error('No Agent ID found in invoke request')
@@ -68,26 +70,29 @@ const invokeBedrockAgentParseBodyGetText = async (prompt: string, chatSession: S
         prompt: prompt,
         agentId: chatSession.aiBotInfo?.aiBotId,
         agentAliasId: chatSession.aiBotInfo?.aiBotAliasId,
-        sessionId: chatSession.id
+        chatSessionId: chatSession.id
     })
     console.log('Bedrock Agent Response: ', response.data)
     if (!(response.data)) {
         console.log('No response from bedrock agent after prompt: ', prompt)
         return
     }
-    return response.data
+    return {
+        text: response.data.completion,
+        trace: response.data.orchestrationTrace
+    }
 }
 
 const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targetChatSession: Schema['ChatSession']['type']) => {
     const outputStructure = {
         title: "SummarizeMessageIntnet",
-        description: "What intent does the use have when sending this message?",
+        description: "Summarize the intent of the user's message?",
         type: "object",
         properties: {
             summary: {
                 type: 'string',
-                description: `message intent title`,
-                maxLength: 20
+                description: `Message intent summary in 20 characters or fewer.`,
+                // maxLength: 20
             }
         },
         required: ['summary'],
@@ -95,7 +100,7 @@ const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targe
 
     const structuredResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
         chatSessionId: targetChatSession.id,
-        lastMessageText: "",
+        lastMessageText: firstMessageBody,
         outputStructure: JSON.stringify(outputStructure)
     })
     console.log("Structured Output Response: ", structuredResponse)
@@ -108,7 +113,7 @@ const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targe
     } else console.log('No structured output found in response: ', structuredResponse)
 
 
-    
+
 }
 
 const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
@@ -177,19 +182,52 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
 
+    //Set the chat session from params
+    useEffect(() => {
+        if (params && params.chatSessionId) {
+            amplifyClient.models.ChatSession.get({ id: params.chatSessionId }).then(({ data: chatSession }) => {
+                if (chatSession) {
+                    setActiveChatSession(chatSession)
 
+                    console.log('Loaded chat session. Ai Bot Info:', chatSession.aiBotInfo)
+
+                    // if (
+                    //     chatSession.aiBotInfo && 
+                    //     chatSession.aiBotInfo.aiBotId && 
+                    //     chatSession.aiBotInfo.aiBotId in defaultAgents
+                    // ) setSuggestedPromptes(defaultAgents[chatSession.aiBotInfo.aiBotId].samplePrompts)
+
+                } else {
+                    console.log(`Chat session ${params.chatSessionId} not found`)
+                }
+            })
+        } else {
+            console.log("No chat session id in params: ", params)
+        }
+    }, [params])
 
     // Set isLoading to false if the last message is from ai and has no tool call
     useEffect(() => {
         console.log("Messages: ", messages)
+
+        //Set the default prompts if this is the first message
+        if (
+            !messages.length && //No messages currently in the chat
+            activeChatSession &&
+            activeChatSession.aiBotInfo &&
+            activeChatSession.aiBotInfo.aiBotId &&
+            activeChatSession.aiBotInfo.aiBotId in defaultAgents
+        ) setSuggestedPromptes(defaultAgents[activeChatSession.aiBotInfo.aiBotId].samplePrompts)
+
+        //If there are no messages, or the last message is an AI message with no tool calls, prepare for a human message
         if (
             messages.length &&
             messages[messages.length - 1].role === "ai" &&
             (!messages[messages.length - 1].tool_calls || messages[messages.length - 1].tool_calls === "[]")
+
         ) {
             console.log('Ready for human response')
             setIsLoading(false)
-
 
             async function fetchAndSetSuggestedPrompts() {
                 setSuggestedPromptes([])
@@ -207,27 +245,14 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
             }
             fetchAndSetSuggestedPrompts()
-        }
+        } else if (messages.length) setIsLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
+
     }, [messages, activeChatSession])
 
-    //Set the chat session from params
-    useEffect(() => {
-        if (params && params.chatSessionId) {
-            amplifyClient.models.ChatSession.get({ id: params.chatSessionId }).then(({ data: chatSession }) => {
-                if (chatSession) {
-                    setActiveChatSession(chatSession)
-                } else {
-                    console.log(`Chat session ${params.chatSessionId} not found`)
-                }
-            })
-        } else {
-            console.log("No chat session id in params: ", params)
-        }
-    }, [params])
+
 
     // List the user's chat sessions
     useEffect(() => {
-        console.log("user: ", user)
         if (user) {
             amplifyClient.models.ChatSession.observeQuery({
                 filter: {
@@ -293,13 +318,14 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
     }
 
-    function addChatMessage(body: string, role: "human" | "ai" | "tool") {
+    function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string }) {
         const targetChatSessionId = activeChatSession?.id;
 
         if (targetChatSessionId) {
             return amplifyClient.models.ChatMessage.create({
-                content: body,
-                role: role,
+                content: props.body,
+                trace: props.trace,
+                role: props.role,
                 chatSessionId: targetChatSessionId
             })
         }
@@ -308,10 +334,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     async function addUserChatMessage(body: string) {
         if (!messages.length) {
             console.log("This is the initial message. Getting summary for chat session")
-            if (!activeChatSession) throw new Error("No active chat session")            
+            if (!activeChatSession) throw new Error("No active chat session")
             setChatSessionFirstMessageSummary(body, activeChatSession)
         }
-        await addChatMessage(body, "human")
+        await addChatMessage({ body: body, role: "human" })
         sendMessageToChatBot(body);
     }
 
@@ -323,14 +349,18 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         //     : 'No Agent Configured';
 
         if (activeChatSession?.aiBotInfo?.aiBotAliasId) {
-            const responseText = await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
-            if (!responseText) throw new Error("No response from agent");
-            addChatMessage(responseText, "ai")
+            const response = await invokeBedrockAgentParseBodyGetTextAndTrace(prompt, activeChatSession)
+            if (!response) throw new Error("No response from agent");
+            // Agent function now adds messages directly
+            // const { text, trace } = response
+            // if (!text ) throw new Error("No text in response from agent");
+            // if (!trace ) throw new Error("No text in response from agent");
+            // addChatMessage({body: text, trace: trace, role: "ai"})
         } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') {
             const responseText = await invokeBedrockModelParseBodyGetText(prompt)
             if (!responseText) throw new Error("No response from agent");
-            addChatMessage(responseText, "ai")
-        } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Production Agent') {
+            addChatMessage({ body: responseText, role: "ai" })
+        } else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.ProductionAgent.name) {
             await invokeProductionAgent(prompt, activeChatSession)
         } else {
             throw new Error("No Agent Configured");
@@ -362,23 +392,25 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     <DropdownMenu buttonText='New Chat Session'>
                         {
                             [
-                                ...[
-                                    {
-                                        agentName: "Production Agent",
-                                        agentId: null
-                                    },
-                                    {
-                                        agentName: "Foundation Model",
-                                        agentId: null
-                                    },
-                                ],
+                                // ...[
+                                //     {
+                                //         agentName: defaultAgents.ProductionAgent.name,
+                                //         agentId: 'ProductionAgent'
+                                //     },
+                                //     {
+                                //         agentName: "Foundation Model",
+                                //         agentId: "FoundationModel"
+                                //     },
+                                // ],
+                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({agentId: agentId, agentName: agentInfo.name})),
                                 ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
                             ]
                                 .map((agent) => (
                                     <MenuItem
                                         key={agent.agentName}
                                         onClick={async () => {
-                                            const agentAliasId = agent.agentId ? await getAgentAliasId(agent.agentId) : null//If the agent is not a bedrock agent then don't get the alias ID
+                                            // const agentAliasId = agent.agentId ? await getAgentAliasId(agent.agentId) : null//If the agent is not a bedrock agent then don't get the alias ID
+                                            const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
                                             createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
                                         }}
                                     >
@@ -431,7 +463,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 </Box>
             </Drawer>
             <div style={{ marginLeft: '260px', padding: '20px' }}>
-                <Toolbar/>
+                <Toolbar />
                 <Box>
                     <Typography variant="h4" gutterBottom>
                         Chat with {activeChatSession?.aiBotInfo?.aiBotName}
