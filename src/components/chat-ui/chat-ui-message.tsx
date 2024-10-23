@@ -213,9 +213,15 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             ) : null
             }
             {isValidJSON(props.message.content) ? (
-              <div>
-                <pre>{JSON.stringify(JSON.parse(props.message.content), null, 2)}</pre>
-              </div>
+              <pre
+                style={{ //Wrap long lines
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word',
+                }}
+              >
+                {JSON.stringify(JSON.parse(props.message.content), null, 2)}
+              </pre>
 
             ) : (
               <ReactMarkdown
