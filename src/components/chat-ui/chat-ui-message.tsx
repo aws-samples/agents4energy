@@ -163,7 +163,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             </Popover>
           </div>
 
-          {props.message.tool_name ? (
+          {props.message.tool_name && !isValidJSON(props.message.content) ? (
             <div className={styles.btn_chabot_message_copy}>
               <Popover
                 size="medium"

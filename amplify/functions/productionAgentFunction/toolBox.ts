@@ -1,17 +1,9 @@
-// import { Client } from 'aws-amplify/data';
 import { LambdaClient, InvokeCommand, InvokeCommandInput } from "@aws-sdk/client-lambda";
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
 import { env } from '$amplify/env/production-agent-function';
-
-import { convertPdfToB64Strings } from '../utils/pdfUtils'
-import { generateAmplifyClientWrapper } from '../utils/amplifyUtils'
-// import { convertPdfToImages } from '../graphql/queries'
-
-
-// const amplifyClientWrapper = generateAmplifyClientWrapper(env)
 
 const calculatorSchema = z.object({
     operation: z

@@ -16,15 +16,12 @@ const testArguments = {
       "columnName": "Operation Type"
     },
     {
-      "columnDescription": "Text from the report describing details of the operation",
-      "columnName": "Operational Details"
-    },
-    {
-      "columnDescription": "The title of the document the details came from",
-      "columnName": "Document Title"
+      "columnDescription": "Text describing the details of the operation",
+      "columnName": "Operation Details"
     }
   ],
-  "dataToExclude": "transportation corporation,cathotic protection",
+  "dataToExclude": "transportation corporation, cathotic protection"
+  ,
   // s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00114.pdf" // Change in Transporter
   // s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/3003907715_24_wf_1.pdf" // Cathodic Protection
   // "s3Key": "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00112.pdf" //Drill Report

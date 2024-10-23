@@ -54,7 +54,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             const newMessage: BaseMessage = chunk.messages[chunk.messages.length - 1];
 
             if (!(newMessage instanceof HumanMessage)) {
-                console.log('newMessage: ', newMessage)
+                console.log('new message: ', newMessage)
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId, 
                     owner: event.identity.sub, 
