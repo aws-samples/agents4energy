@@ -8,17 +8,19 @@ import {
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
-  dummyFunction
-  // convertPdfToImagesAndAddMessagesFunction
+  // addIamDirectiveFunction
 } from './data/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
-import * as appsync from 'aws-cdk-lib/aws-appsync';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as cr from 'aws-cdk-lib/custom-resources';
 
 import { productionAgentBuilder } from "./custom/productionAgent"
+import { AppConfigurator } from './custom/appConfigurator'
 
 const resourceTags = {
   Project: 'agents-for-energy',
@@ -32,16 +34,16 @@ const backend = defineBackend({
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
-  dummyFunction
-
+  // addIamDirectiveFunction,
   // convertPdfToImagesAndAddMessagesFunction
 });
 
-backend.addOutput({
-  custom: {
-    api_id: backend.data.resources.graphqlApi.apiId,
-  },
-});
+// backend.addOutput({
+//   custom: {
+//     api_id: backend.data.resources.graphqlApi.apiId,
+//     root_stack_name: 
+//   },
+// });
 
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
   "bedrockRuntimeDS",
@@ -137,8 +139,18 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
   })
 )
 
-function applyTagsToRootStack(targetStack: cdk.Stack) {
-  const rootStack = cdk.Stack.of(targetStack).nestedStackParent
+const customStack = backend.createStack('customStack')
+const rootStack = cdk.Stack.of(customStack).nestedStackParent
+if (!rootStack) throw new Error('Root stack not found')
+
+backend.addOutput({
+  custom: {
+    api_id: backend.data.resources.graphqlApi.apiId,
+    root_stack_name: rootStack.stackName
+  },
+});
+
+function applyTagsToRootStack() {
   if (!rootStack) throw new Error('Root stack not found')
   //Apply tags to all the nested stacks
   Object.entries(resourceTags).map(([key, value]) => {
@@ -147,8 +159,7 @@ function applyTagsToRootStack(targetStack: cdk.Stack) {
   cdk.Tags.of(rootStack).add('rootStackName', rootStack.stackName)
 }
 
-const customStack = backend.createStack('customStack')
-applyTagsToRootStack(customStack)
+applyTagsToRootStack()
 
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -255,3 +266,48 @@ convertPdfToJsonFunctionDS.createResolver(
 //   ghostScriptLayer.layerVersionArn,
 //   imageMagickLayer.layerVersionArn
 // ]
+
+// Create a stack with the resources to configure the app
+const configuratorStack = backend.createStack('configuratorStack')
+
+new AppConfigurator(configuratorStack, 'appConfigurator',{})
+
+// // This function and custom resource will update the GraphQL schema to allow for @aws_iam access to all resources 
+// const addIamDirectiveFunction = new NodejsFunction(customStack, 'addIamDirective', {
+//   runtime: lambda.Runtime.NODEJS_20_X,
+//   entry: path.join(__dirname, 'functions', 'addIamDirectiveToAllAssets.ts'),
+//   // bundling: {
+//   //     format: OutputFormat.CJS,
+//   //     loader: {
+//   //         '.node': 'file',
+//   //     },
+//   //     bundleAwsSDK: true,
+//   //     minify: true,
+//   //     sourceMap: true,
+//   // },
+//   timeout: cdk.Duration.seconds(30),
+//   environment: {
+//     // GRAPHQL_API_ID: backend.data.resources.graphqlApi.apiId,
+//     ROOT_STACK_NAME: rootStack.stackName
+//   },
+// });
+
+// const provider = new cr.Provider(customStack, 'Provider', {
+//   onEventHandler: addIamDirectiveFunction,
+// });
+
+// const resource = new cdk.CustomResource(customStack, 'Resource', {
+//   serviceToken: provider.serviceToken,
+//   properties: {
+//     apiId: backend.data.resources.graphqlApi.apiId,
+//     directivesToAdd: "aws_iam,aws_cognito_user_pools"
+//   },
+// });
+
+// new cr.AwsCustomResource(customStack, 'MyCustomResource', {
+//   functionName: addIamDirectiveFunction.functionName,
+  
+//   // properties: {
+//   //   Message: 'Hello from Custom Resource!',
+//   // },
+// });

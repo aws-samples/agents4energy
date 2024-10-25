@@ -24,11 +24,11 @@ export const productionAgentFunction = defineFunction({
   runtime: 20
 });
 
-export const dummyFunction = defineFunction({
-  name: 'dummy-function',
-  entry: '../functions/invokeBedrockAgent.ts',
-  timeoutSeconds: 120
-});
+// export const addIamDirectiveFunction = defineFunction({
+//   name: "add-iam-directive-function",
+//   entry: '../functions/addIamDirectiveToAllAssets.ts',
+//   timeoutSeconds: 60,
+// });
 
 // export const dummyFunction2 = defineFunction()
 
@@ -176,7 +176,6 @@ const schema = a.schema({
   allow.resource(getStructuredOutputFromLangchainFunction),
   allow.resource(productionAgentFunction),
   allow.resource(invokeBedrockAgentFunction),
-  allow.resource(dummyFunction),
 ]);
 
 export type Schema = ClientSchema<typeof schema>;
