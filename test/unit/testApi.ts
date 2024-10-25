@@ -1,13 +1,13 @@
 // import { generateAmplifyClientWrapper } from '../../amplify/functions/utils/amplifyUtils'
 // import outputs from '@/../amplify_outputs.json';
-// import { convertPdfToImages } from '../../amplify/functions/graphql/queries'
+// // import { convertPdfToImages } from '../../amplify/functions/graphql/queries'
 
-// import { AppSyncClient } from '@aws-sdk/client-appsync';
+// // import { AppSyncClient } from '@aws-sdk/client-appsync';
 
-// import AWS from 'aws-sdk';
+// // import AWS from 'aws-sdk';
 
-// console.log('AWS Region: ', AWS.config.region)
-// const credentials = new AWS.EnvironmentCredentials('AWS');
+// // console.log('AWS Region: ', AWS.config.region)
+// // const credentials = new AWS.EnvironmentCredentials('AWS');
 
 
 // // console.log('amplifyClient: ', amplifyClientWrapper)

@@ -4,7 +4,7 @@ import * as APITypes from "../graphql/API";
 import { listChatMessageByChatSessionIdAndCreatedAt } from "../graphql/queries"
 import { Schema } from '../../data/resource';
 
-import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText, MessageContentImageUrl } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage, MessageContentText, MessageContentImageUrl } from "@langchain/core/messages";
 
 // import { getInfoFromPdf, listBedrockAgents } from '../graphql/queries'
 
@@ -37,7 +37,7 @@ createChatMessage(condition: $condition, input: $input) {
     APITypes.CreateChatMessageMutation
 >;
 
-export function getLangChainMessageTextContent(message: HumanMessage | AIMessage | ToolMessage): string | void {
+export function getLangChainMessageTextContent(message: HumanMessage | AIMessage | AIMessageChunk | ToolMessage): string | void {
     // console.log('message type: ', message._getType())
     // console.log('Content type: ', typeof message.content)
     // console.log('(message.content[0] as MessageContentText).text', (message.content[0] as MessageContentText).text)
@@ -67,13 +67,16 @@ export function getLangChainMessageTextContent(message: HumanMessage | AIMessage
 }
 
 export function generateAmplifyClientWrapper(env: any) {
+    console.log('AMPLIFY_DATA_GRAPHQL_ENDPOINT from env: ', env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
+    // console.log('env: ', env)
     Amplify.configure(
         {
             API: {
                 GraphQL: {
                     endpoint: env.AMPLIFY_DATA_GRAPHQL_ENDPOINT, // replace with your defineData name
                     region: env.AWS_REGION,
-                    defaultAuthMode: 'identityPool'
+                    defaultAuthMode: 'identityPool',
+                    apiKey: env.A
                 }
             }
         },
@@ -100,11 +103,11 @@ export function generateAmplifyClientWrapper(env: any) {
 
     const amplifyClient = generateClient<Schema>()
 
-    
 
-    
 
-    type PublishMessagePropsType = {chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage }
+
+
+    type PublishMessagePropsType = { chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage }
     async function publishMessage(props: PublishMessagePropsType) {
 
         const messageTextContent = getLangChainMessageTextContent(props.message)
@@ -147,7 +150,7 @@ export function generateAmplifyClientWrapper(env: any) {
 
     // If you use the amplifyClient: Client type, you get the error below
     //Excessive stack depth comparing types 'Prettify<DeepReadOnlyObject<RestoreArrays<UnionToIntersection<DeepPickFromPath<FlatModel, ?[number]>>, FlatModel>>>' and 'Prettify<DeepReadOnlyObject<RestoreArrays<UnionToIntersection<DeepPickFromPath<FlatModel, ?[number]>>, FlatModel>>>'.ts(2321)
-    async function getChatMessageHistory(props: {chatSessionId: string, latestHumanMessageText: string }) {
+    async function getChatMessageHistory(props: { chatSessionId: string, latestHumanMessageText: string }) {
 
         // console.log('event: ', event)
         // console.log('context: ', context)
@@ -202,9 +205,10 @@ export function generateAmplifyClientWrapper(env: any) {
 
         // If the last message is from AI, add the latestHumanMessageText to the end of the messages.
         if (
-            messages &&
-            messages[messages.length - 1] &&
-            !(messages[messages.length - 1] instanceof HumanMessage)
+            messages.length === 0 || (
+                messages[messages.length - 1] &&
+                !(messages[messages.length - 1] instanceof HumanMessage)
+            )
         ) {
             messages.push(
                 new HumanMessage({
@@ -228,7 +232,7 @@ export function generateAmplifyClientWrapper(env: any) {
     //     })
     //     return JSON.parse(convertPdfToImagesResponse.data.convertPdfToImages || "").imageMessaggeContentBlocks
     // }
-    
+
 
     return {
         amplifyClient: amplifyClient,

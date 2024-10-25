@@ -9,16 +9,16 @@ import {
 import remarkGfm from "remark-gfm";
 import ReactMarkdown from "react-markdown";
 
-import type { Schema } from '@/../amplify/data/resource';
 import { formatDate } from "@/utils/date-utils";
 import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
 
 import styles from "@/styles/chat-ui.module.scss";
 import React, { useState } from "react";
-// import { Message } from "@aws-amplify/ui-react";
+import { Message } from "../../utils/types";
 
 export interface ChatUIMessageProps {
-  message: Schema["ChatMessage"]["type"];
+  // message: Schema["ChatMessage"]["type"];
+  message: Message
   showCopyButton?: boolean;
 }
 
@@ -56,7 +56,9 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
-  async function getGlossary(message: Schema["ChatMessage"]["type"]) {
+  // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
+  async function getGlossary(message: Message) {
+
     if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
 
     if (message.chatSessionId in glossaryBlurbs) return
@@ -71,7 +73,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
   }
 
-  async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
+  // async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
+  async function getDataQualityCheck(message: Message) {
     setDataQualityBlurb("")
 
     if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
@@ -122,46 +125,51 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             </Popover>
           </div>
 
+          {props.message.chatSessionId ? (
+            <>
+              <div className={styles.btn_chabot_message_copy}>
+                <Popover
+                  size="medium"
+                  position="top"
+                  triggerType="custom"
+                  dismissButton={false}
+                  content={
+                    <p>
+                      {dataQualityBlurb ? dataQualityBlurb : <Spinner />}
+                    </p>
+                  }
+                >
+                  <Button
+                    onClick={() => getDataQualityCheck(props.message)}
+                  >
+                    Data Quality Check
+                  </Button>
+                </Popover>
+              </div>
 
-          <div className={styles.btn_chabot_message_copy}>
-            <Popover
-              size="medium"
-              position="top"
-              triggerType="custom"
-              dismissButton={false}
-              content={
-                <p>
-                  {dataQualityBlurb ? dataQualityBlurb : <Spinner />}
-                </p>
-              }
-            >
-              <Button
-                onClick={() => getDataQualityCheck(props.message)}
-              >
-                Data Quality Check
-              </Button>
-            </Popover>
-          </div>
+              <div className={styles.btn_chabot_message_copy}>
+                <Popover
+                  size="medium"
+                  position="top"
+                  triggerType="custom"
+                  dismissButton={false}
+                  content={
+                    <p>
+                      {glossaryBlurbs[props.message.chatSessionId] ? glossaryBlurbs[props.message.chatSessionId] : <Spinner />}
+                    </p>
+                  }
+                >
+                  <Button
+                    onClick={() => getGlossary(props.message)}
+                  >
+                    Show Glossary
+                  </Button>
+                </Popover>
+              </div>
+            </>
+          ) : null
+          }
 
-          <div className={styles.btn_chabot_message_copy}>
-            <Popover
-              size="medium"
-              position="top"
-              triggerType="custom"
-              dismissButton={false}
-              content={
-                <p>
-                  {props.message.chatSessionId && glossaryBlurbs[props.message.chatSessionId] ? glossaryBlurbs[props.message.chatSessionId] : <Spinner />}
-                </p>
-              }
-            >
-              <Button
-                onClick={() => getGlossary(props.message)}
-              >
-                Show Glossary
-              </Button>
-            </Popover>
-          </div>
 
           {props.message.tool_name && !isValidJSON(props.message.content) ? (
             <div className={styles.btn_chabot_message_copy}>

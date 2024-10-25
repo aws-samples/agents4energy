@@ -188,3 +188,14 @@ export const onUpdateChatSession = /* GraphQL */ `subscription OnUpdateChatSessi
   APITypes.OnUpdateChatSessionSubscriptionVariables,
   APITypes.OnUpdateChatSessionSubscription
 >;
+export const recieveResponseStreamChunk = /* GraphQL */ `subscription RecieveResponseStreamChunk {
+  recieveResponseStreamChunk {
+    chatSessionId
+    chunk
+    __typename
+  }
+}
+` as GeneratedSubscription<
+  APITypes.RecieveResponseStreamChunkSubscriptionVariables,
+  APITypes.RecieveResponseStreamChunkSubscription
+>;

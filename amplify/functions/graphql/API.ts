@@ -237,6 +237,12 @@ export type DeleteChatSessionInput = {
   id: string,
 };
 
+export type ResponseStreamChunk = {
+  __typename: "ResponseStreamChunk",
+  chatSessionId: string,
+  chunk: string,
+};
+
 export type UpdateChatMessageInput = {
   chatSessionId?: string | null,
   content?: string | null,
@@ -314,12 +320,12 @@ export type ModelSubscriptionChatSessionFilterInput = {
   updatedAt?: ModelSubscriptionStringInput | null,
 };
 
-export type ConvertPdfToYAMLQueryVariables = {
+export type ConvertPdfToJsonQueryVariables = {
   s3Key: string,
 };
 
-export type ConvertPdfToYAMLQuery = {
-  convertPdfToYAML?: string | null,
+export type ConvertPdfToJsonQuery = {
+  convertPdfToJson?: string | null,
 };
 
 export type GetChatMessageQueryVariables = {
@@ -654,6 +660,19 @@ export type DeleteChatSessionMutation = {
   } | null,
 };
 
+export type PublishResponseStreamChunkMutationVariables = {
+  chatSessionId: string,
+  chunk: string,
+};
+
+export type PublishResponseStreamChunkMutation = {
+  publishResponseStreamChunk?:  {
+    __typename: "ResponseStreamChunk",
+    chatSessionId: string,
+    chunk: string,
+  } | null,
+};
+
 export type UpdateChatMessageMutationVariables = {
   condition?: ModelChatMessageConditionInput | null,
   input: UpdateChatMessageInput,
@@ -883,5 +902,16 @@ export type OnUpdateChatSessionSubscription = {
     } | null,
     owner?: string | null,
     updatedAt: string,
+  } | null,
+};
+
+export type RecieveResponseStreamChunkSubscriptionVariables = {
+};
+
+export type RecieveResponseStreamChunkSubscription = {
+  recieveResponseStreamChunk?:  {
+    __typename: "ResponseStreamChunk",
+    chatSessionId: string,
+    chunk: string,
   } | null,
 };

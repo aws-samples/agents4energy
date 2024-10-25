@@ -21,7 +21,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const rootStack = cdk.Stack.of(scope).nestedStackParent
 
     if (!rootStack) throw new Error('Root stack not found')
-
+    
 
     // Lambda function to apply a promp to a pdf file
     const queryReportsLambdaRole = new iam.Role(scope, 'LambdaExecutionRole', {

@@ -9,6 +9,7 @@ import TextareaAutosize from "react-textarea-autosize";
 import { ChatScrollState } from "./chat-ui";
 // import { ChatMessage } from "./types";
 import type { Schema } from '@/../amplify/data/resource';
+import { Message } from '../../utils/types'
 
 import styles from "../../styles/chat-ui.module.scss";
 
@@ -16,7 +17,7 @@ export interface ChatUIInputPanelProps {
   inputPlaceholderText?: string;
   sendButtonText?: string;
   running?: boolean;
-  messages?: Array<Schema["ChatMessage"]["type"]>;
+  messages?: Message[];
   onSendMessage?: (message: string) => void;
 }
 
