@@ -8,15 +8,19 @@ import {
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
-  // convertPdfToImagesAndAddMessagesFunction
+  // addIamDirectiveFunction
 } from './data/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as cr from 'aws-cdk-lib/custom-resources';
 
 import { productionAgentBuilder } from "./custom/productionAgent"
+import { AppConfigurator } from './custom/appConfigurator'
 
 const resourceTags = {
   Project: 'agents-for-energy',
@@ -30,8 +34,16 @@ const backend = defineBackend({
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
+  // addIamDirectiveFunction,
   // convertPdfToImagesAndAddMessagesFunction
 });
+
+// backend.addOutput({
+//   custom: {
+//     api_id: backend.data.resources.graphqlApi.apiId,
+//     root_stack_name: 
+//   },
+// });
 
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
   "bedrockRuntimeDS",
@@ -76,8 +88,7 @@ bedrockRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
     resources: [
       `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
     ],
-    actions: ["bedrock:InvokeModel"],
-
+    actions: ["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],
   })
 );
 
@@ -128,8 +139,18 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
   })
 )
 
-function applyTagsToRootStack(targetStack: cdk.Stack) {
-  const rootStack = cdk.Stack.of(targetStack).nestedStackParent
+const customStack = backend.createStack('customStack')
+const rootStack = cdk.Stack.of(customStack).nestedStackParent
+if (!rootStack) throw new Error('Root stack not found')
+
+backend.addOutput({
+  custom: {
+    api_id: backend.data.resources.graphqlApi.apiId,
+    root_stack_name: rootStack.stackName
+  },
+});
+
+function applyTagsToRootStack() {
   if (!rootStack) throw new Error('Root stack not found')
   //Apply tags to all the nested stacks
   Object.entries(resourceTags).map(([key, value]) => {
@@ -138,29 +159,29 @@ function applyTagsToRootStack(targetStack: cdk.Stack) {
   cdk.Tags.of(rootStack).add('rootStackName', rootStack.stackName)
 }
 
-const customStack = backend.createStack('customStack')
-applyTagsToRootStack(customStack)
+applyTagsToRootStack()
 
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const fileDeployment = new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
+new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'testData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
 });
 
-const { queryImagesStateMachineArn, ghostScriptLayer, imageMagickLayer, getInfoFromPdfFunction, convertPdfToJsonFunction } = productionAgentBuilder(customStack, {
+const { queryImagesStateMachineArn, getInfoFromPdfFunction, convertPdfToJsonFunction } = productionAgentBuilder(customStack, {
   s3BucketName: backend.storage.resources.bucket.bucketName
 })
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
 backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_JSON_LAMBDA_ARN', convertPdfToJsonFunction.functionArn)
+// if (backend.data.apiKey) backend.productionAgentFunction.addEnvironment('API_KEY',backend.data.apiKey)
 
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
-    actions: ["bedrock:InvokeModel"],
+    actions: ["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],
     resources: [
       `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
       `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
@@ -221,6 +242,22 @@ convertPdfToJsonFunctionDS.createResolver(
   }
 )
 
+// new appsync.Resolver(customStack, 'publishResponseStreamChunkResolver', {
+//   api: backend.data.resources.graphqlApi,
+//   typeName: 'Query',
+//   fieldName: 'listBedrockAgents',
+//   code: appsync.Code.fromAsset(path.join(rootDir, 'amplify/data/listBedrockAgents.js')),
+//   runtime: appsync.FunctionRuntime.JS_1_0_0
+// })
+
+// noneDS.createResolver(
+//   'updatedResolver',
+//   {
+//     typeName: 'Mutation',
+//     fieldName: 'publishResponseStreamChunk'
+//   }
+// )
+
 
 // if (backend.productionAgentFunction.resources.lambda.role) convertPdfToYAMLFunction.grantInvoke(backend.productionAgentFunction.resources.lambda.role)
 
@@ -229,3 +266,48 @@ convertPdfToJsonFunctionDS.createResolver(
 //   ghostScriptLayer.layerVersionArn,
 //   imageMagickLayer.layerVersionArn
 // ]
+
+// Create a stack with the resources to configure the app
+const configuratorStack = backend.createStack('configuratorStack')
+
+new AppConfigurator(configuratorStack, 'appConfigurator',{})
+
+// // This function and custom resource will update the GraphQL schema to allow for @aws_iam access to all resources 
+// const addIamDirectiveFunction = new NodejsFunction(customStack, 'addIamDirective', {
+//   runtime: lambda.Runtime.NODEJS_20_X,
+//   entry: path.join(__dirname, 'functions', 'addIamDirectiveToAllAssets.ts'),
+//   // bundling: {
+//   //     format: OutputFormat.CJS,
+//   //     loader: {
+//   //         '.node': 'file',
+//   //     },
+//   //     bundleAwsSDK: true,
+//   //     minify: true,
+//   //     sourceMap: true,
+//   // },
+//   timeout: cdk.Duration.seconds(30),
+//   environment: {
+//     // GRAPHQL_API_ID: backend.data.resources.graphqlApi.apiId,
+//     ROOT_STACK_NAME: rootStack.stackName
+//   },
+// });
+
+// const provider = new cr.Provider(customStack, 'Provider', {
+//   onEventHandler: addIamDirectiveFunction,
+// });
+
+// const resource = new cdk.CustomResource(customStack, 'Resource', {
+//   serviceToken: provider.serviceToken,
+//   properties: {
+//     apiId: backend.data.resources.graphqlApi.apiId,
+//     directivesToAdd: "aws_iam,aws_cognito_user_pools"
+//   },
+// });
+
+// new cr.AwsCustomResource(customStack, 'MyCustomResource', {
+//   functionName: addIamDirectiveFunction.functionName,
+  
+//   // properties: {
+//   //   Message: 'Hello from Custom Resource!',
+//   // },
+// });

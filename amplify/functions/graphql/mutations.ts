@@ -128,6 +128,17 @@ export const deleteChatSession = /* GraphQL */ `mutation DeleteChatSession(
   APITypes.DeleteChatSessionMutationVariables,
   APITypes.DeleteChatSessionMutation
 >;
+export const publishResponseStreamChunk = /* GraphQL */ `mutation PublishResponseStreamChunk($chatSessionId: String!, $chunk: String!) {
+  publishResponseStreamChunk(chatSessionId: $chatSessionId, chunk: $chunk) {
+    chatSessionId
+    chunk
+    __typename
+  }
+}
+` as GeneratedMutation<
+  APITypes.PublishResponseStreamChunkMutationVariables,
+  APITypes.PublishResponseStreamChunkMutation
+>;
 export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
   $condition: ModelChatMessageConditionInput
   $input: UpdateChatMessageInput!

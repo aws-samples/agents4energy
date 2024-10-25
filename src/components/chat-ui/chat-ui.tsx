@@ -1,17 +1,15 @@
 import { StatusIndicator } from "@cloudscape-design/components";
-// import { ChatMessage } from "./types";
 import ChatUIInputPanel from "./chat-ui-input-panel";
 import { useEffect } from "react";
 import ChatUIMessageList from "./chat-ui-message-list";
 import styles from "../../styles/chat-ui.module.scss";
-import type { Schema } from '@/../amplify/data/resource';
-
+import { Message } from '../../utils/types'
 
 
 export interface ChatUIProps {
   loading?: boolean;
   running?: boolean;
-  messages?: Array<Schema["ChatMessage"]["type"]>;
+  messages?: Message[];
   welcomeText?: string;
   inputPlaceholderText?: string;
   sendButtonText?: string;

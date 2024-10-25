@@ -115,7 +115,7 @@ async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => a
     return response
 }
 
-export const handler: Schema["getInfoFromPdf"]["functionHandler"] = async (event, context) => {
+export const handler: Schema["getInfoFromPdf"]["functionHandler"] = async (event) => {
 
     // throw new Error("This function is not implemented yet");
     // console.log('event: ', event)
@@ -123,6 +123,9 @@ export const handler: Schema["getInfoFromPdf"]["functionHandler"] = async (event
     // console.log('Amplify env: ', env)
 
     // If event.aruments.tableColumns is not an array throw an error
+
+    console.log("S3 Key: ", event.arguments.s3Key)
+
     if (!Array.isArray(event.arguments.tableColumns)) throw new Error("tableColumns must be an array of TableColumn type");
     if (!process.env.DATA_BUCKET_NAME) throw new Error("DATA_BUCKET_NAME does not exist in env vars");
 
@@ -154,6 +157,7 @@ export const handler: Schema["getInfoFromPdf"]["functionHandler"] = async (event
         }
     })
 
+    console.log(`Args: ${event.arguments}`)
     // Print the structure of the outputSchema:
     console.log('Target output schema: ', tableRowOutputFomat)
 

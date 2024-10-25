@@ -1,5 +1,4 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
-import { DerivedCombinedSchema } from '@aws-amplify/data-schema-types'; 
 import { defineFunction } from '@aws-amplify/backend';
 
 export const invokeBedrockAgentFunction = defineFunction({
@@ -25,11 +24,13 @@ export const productionAgentFunction = defineFunction({
   runtime: 20
 });
 
-// export const convertPdfToImagesAndAddMessagesFunction = defineFunction({
-//   name: "convert-pdf-to-image-function",
-//   entry: '../functions/convertPdfToImages/index.ts',
-//   timeoutSeconds: 900,
+// export const addIamDirectiveFunction = defineFunction({
+//   name: "add-iam-directive-function",
+//   entry: '../functions/addIamDirectiveToAllAssets.ts',
+//   timeoutSeconds: 60,
 // });
+
+// export const dummyFunction2 = defineFunction()
 
 const schema = a.schema({
 
@@ -54,7 +55,7 @@ const schema = a.schema({
         aiBotVersion: a.string(),
       })
     })
-    .authorization((allow) => [allow.owner(), allow.authenticated()]), //The allow.authenticated() allows other users to view chat sessions.
+    .authorization((allow) => [allow.owner(), allow.authenticated().to(['read'])]), //The allow.authenticated() allows other users to view chat sessions.
   // TODO: let authenticated only read
 
   ChatMessage: a
@@ -139,33 +140,49 @@ const schema = a.schema({
       dataToInclude: a.json()
     })
     .returns(a.json()),
-  // .authorization(allow => allow.authenticated())
-  // .handler(
-  //   a.handler.
-  // ),
 
   convertPdfToJson: a
     .query()
     .arguments({
       s3Key: a.string().required()
     })
-    .returns(a.json())
-    // .authorization(allow => [allow.authenticated()])
-  ,
-  // .authorization(allow => allow.authenticated()),
+    .returns(a.json()),
 
+  //These assets enable token level streaming from the model
+  ResponseStreamChunk: a
+    .customType({
+      chunk: a.string().required(),
+      chatSessionId: a.string().required()
+    }),
+
+  publishResponseStreamChunk: a
+    .mutation()
+    .arguments({
+      chunk: a.string().required(),
+      chatSessionId: a.string().required(),
+    })
+    .returns(a.ref('ResponseStreamChunk'))
+    .handler(a.handler.custom({ entry: './publishMessageStreamChunk.js' }))
+    .authorization(allow => [allow.authenticated()]),
+
+  recieveResponseStreamChunk: a
+    .subscription()
+    .for(a.ref('publishResponseStreamChunk'))
+    .arguments({ chatSessionId: a.string().required() })
+    .handler(a.handler.custom({ entry: './receiveMessageStreamChunk.js' }))
+    .authorization(allow => [allow.authenticated()]),
 
 }).authorization(allow => [
   allow.resource(getStructuredOutputFromLangchainFunction),
   allow.resource(productionAgentFunction),
-  allow.resource(invokeBedrockAgentFunction)
+  allow.resource(invokeBedrockAgentFunction),
 ]);
 
 export type Schema = ClientSchema<typeof schema>;
 
 // https://aws-amplify.github.io/amplify-backend/functions/_aws_amplify_backend.defineData.html
 export const data = defineData({
-  schema: {schemas: [schema]},
+  schema: { schemas: [schema] },
   authorizationModes: {
     defaultAuthorizationMode: 'userPool',
     apiKeyAuthorizationMode: {

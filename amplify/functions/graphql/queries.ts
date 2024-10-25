@@ -8,12 +8,12 @@ type GeneratedQuery<InputType, OutputType> = string & {
   __generatedQueryOutput: OutputType;
 };
 
-export const convertPdfToYAML = /* GraphQL */ `query ConvertPdfToYAML($s3Key: String!) {
-  convertPdfToYAML(s3Key: $s3Key)
+export const convertPdfToJson = /* GraphQL */ `query ConvertPdfToJson($s3Key: String!) {
+  convertPdfToJson(s3Key: $s3Key)
 }
 ` as GeneratedQuery<
-  APITypes.ConvertPdfToYAMLQueryVariables,
-  APITypes.ConvertPdfToYAMLQuery
+  APITypes.ConvertPdfToJsonQueryVariables,
+  APITypes.ConvertPdfToJsonQuery
 >;
 export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
   getChatMessage(id: $id) {

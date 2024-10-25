@@ -1,10 +1,9 @@
 import { SpaceBetween } from "@cloudscape-design/components";
-// import { ChatMessage } from "./types";
 import ChatUIMessage from "./chat-ui-message";
-import type { Schema } from '@/../amplify/data/resource';
+import { Message } from '../../utils/types'
 
 export interface ChatUIMessageListProps {
-  messages?: Array<Schema["ChatMessage"]["type"]>;
+  messages?: Message[];
   showCopyButton?: boolean;
 }
 

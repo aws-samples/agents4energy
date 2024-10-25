@@ -10,6 +10,8 @@ import DropdownMenu from '@/components/DropDownMenu';
 
 import { defaultAgents } from '@/utils/config'
 
+import { Message } from '@/utils/types'
+
 import '@aws-amplify/ui-react/styles.css'
 
 import {
@@ -173,6 +175,7 @@ const getSuggestedPromptsOutputStructure = {
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["type"]>>([]);
+    const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({role:"ai", content:"", createdAt: new Date().toISOString()});
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
     const [activeChatSession, setActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
@@ -191,12 +194,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
                     console.log('Loaded chat session. Ai Bot Info:', chatSession.aiBotInfo)
 
-                    // if (
-                    //     chatSession.aiBotInfo && 
-                    //     chatSession.aiBotInfo.aiBotId && 
-                    //     chatSession.aiBotInfo.aiBotId in defaultAgents
-                    // ) setSuggestedPromptes(defaultAgents[chatSession.aiBotInfo.aiBotId].samplePrompts)
-
                 } else {
                     console.log(`Chat session ${params.chatSessionId} not found`)
                 }
@@ -206,9 +203,17 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         }
     }, [params])
 
-    // Set isLoading to false if the last message is from ai and has no tool call
+    // This runs when the chat session messages change
+    // The blurb below sets the suggested prompts and the isLoading indicator
     useEffect(() => {
         console.log("Messages: ", messages)
+
+        //Reset the character stream when we get a new message
+        setCharacterStreamMessage(() => ({
+            content: "",
+            role: "ai",
+            createdAt: new Date().toISOString()
+        }))
 
         //Set the default prompts if this is the first message
         if (
@@ -249,8 +254,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }, [messages, activeChatSession])
 
-
-
     // List the user's chat sessions
     useEffect(() => {
         if (user) {
@@ -277,6 +280,26 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             }).subscribe({
                 next: ({ items }) => { //isSynced is an option here to
                     setMessages((prevMessages) => combineAndSortMessages(prevMessages, items))
+                }
+            }
+            )
+            return () => sub.unsubscribe();
+        }
+
+    }, [activeChatSession])
+
+    // Subscribe to the token stream for this chat session
+    useEffect(() => {
+        if (activeChatSession) {
+            const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: activeChatSession.id}).subscribe({
+                next: ({ chunk }) => {
+                    // console.log('Message Stream Chunk: ', chunk)
+
+                    setCharacterStreamMessage((prevStreamMessage) => ({
+                        content: prevStreamMessage? (prevStreamMessage.content || "") + chunk : chunk,
+                        role: "ai",
+                        createdAt: new Date().toISOString()
+                    }))
                 }
             }
             )
@@ -392,16 +415,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     <DropdownMenu buttonText='New Chat Session'>
                         {
                             [
-                                // ...[
-                                //     {
-                                //         agentName: defaultAgents.ProductionAgent.name,
-                                //         agentId: 'ProductionAgent'
-                                //     },
-                                //     {
-                                //         agentName: "Foundation Model",
-                                //         agentId: "FoundationModel"
-                                //     },
-                                // ],
                                 ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({agentId: agentId, agentName: agentInfo.name})),
                                 ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
                             ]
@@ -409,7 +422,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                     <MenuItem
                                         key={agent.agentName}
                                         onClick={async () => {
-                                            // const agentAliasId = agent.agentId ? await getAgentAliasId(agent.agentId) : null//If the agent is not a bedrock agent then don't get the alias ID
                                             const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
                                             createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
                                         }}
@@ -472,7 +484,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 <Box>
                     <ChatUI
                         onSendMessage={addUserChatMessage}
-                        messages={messages}
+                        messages={[
+                            ...messages,
+                            ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                        ]}
                         running={isLoading}
                     />
                 </Box>
