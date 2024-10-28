@@ -263,6 +263,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
 
     const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}` // Please note that the double literal variable notation is required here or it won't work!
+    // const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?${hydrocarbonProductionDb.secret?.secretName}` // Please note that the double literal variable notation is required here or it won't work!
         
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
     const ProdDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
@@ -271,10 +272,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             semanticVersion: `2024.39.1`
         },
         parameters: {
-            // "DefaultConnectionString": `jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}`,
-            // DefaultConnectionString: `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}\${hydrocarbonProductionDb.secret?.secretName}&...`,
-            // DefaultConnectionString: `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}\${${hydrocarbonProductionDb.secret?.secretName}}`,
-            // DefaultConnectionString: `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?${hydrocarbonProductionDb.secret?.secretName}`,
             DefaultConnectionString: jdbcConnectionString,
             LambdaFunctionName: `${rootStack.stackName}-query-postgres`.slice(-64),
             SecretNamePrefix: `${rootStack.stackName}`,

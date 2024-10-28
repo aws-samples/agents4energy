@@ -59,7 +59,7 @@ export class AppConfigurator extends Construct {
 
     const configureProdDbFunction = new NodejsFunction(this, 'configureProdDbFunction', {
       runtime: lambda.Runtime.NODEJS_LATEST,
-      entry: path.join(rootDir, 'functions', 'addIamDirectiveToAllAssets.ts'),
+      entry: path.join(rootDir, 'functions', 'configureProdDb','index.ts'),
       timeout: cdk.Duration.seconds(30),
       environment: {
         CLUSTER_ARN: props.hydrocarbonProductionDb.clusterArn,
