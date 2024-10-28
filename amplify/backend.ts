@@ -15,9 +15,7 @@ import { storage } from './storage/resource';
 import * as cdk from 'aws-cdk-lib'
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
-import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
-import * as cr from 'aws-cdk-lib/custom-resources';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 
 import { productionAgentBuilder } from "./custom/productionAgent"
 import { AppConfigurator } from './custom/appConfigurator'
@@ -150,6 +148,46 @@ backend.addOutput({
   },
 });
 
+// const vpc = new ec2.Vpc(customStack, 'VPC', {
+//   ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
+// })
+
+const vpc = new ec2.Vpc(customStack, 'A4E-VPC', {
+  ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
+  maxAzs: 3,
+  enableDnsHostnames: true,
+  enableDnsSupport: true,
+  subnetConfiguration: [
+    {
+      cidrMask: 24,
+      name: 'public',
+      subnetType: ec2.SubnetType.PUBLIC,
+    },
+    {
+      cidrMask: 24,
+      name: 'private-with-egress',
+      subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+    },
+  ],
+});
+
+
+// const vpc = new ec2.Vpc(customStack, 'VPC', {
+//   maxAzs: 3,
+//   // natGateways: 1,
+//   vpcName: 'agents-for-energy-vpc',
+//   subnetConfiguration: [
+//     {
+//       name: 'private-with-egress',
+//       subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+//     },
+//     {
+//       name: 'public',
+//       subnetType: ec2.SubnetType.PUBLIC,
+//     },
+//   ],
+// });
+
 function applyTagsToRootStack() {
   if (!rootStack) throw new Error('Root stack not found')
   //Apply tags to all the nested stacks
@@ -170,7 +208,14 @@ new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
   // destinationKeyPrefix: '/'
 });
 
-const { queryImagesStateMachineArn, getInfoFromPdfFunction, convertPdfToJsonFunction } = productionAgentBuilder(customStack, {
+const { 
+  queryImagesStateMachineArn, 
+  getInfoFromPdfFunction, 
+  convertPdfToJsonFunction, 
+  defaultProdDatabaseName, 
+  hydrocarbonProductionDb 
+} = productionAgentBuilder(customStack, {
+  vpc: vpc,
   s3BucketName: backend.storage.resources.bucket.bucketName
 })
 
@@ -242,72 +287,10 @@ convertPdfToJsonFunctionDS.createResolver(
   }
 )
 
-// new appsync.Resolver(customStack, 'publishResponseStreamChunkResolver', {
-//   api: backend.data.resources.graphqlApi,
-//   typeName: 'Query',
-//   fieldName: 'listBedrockAgents',
-//   code: appsync.Code.fromAsset(path.join(rootDir, 'amplify/data/listBedrockAgents.js')),
-//   runtime: appsync.FunctionRuntime.JS_1_0_0
-// })
-
-// noneDS.createResolver(
-//   'updatedResolver',
-//   {
-//     typeName: 'Mutation',
-//     fieldName: 'publishResponseStreamChunk'
-//   }
-// )
-
-
-// if (backend.productionAgentFunction.resources.lambda.role) convertPdfToYAMLFunction.grantInvoke(backend.productionAgentFunction.resources.lambda.role)
-
-// //Set the lambda layers so the function can convert pdfs into images
-// backend.productionAgentFunction.resources.cfnResources.cfnFunction.layers = [
-//   ghostScriptLayer.layerVersionArn,
-//   imageMagickLayer.layerVersionArn
-// ]
-
 // Create a stack with the resources to configure the app
 const configuratorStack = backend.createStack('configuratorStack')
 
-new AppConfigurator(configuratorStack, 'appConfigurator',{})
-
-// // This function and custom resource will update the GraphQL schema to allow for @aws_iam access to all resources 
-// const addIamDirectiveFunction = new NodejsFunction(customStack, 'addIamDirective', {
-//   runtime: lambda.Runtime.NODEJS_20_X,
-//   entry: path.join(__dirname, 'functions', 'addIamDirectiveToAllAssets.ts'),
-//   // bundling: {
-//   //     format: OutputFormat.CJS,
-//   //     loader: {
-//   //         '.node': 'file',
-//   //     },
-//   //     bundleAwsSDK: true,
-//   //     minify: true,
-//   //     sourceMap: true,
-//   // },
-//   timeout: cdk.Duration.seconds(30),
-//   environment: {
-//     // GRAPHQL_API_ID: backend.data.resources.graphqlApi.apiId,
-//     ROOT_STACK_NAME: rootStack.stackName
-//   },
-// });
-
-// const provider = new cr.Provider(customStack, 'Provider', {
-//   onEventHandler: addIamDirectiveFunction,
-// });
-
-// const resource = new cdk.CustomResource(customStack, 'Resource', {
-//   serviceToken: provider.serviceToken,
-//   properties: {
-//     apiId: backend.data.resources.graphqlApi.apiId,
-//     directivesToAdd: "aws_iam,aws_cognito_user_pools"
-//   },
-// });
-
-// new cr.AwsCustomResource(customStack, 'MyCustomResource', {
-//   functionName: addIamDirectiveFunction.functionName,
-  
-//   // properties: {
-//   //   Message: 'Hello from Custom Resource!',
-//   // },
-// });
+new AppConfigurator(configuratorStack, 'appConfigurator', {
+  hydrocarbonProductionDb: hydrocarbonProductionDb,
+  defaultProdDatabaseName: defaultProdDatabaseName
+})

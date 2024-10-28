@@ -7,12 +7,19 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as athena from 'aws-cdk-lib/aws-athena';
+import * as glue from 'aws-cdk-lib/aws-glue';
+import * as rds from 'aws-cdk-lib/aws-rds';
+import * as ec2 from 'aws-cdk-lib/aws-ec2'
 
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CfnApplication } from 'aws-cdk-lib/aws-sam';
 
+const defaultProdDatabaseName = 'proddb'
+
 interface ProductionAgentProps {
+    vpc: ec2.Vpc,
     s3BucketName: string,
 }
 
@@ -21,7 +28,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const rootStack = cdk.Stack.of(scope).nestedStackParent
 
     if (!rootStack) throw new Error('Root stack not found')
-    
+
 
     // Lambda function to apply a promp to a pdf file
     const queryReportsLambdaRole = new iam.Role(scope, 'LambdaExecutionRole', {
@@ -188,11 +195,108 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ),
     });
 
+    // // Glue Database for federated query
+    // const glueDatabase = new glue.CfnDatabase(scope, 'HydrocarbonProdGlueDb', {
+    //     catalogId: rootStack.account,
+    //     databaseInput: {
+    //         name: 'db_fed_query',
+    //         description: 'Glue database to give GenAI access to remote data stores',
+    //     },
+    // });
+
+    //This serverless aurora cluster will store hydrocarbon production pressures and volumes
+    const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'HydrocarbonProdDb', {
+        engine: rds.DatabaseClusterEngine.auroraPostgres({
+            version: rds.AuroraPostgresEngineVersion.VER_13_9,
+        }),
+        scaling: {
+            autoPause: cdk.Duration.minutes(10), // default is to pause after 5 minutes
+            minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
+            maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
+        },
+        enableDataApi: true,
+        defaultDatabaseName: defaultProdDatabaseName, // optional: create a database named "mydb"
+        credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
+            secretName: `${rootStack.stackName}-proddb-credentials`
+        }),
+        vpc: props.vpc,
+        vpcSubnets: {
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // //Create an inbound rule for the db's security group which allows inbound traffic from the vpc
+    // hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
+    //     ec2.Peer.ipv4(props.vpc.vpcCidrBlock),
+    //     ec2.Port.tcp(5432),
+    //     'Allow inbound traffic from VPC'
+    // );
+
+    //Allow inbound traffic from the default SG in the VPC
+    hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
+        ec2.Peer.securityGroupId(props.vpc.vpcDefaultSecurityGroup),
+        ec2.Port.tcp(5432),
+        'Allow inbound traffic from VPC'
+    );
+
+    //   const glueConnection = new glue.CfnConnection(scope, 'AuroraGlueConnection', {
+    //     type: 
+    //     type: glue.ConnectionType.JDBC,
+    //     connectionName: 'aurora-hydrocarbon-prod-connection',
+    //     properties: {
+    //       JDBC_CONNECTION_URL: `jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}`,
+    //       USERNAME: `${hydrocarbonProductionDb.secret?.secretValueFromJson('username').toString()}`,
+    //       PASSWORD: `${hydrocarbonProductionDb.secret?.secretValueFromJson('password').toString()}`,
+    //     },
+    //   });
+
+    const athenaWorkgroup = new athena.CfnWorkGroup(scope, 'FedQueryWorkgroup', {
+        name: `${rootStack.stackName}-fed_query_workgroup`.slice(-64),
+        description: 'Workgroup for querying federated data sources',
+        recursiveDeleteOption: true,
+        workGroupConfiguration: {
+            resultConfiguration: {
+                outputLocation: `s3://${props.s3BucketName}/athena_query_results/`,
+            },
+        },
+    });
+
+    const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}` // Please note that the double literal variable notation is required here or it won't work!
+        
+    // Create the Postgres JDBC connector for Amazon Athena Federated Queries
+    const ProdDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
+        location: {
+            applicationId: `arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaPostgreSQLConnector`,
+            semanticVersion: `2024.39.1`
+        },
+        parameters: {
+            // "DefaultConnectionString": `jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}`,
+            // DefaultConnectionString: `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}\${hydrocarbonProductionDb.secret?.secretName}&...`,
+            // DefaultConnectionString: `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}\${${hydrocarbonProductionDb.secret?.secretName}}`,
+            // DefaultConnectionString: `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?${hydrocarbonProductionDb.secret?.secretName}`,
+            DefaultConnectionString: jdbcConnectionString,
+            LambdaFunctionName: `${rootStack.stackName}-query-postgres`.slice(-64),
+            SecretNamePrefix: `${rootStack.stackName}`,
+            SpillBucket: props.s3BucketName,
+            SpillPrefix: `athena-spill/${rootStack.stackName}`,
+            SecurityGroupIds: props.vpc.vpcDefaultSecurityGroup,
+            SubnetIds: props.vpc.privateSubnets.map(subnet => subnet.subnetId).join(',')
+        }
+    });
+
+    //Create a new cfn output with the connection string
+    new cdk.CfnOutput(scope, 'ProdDbJdbcConnectorConnectionString', {
+        value: `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?...&${hydrocarbonProductionDb.secret?.secretName}&...`
+    });
+
     return {
         queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,
         imageMagickLayer: imageMagickLayer,
         ghostScriptLayer: ghostScriptLayer,
         getInfoFromPdfFunction: queryReportImageLambda,
-        convertPdfToJsonFunction: convertPdfToJsonFunction
+        convertPdfToJsonFunction: convertPdfToJsonFunction,
+        defaultProdDatabaseName: defaultProdDatabaseName,
+        hydrocarbonProductionDb: hydrocarbonProductionDb,
     };
 }
