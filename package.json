@@ -41,6 +41,7 @@
     "@aws-sdk/client-bedrock-agent-runtime": "^3.670.0",
     "@aws-sdk/client-sfn": "^3.670.0",
     "@aws-sdk/credential-provider-node": "^3.670.0",
+    "@cdklabs/generative-ai-cdk-constructs": "^0.1.278",
     "@types/gm": "^1.25.4",
     "@types/node": "^20",
     "@types/react": "^18",
