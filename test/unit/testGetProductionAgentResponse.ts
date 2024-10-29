@@ -14,9 +14,6 @@ process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT = outputs.data.url
 process.env.AWS_DEFAULT_REGION = outputs.auth.aws_region
 process.env.MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
 
-
-
-
 const dummyContext: Context = {
   callbackWaitsForEmptyEventLoop: true,
   functionName: 'test-function',

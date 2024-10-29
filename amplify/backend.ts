@@ -171,23 +171,6 @@ const vpc = new ec2.Vpc(customStack, 'A4E-VPC', {
   ],
 });
 
-
-// const vpc = new ec2.Vpc(customStack, 'VPC', {
-//   maxAzs: 3,
-//   // natGateways: 1,
-//   vpcName: 'agents-for-energy-vpc',
-//   subnetConfiguration: [
-//     {
-//       name: 'private-with-egress',
-//       subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-//     },
-//     {
-//       name: 'public',
-//       subnetType: ec2.SubnetType.PUBLIC,
-//     },
-//   ],
-// });
-
 function applyTagsToRootStack() {
   if (!rootStack) throw new Error('Root stack not found')
   //Apply tags to all the nested stacks
@@ -203,7 +186,7 @@ applyTagsToRootStack()
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
-  sources: [s3Deployment.Source.asset(path.join(rootDir, 'testData'))],
+  sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
 });
@@ -213,10 +196,13 @@ const {
   getInfoFromPdfFunction, 
   convertPdfToJsonFunction, 
   defaultProdDatabaseName, 
-  hydrocarbonProductionDb 
+  hydrocarbonProductionDb,
+  // sqlTableDefBedrockKnoledgeBase,
+  athenaWorkgroup,
+  athenaPostgresCatalog
 } = productionAgentBuilder(customStack, {
   vpc: vpc,
-  s3BucketName: backend.storage.resources.bucket.bucketName
+  s3Bucket: backend.storage.resources.bucket
 })
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
@@ -292,5 +278,9 @@ const configuratorStack = backend.createStack('configuratorStack')
 
 new AppConfigurator(configuratorStack, 'appConfigurator', {
   hydrocarbonProductionDb: hydrocarbonProductionDb,
-  defaultProdDatabaseName: defaultProdDatabaseName
+  defaultProdDatabaseName: defaultProdDatabaseName,
+  // sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
+  athenaWorkgroup: athenaWorkgroup,
+  athenaPostgresCatalog: athenaPostgresCatalog,
+  s3Bucket: backend.storage.resources.bucket
 })

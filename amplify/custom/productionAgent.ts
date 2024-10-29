@@ -11,6 +11,8 @@ import * as athena from 'aws-cdk-lib/aws-athena';
 import * as glue from 'aws-cdk-lib/aws-glue';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as ec2 from 'aws-cdk-lib/aws-ec2'
+import * as s3 from 'aws-cdk-lib/aws-s3';
+// import { amazonaurora, bedrock } from "@cdklabs/generative-ai-cdk-constructs";
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -20,7 +22,7 @@ const defaultProdDatabaseName = 'proddb'
 
 interface ProductionAgentProps {
     vpc: ec2.Vpc,
-    s3BucketName: string,
+    s3Bucket: s3.IBucket,
 }
 
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
@@ -49,13 +51,13 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                     new iam.PolicyStatement({
                         actions: ["s3:GetObject"],
                         resources: [
-                            `arn:aws:s3:::${props.s3BucketName}/*`
+                            `arn:aws:s3:::${props.s3Bucket.bucketName}/*`
                         ],
                     }),
                     new iam.PolicyStatement({
                         actions: ["s3:ListBucket"],
                         resources: [
-                            `arn:aws:s3:::${props.s3BucketName}`
+                            `arn:aws:s3:::${props.s3Bucket.bucketName}`
                         ],
                     }),
                 ]
@@ -103,7 +105,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         memorySize: 3000,
         role: queryReportsLambdaRole,
         environment: {
-            'DATA_BUCKET_NAME': props.s3BucketName,
+            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
             // 'MODEL_ID': 'anthropic.claude-3-sonnet-20240229-v1:0',
             'MODEL_ID': 'anthropic.claude-3-haiku-20240307-v1:0',
         },
@@ -126,7 +128,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         memorySize: 3000,
         role: queryReportsLambdaRole,
         environment: {
-            'DATA_BUCKET_NAME': props.s3BucketName,
+            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
         },
         layers: [imageMagickLayer, ghostScriptLayer]
     });
@@ -149,14 +151,14 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 service: 's3',
                 action: 'listObjectsV2',
                 parameters: {
-                    Bucket: props.s3BucketName,
+                    Bucket: props.s3Bucket.bucketName,
                     Prefix: sfn.JsonPath.stringAt('$.s3Prefix'),
 
                 },
                 iamAction: 's3:ListBucket',
                 iamResources: [
-                    `arn:aws:s3:::${props.s3BucketName}`,
-                    `arn:aws:s3:::${props.s3BucketName}/*`
+                    `arn:aws:s3:::${props.s3Bucket.bucketName}`,
+                    `arn:aws:s3:::${props.s3Bucket.bucketName}/*`
                 ],
                 resultPath: '$.s3Result',
 
@@ -257,35 +259,67 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         recursiveDeleteOption: true,
         workGroupConfiguration: {
             resultConfiguration: {
-                outputLocation: `s3://${props.s3BucketName}/athena_query_results/`,
+                outputLocation: `s3://${props.s3Bucket.bucketName}/athena_query_results/`,
             },
         },
     });
 
-    const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}` // Please note that the double literal variable notation is required here or it won't work!
-    // const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?${hydrocarbonProductionDb.secret?.secretName}` // Please note that the double literal variable notation is required here or it won't work!
-        
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
-    const ProdDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
+    const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
+    // const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?${hydrocarbonProductionDb.secret?.secretName}` 
+    const postgressConnectorLambdaFunctionName = `${rootStack.stackName}-query-postgres`.slice(-64)
+    const prodDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
         location: {
             applicationId: `arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaPostgreSQLConnector`,
             semanticVersion: `2024.39.1`
         },
         parameters: {
             DefaultConnectionString: jdbcConnectionString,
-            LambdaFunctionName: `${rootStack.stackName}-query-postgres`.slice(-64),
+            LambdaFunctionName: postgressConnectorLambdaFunctionName,
             SecretNamePrefix: `${rootStack.stackName}`,
-            SpillBucket: props.s3BucketName,
+            SpillBucket: props.s3Bucket.bucketName,
             SpillPrefix: `athena-spill/${rootStack.stackName}`,
             SecurityGroupIds: props.vpc.vpcDefaultSecurityGroup,
             SubnetIds: props.vpc.privateSubnets.map(subnet => subnet.subnetId).join(',')
         }
     });
 
-    //Create a new cfn output with the connection string
-    new cdk.CfnOutput(scope, 'ProdDbJdbcConnectorConnectionString', {
-        value: `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?...&${hydrocarbonProductionDb.secret?.secretName}&...`
+    //Create an athena datasource for postgres databases
+    const athenaPostgresCatalog = new athena.CfnDataCatalog(scope, 'PostgresAthenaDataSource', {
+        name: `${rootStack.stackName}-postgres`.slice(-64),
+        type: 'LAMBDA',
+        description: 'Athena data source for postgres',
+        parameters: {
+            'function': `arn:aws:lambda:${rootStack.region}:${rootStack.account}:function:${postgressConnectorLambdaFunctionName}`
+        },
     });
+
+    // // Create a bedrock knolege base to present relevant table definitions to the agent
+    // // Dimension of your vector embedding
+    // const embeddingsModelVectorDimension = 1024;
+    // const auroraDb = new amazonaurora.AmazonAuroraVectorStore(scope, "AuroraDefaultVectorStore", {
+    //     embeddingsModelVectorDimension: embeddingsModelVectorDimension,
+        
+    // });
+
+    // const sqlTableDefBedrockKnoledgeBase = new bedrock.KnowledgeBase(scope, "KnowledgeBase", {
+    //     vectorStore: auroraDb,
+    //     embeddingsModel: bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
+    //     instruction: "Use this knowledge base to answer questions about books. " + "It contains the full text of novels.",
+    // });
+
+    // const sqlTableDefBedrockKnoledgeBase = new bedrock.KnowledgeBase(scope, "KnowledgeBase", {
+    //     embeddingsModel: bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
+    //     instruction: "Use this knowledge base to answer questions about books. " + "It contains the full text of novels.",
+    //   });
+
+    // new bedrock.S3DataSource(scope, "DataSource", {
+    //     bucket: props.s3Bucket,
+    //     knowledgeBase: sqlTableDefBedrockKnoledgeBase,
+    //     dataSourceName: "books",
+    //     chunkingStrategy: bedrock.ChunkingStrategy.FIXED_SIZE,
+    // });
+
 
     return {
         queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,
@@ -295,5 +329,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         convertPdfToJsonFunction: convertPdfToJsonFunction,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
+        // sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
+        athenaWorkgroup: athenaWorkgroup,
+        athenaPostgresCatalog: athenaPostgresCatalog
     };
 }

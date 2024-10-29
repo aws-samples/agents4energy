@@ -14,10 +14,15 @@ import * as cr from 'aws-cdk-lib/custom-resources';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { bedrock } from '@cdklabs/generative-ai-cdk-constructs'
 
 export interface AppConfiguratorProps {
     hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster,
-    defaultProdDatabaseName: string
+    defaultProdDatabaseName: string,
+    athenaWorkgroup: cdk.aws_athena.CfnWorkGroup,
+    athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
+    s3Bucket: cdk.aws_s3.IBucket
+    // sqlTableDefBedrockKnoledgeBase: bedrock.KnowledgeBase
 }
 
 
@@ -35,7 +40,7 @@ export class AppConfigurator extends Construct {
     const addIamDirectiveFunction = new NodejsFunction(scope, 'addIamDirective', {
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(rootDir, 'functions', 'addIamDirectiveToAllAssets.ts'),
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(60),
       environment: {
         ROOT_STACK_NAME: rootStack.stackName
       },
@@ -60,16 +65,55 @@ export class AppConfigurator extends Construct {
     const configureProdDbFunction = new NodejsFunction(this, 'configureProdDbFunction', {
       runtime: lambda.Runtime.NODEJS_LATEST,
       entry: path.join(rootDir, 'functions', 'configureProdDb','index.ts'),
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(300),
       environment: {
         CLUSTER_ARN: props.hydrocarbonProductionDb.clusterArn,
         SECRET_ARN: props.hydrocarbonProductionDb.secret!.secretArn,
         DATABASE_NAME: props.defaultProdDatabaseName,
+        ATHENA_WORKGROUP_NAME: props.athenaWorkgroup.name,
+        ATHENA_CATALOG_NAME: props.athenaPostgresCatalog.name,
+        S3_BUCKET_NAME: props.s3Bucket.bucketName
+        // TABLE_DEF_KB_ID: props.sqlTableDefBedrockKnoledgeBase.knowledgeBaseId
       },
     });
 
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+      actions: [
+        'rds-data:ExecuteStatement',
+      ],
+      resources: [`arn:aws:rds:${rootStack.region}:${rootStack.account}:*`],
+      conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+        'StringEquals': {
+          'aws:ResourceTag/rootStackName': rootStack.stackName
+        }
+      }
+    }))
 
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+      actions: [
+        'secretsmanager:GetSecretValue',
+      ],
+      resources: [`arn:aws:secretsmanager:${rootStack.region}:${rootStack.account}:secret:*`],
+      conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+        'StringEquals': {
+          'aws:ResourceTag/rootStackName': rootStack.stackName
+        }
+      }
+    }))
 
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+      actions: [
+        'athena:StartQueryExecution',
+      ],
+      resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:*`],
+      conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+        'StringEquals': {
+          'aws:ResourceTag/rootStackName': rootStack.stackName
+        }
+      }
+    }))
+    
+    // Define a step function which waits for the cloudformation stackk to complete before executing a configureation update
     const waitForCfnStack = new stepfunctions_tasks.CallAwsService(this, 'WaitForCfnStack', {
       service: 'cloudformation',
       action: 'describeStacks',
@@ -138,7 +182,7 @@ export class AppConfigurator extends Construct {
     });
   
     // Create a Custom Resource that invokes only if the dependencies change
-    new cr.AwsCustomResource(this, `TriggerOnDepChange}`, {
+    new cr.AwsCustomResource(this, `TriggerOnDepChange`, {
       onCreate: {
         service: 'Lambda',
         action: 'invoke',
@@ -163,14 +207,6 @@ export class AppConfigurator extends Construct {
           resources: [configureProdDbFunction.functionArn],
         }),
       ]),
-      // policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
-      //   resources: [configureProdDbFunction.functionArn],
-      // }),
-    
     });
-
-
-
-
   }
 }
