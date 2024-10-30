@@ -59,7 +59,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgen
     //     agentResourceRoleArn: maintAgentRole.roleArn
     // };
     // Agent declaration
-    const maintAgent = new bedrock.Agent(scope, "MaintAgent", {
+    const maintAgent = new bedrock.Agent(scope, "MaintenanceAssistant", {
         //maintAgentProps
         foundationModel: bedrock.BedrockFoundationModel.ANTHROPIC_CLAUDE_SONNET_V1_0,
         instruction: "You are an industrial maintenance specialist who has access to files and data about internal company operations.  Shift handover reports, maintenance logs, work permits, safety inspections and other data should be used to provide insights on the efficiency and safety of operations for the facility or operations manager.  To find information from the Computerized Maintenance Management System (CMMS), first try to use the action group tool to query the SQL database as it is is the definitive system of record for information.  The kb-maintenance Bedrock Knowledge base may also have information in documents.  Alert the user if you find discrepancies between the relational database and documents in the KB.  For each request, check both data sources and compare the data to see if it matches.  When running SQL statements, verify that the syntax is correct and results are returned from the CMMS database.  If you do not get results, rewrite the query and try again.",
@@ -137,10 +137,10 @@ export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgen
       exportName: 'MaintDataSourceId'
     });
     //Agent ID
-    new cdk.CfnOutput(scope, 'agentId', {
+    new cdk.CfnOutput(scope, 'MaintAgentId', {
         value: maintAgent.agentId,
-        description: 'Agent ID',
-        exportName: 'agentId'
+        description: 'Maintenance Agent ID',
+        exportName: 'MaintAgentId'
     });
     // //Agent Alias ID
     // new cdk.CfnOutput(scope, 'agentAliasId', {
