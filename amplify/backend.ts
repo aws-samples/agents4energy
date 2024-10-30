@@ -21,6 +21,7 @@ import * as cr from 'aws-cdk-lib/custom-resources';
 
 import { productionAgentBuilder } from "./custom/productionAgent"
 import { AppConfigurator } from './custom/appConfigurator'
+import { maintenanceAgentBuilder } from "./custom/maintenanceAgent"
 
 const resourceTags = {
   Project: 'agents-for-energy',
@@ -266,6 +267,13 @@ convertPdfToJsonFunctionDS.createResolver(
 //   ghostScriptLayer.layerVersionArn,
 //   imageMagickLayer.layerVersionArn
 // ]
+
+// Create the Bedrock Managed Maintenance KB and Agent
+const { maintKb, maintDataSource, maintAgent } = maintenanceAgentBuilder(customStack, {
+  s3BucketName: backend.storage.resources.bucket.bucketName
+})
+
+
 
 // Create a stack with the resources to configure the app
 const configuratorStack = backend.createStack('configuratorStack')

@@ -5,8 +5,9 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { bedrock } from '@cdklabs/generative-ai-cdk-constructs';
 
+
 interface MaintenanceAgentProps {
-    s3BucketName: s3.Bucket,
+    s3BucketName: string,
 }
 
 export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgentProps) {
@@ -25,9 +26,11 @@ export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgen
         instruction: `You are an expert at understanding mainteance.`,
         description: `This knowledge base contains data and documents related to oil and gas related maintenance activities.`
     });
+    const maintDocBucket = new s3.Bucket(scope, "MaintDocBucket");
+    
     //Define the data source for the knowledge base.
     const maintDataSource = new bedrock.S3DataSource(scope, 'MaintDataSource', {
-        bucket: props.s3BucketName,
+        bucket: maintDocBucket,
         knowledgeBase: maintKb,
         dataSourceName: 'MaintData'
       });
@@ -44,38 +47,38 @@ export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgen
             cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonBedrockFullAccess')
         ]
     });
-    // Configure the Agent properties
-    const cfnAgentProps: bedrock.CfnAgentProps = {
-        agentName: 'MaintAgent',
-        instruction: 'You are an industrial maintenance specialist who has access to files and data about internal company operations.  Shift handover reports, maintenance logs, work permits, safety inspections and other data should be used to provide insights on the efficiency and safety of operations for the facility or operations manager.  To find information from the Computerized Maintenance Management System (CMMS), first try to use the action group tool to query the SQL database as it is is the definitive system of record for information.  The kb-maintenance Bedrock Knowledge base may also have information in documents.  Alert the user if you find discrepancies between the relational database and documents in the KB.  For each request, check both data sources and compare the data to see if it matches.  When running SQL statements, verify that the syntax is correct and results are returned from the CMMS database.  If you do not get results, rewrite the query and try again.',
-        description: 'Maintenance assistant to provide insights on operations across the company about industrial facility repairs, potential issues, and preventative maintenance work',
-        foundationModel: 'anthropic.claude-3-sonnet-20240229-v1:0',
-        knowledgeBases: [{
-            description: 'Maintenance Data Knowledge Base',
-            knowledgeBaseId: maintKb.knowledgeBaseId,
-            knowledgeBaseState: 'ENABLED'
-        }],
-        // Auto prepare the agent when it is deployed from the CDK
-        autoPrepare: true,
-        //Use the role created above
-        agentResourceRoleArn: maintAgentRole.roleArn
-    };
+    // // Configure the Agent properties
+    // const maintAgentProps: bedrock.AgentProps = {
+    //     agentName: 'MaintAgent',
+    //     instruction: 'You are an industrial maintenance specialist who has access to files and data about internal company operations.  Shift handover reports, maintenance logs, work permits, safety inspections and other data should be used to provide insights on the efficiency and safety of operations for the facility or operations manager.  To find information from the Computerized Maintenance Management System (CMMS), first try to use the action group tool to query the SQL database as it is is the definitive system of record for information.  The kb-maintenance Bedrock Knowledge base may also have information in documents.  Alert the user if you find discrepancies between the relational database and documents in the KB.  For each request, check both data sources and compare the data to see if it matches.  When running SQL statements, verify that the syntax is correct and results are returned from the CMMS database.  If you do not get results, rewrite the query and try again.',
+    //     description: 'Maintenance assistant to provide insights on operations across the company about industrial facility repairs, potential issues, and preventative maintenance work',
+    //     foundationModel: bedrock.BedrockFoundationModel.ANTHROPIC_CLAUDE_3_5_SONNET_V1_0,
+    //     // Auto prepare the agent when it is deployed from the CDK
+    //     autoPrepare: true,
+    //     //Use the role created above
+    //     agentResourceRoleArn: maintAgentRole.roleArn
+    // };
     // Agent declaration
-    const maintAgent = new bedrock.CfnAgent(
-        scope,
-        'MaintAgent',
-        cfnAgentProps
-    );
-    // Create an agent alias for the Agent
-    const maintAgentAlias = new bedrock.CfnAgentAlias(
-        scope,
-        'MaintAgentAlias',
-        {
-            agentId: maintAgent.attrAgentId,
-            agentAliasName: 'MaintAgentAlias'
-        });
-    // Add a dependency so the agent gets created before the agent alias
-    maintAgentAlias.addDependency(maintAgent);
+    const maintAgent = new bedrock.Agent(scope, "MaintAgent", {
+        //maintAgentProps
+        foundationModel: bedrock.BedrockFoundationModel.ANTHROPIC_CLAUDE_SONNET_V1_0,
+        instruction: "You are an industrial maintenance specialist who has access to files and data about internal company operations.  Shift handover reports, maintenance logs, work permits, safety inspections and other data should be used to provide insights on the efficiency and safety of operations for the facility or operations manager.  To find information from the Computerized Maintenance Management System (CMMS), first try to use the action group tool to query the SQL database as it is is the definitive system of record for information.  The kb-maintenance Bedrock Knowledge base may also have information in documents.  Alert the user if you find discrepancies between the relational database and documents in the KB.  For each request, check both data sources and compare the data to see if it matches.  When running SQL statements, verify that the syntax is correct and results are returned from the CMMS database.  If you do not get results, rewrite the query and try again.",
+        aliasName: "latest",
+        shouldPrepareAgent: true
+    });
+    maintAgent.addKnowledgeBase(maintKb);
+    //maintAgent.addDependency(maintKb)
+    
+    // // Create an agent alias for the Agent
+    // const maintAgentAlias = new bedrock.AgentAlias(
+    //     scope,
+    //     'MaintAgentAlias',
+    //     {
+    //         agentId: maintAgent.attrAgentId,
+    //         agentAliasName: 'MaintAgentAlias'
+    //     });
+    // // Add a dependency so the agent gets created before the agent alias
+    // //maintAgentAlias.addDependency(maintAgent);
 
 
   
@@ -135,23 +138,23 @@ export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgen
     });
     //Agent ID
     new cdk.CfnOutput(scope, 'agentId', {
-        value: maintAgent.attrAgentId,
+        value: maintAgent.agentId,
         description: 'Agent ID',
         exportName: 'agentId'
     });
-    //Agent Alias ID
-    new cdk.CfnOutput(scope, 'agentAliasId', {
-        value: maintAgentAlias.attrAgentAliasId,
-        description: 'Agent Alias ID',
-        exportName: 'agentAliasId'
-    });
+    // //Agent Alias ID
+    // new cdk.CfnOutput(scope, 'agentAliasId', {
+    //     value: maintAgentAlias.attrAgentAliasId,
+    //     description: 'Agent Alias ID',
+    //     exportName: 'agentAliasId'
+    // });
   
     // TODO: What should be returned?    
     return { 
         maintKb: maintKb,
         maintDataSource: maintDataSource,
         maintAgent: maintAgent,
-        maintAgentAlias: maintAgentAlias
+        //aintAgentAlias: maintAgentAlias
     }
 
 
