@@ -92,11 +92,11 @@ export const handler = async (event: any, context: any, callback: any): Promise<
 
       console.log('Athena Query Result Outputs:\n', describeTableResult);
 
-
+      if (!describeTableResult) throw new Error(`No table definition found for table: ${tableName}`)
       //Upload the describeTableResult to S3
       await uploadStringToS3({
         key: `production-agent/table-definitions/database=${database}/table-name=${tableName}.txt`,
-        content: describeTableResult || '',
+        content: describeTableResult,
         contentType: 'text/plain'
       })
 

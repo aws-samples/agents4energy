@@ -1,4 +1,4 @@
-const sqlStatements = /* sql */`
+export const sqlStatements = [/* sql */`
 
 -- Create the Business Units Table
 DO $$
@@ -15,7 +15,8 @@ BEGIN
         );
     END IF;
 END $$;
-
+`,
+/* sql */`
 -- Create the Location Types Table
 DO $$
 BEGIN
@@ -33,7 +34,8 @@ BEGIN
 
     END IF;
 END $$;
-
+`,
+/* sql */`
 -- Create the Locations table
 DO $$
 BEGIN
@@ -68,7 +70,8 @@ BEGIN
 
     END IF;
 END $$;
-
+`,
+/* sql */`
 -- Check if the schema 'production' already exists
 DO $$
 BEGIN
@@ -76,7 +79,8 @@ BEGIN
         CREATE SCHEMA production;
     END IF;
 END $$;
-
+`,
+/* sql */`
 -- Create the daily production table if it doesn't already exist
 DO $$
 BEGIN
@@ -146,13 +150,10 @@ BEGIN
         ) AS well_data (wellid, first_prod, initial_oil, initial_gas, initial_water, initial_tubpres, initial_caspres),
         generate_series(CAST('2017-07-01' AS DATE), CAST('2024-09-30' AS DATE), INTERVAL '1 day') AS proddate
         WHERE first_prod <= proddate;
-
-
-
-
     END IF;
 END $$;
-
+`,
+/* sql */`
 -- Create index for quicker SQL queries
 CREATE INDEX ON production.daily (wellid, proddate);
 
@@ -161,54 +162,55 @@ SELECT LW.locationid wellid, LW.locname well_name, LW.facility wellpadid, LP.loc
 from locations LW
 join (select locationid, locname from locations where loctypeid='WPD') LP on LP.locationid = CAST(LW.facility as INT)
 where LW.loctypeid = 'WEL'
-`
+`]
 
-function splitByTopLevelSemicolon(input: string): string[] {
-    // Split the input into lines
-    const lines = input.split('\n');
-    let currentBlock: string[] = [];
-    const results: string[] = [];
+// function splitByTopLevelSemicolon(input: string): string[] {
+//     // Split the input into lines
+//     const lines = input.split('\n');
+//     let currentBlock: string[] = [];
+//     const results: string[] = [];
     
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+//     for (let i = 0; i < lines.length; i++) {
+//         const line = lines[i];
         
-        // Check if line starts with whitespace
-        if (/^\s/.test(line)) {
-            // If it starts with whitespace, add to current block
-            currentBlock.push(line);
-        } else {
-            // If it doesn't start with whitespace, check for semicolon
-            if (line.includes(';')) {
-                // Split the line by semicolon
-                const parts = line.split(';');
+//         // Check if line starts with whitespace
+//         if (/^\s/.test(line)) {
+//             // If it starts with whitespace, add to current block
+//             currentBlock.push(line);
+//         } else {
+//             // If it doesn't start with whitespace, check for semicolon
+//             if (line.includes(';')) {
+//                 // Split the line by semicolon
+//                 const parts = line.split(';');
                 
-                // Add all parts except the last one (with their semicolons)
-                for (let j = 0; j < parts.length - 1; j++) {
-                    const blockToAdd = [...currentBlock, parts[j] + ';'].join('\n');
-                    if (blockToAdd.trim()) {
-                        results.push(blockToAdd);
-                    }
-                    currentBlock = [];
-                }
+//                 // Add all parts except the last one (with their semicolons)
+//                 for (let j = 0; j < parts.length - 1; j++) {
+//                     const blockToAdd = [...currentBlock, parts[j] + ';'].join('\n');
+//                     if (blockToAdd.trim()) {
+//                         results.push(blockToAdd);
+//                     }
+//                     currentBlock = [];
+//                 }
                 
-                // Start new block with the last part
-                currentBlock = [parts[parts.length - 1]];
-            } else {
-                // No semicolon, just add to current block
-                currentBlock.push(line);
-            }
-        }
-    }
+//                 // Start new block with the last part
+//                 currentBlock = [parts[parts.length - 1]];
+//             } else {
+//                 // No semicolon, just add to current block
+//                 currentBlock.push(line);
+//             }
+//         }
+//     }
     
-    // Add any remaining content
-    if (currentBlock.length > 0) {
-        const finalBlock = currentBlock.join('\n');
-        if (finalBlock.trim()) {
-            results.push(finalBlock);
-        }
-    }
+//     // Add any remaining content
+//     if (currentBlock.length > 0) {
+//         const finalBlock = currentBlock.join('\n');
+//         if (finalBlock.trim()) {
+//             results.push(finalBlock);
+//         }
+//     }
     
-    return results;
-}
+//     return results;
+// }
 
-export default splitByTopLevelSemicolon(sqlStatements).filter((stmt) => stmt.trim() !== '')
+// export default splitByTopLevelSemicolon(sqlStatements).filter((stmt) => stmt.trim() !== '')
+export default sqlStatements

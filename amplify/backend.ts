@@ -77,9 +77,9 @@ const bedrockAgentRuntimeDataSource = backend.data.resources.graphqlApi.addHttpD
 );
 
 
-const noneDS = backend.data.resources.graphqlApi.addNoneDataSource(
-  "noneDS"
-);
+// const noneDS = backend.data.resources.graphqlApi.addNoneDataSource(
+//   "noneDS"
+// );
 
 bedrockRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
   new iam.PolicyStatement({
@@ -185,7 +185,7 @@ applyTagsToRootStack()
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
@@ -202,7 +202,7 @@ const {
   athenaPostgresCatalog
 } = productionAgentBuilder(customStack, {
   vpc: vpc,
-  s3Bucket: backend.storage.resources.bucket
+  s3Bucket: uploadToS3Deployment.deployedBucket // This causes the assets here to not deploy until the s3 upload is complete.
 })
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)

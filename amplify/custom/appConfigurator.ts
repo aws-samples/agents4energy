@@ -62,56 +62,56 @@ export class AppConfigurator extends Construct {
       }
     }))
 
-    const configureProdDbFunction = new NodejsFunction(this, 'configureProdDbFunction', {
-      runtime: lambda.Runtime.NODEJS_LATEST,
-      entry: path.join(rootDir, 'functions', 'configureProdDb','index.ts'),
-      timeout: cdk.Duration.seconds(300),
-      environment: {
-        CLUSTER_ARN: props.hydrocarbonProductionDb.clusterArn,
-        SECRET_ARN: props.hydrocarbonProductionDb.secret!.secretArn,
-        DATABASE_NAME: props.defaultProdDatabaseName,
-        ATHENA_WORKGROUP_NAME: props.athenaWorkgroup.name,
-        ATHENA_CATALOG_NAME: props.athenaPostgresCatalog.name,
-        S3_BUCKET_NAME: props.s3Bucket.bucketName
-        // TABLE_DEF_KB_ID: props.sqlTableDefBedrockKnoledgeBase.knowledgeBaseId
-      },
-    });
+    // const configureProdDbFunction = new NodejsFunction(this, 'configureProdDbFunction', {
+    //   runtime: lambda.Runtime.NODEJS_LATEST,
+    //   entry: path.join(rootDir, 'functions', 'configureProdDb','index.ts'),
+    //   timeout: cdk.Duration.seconds(300),
+    //   environment: {
+    //     CLUSTER_ARN: props.hydrocarbonProductionDb.clusterArn,
+    //     SECRET_ARN: props.hydrocarbonProductionDb.secret!.secretArn,
+    //     DATABASE_NAME: props.defaultProdDatabaseName,
+    //     ATHENA_WORKGROUP_NAME: props.athenaWorkgroup.name,
+    //     ATHENA_CATALOG_NAME: props.athenaPostgresCatalog.name,
+    //     S3_BUCKET_NAME: props.s3Bucket.bucketName
+    //     // TABLE_DEF_KB_ID: props.sqlTableDefBedrockKnoledgeBase.knowledgeBaseId
+    //   },
+    // });
 
-    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-      actions: [
-        'rds-data:ExecuteStatement',
-      ],
-      resources: [`arn:aws:rds:${rootStack.region}:${rootStack.account}:*`],
-      conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-        'StringEquals': {
-          'aws:ResourceTag/rootStackName': rootStack.stackName
-        }
-      }
-    }))
+    // configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+    //   actions: [
+    //     'rds-data:ExecuteStatement',
+    //   ],
+    //   resources: [`arn:aws:rds:${rootStack.region}:${rootStack.account}:*`],
+    //   conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+    //     'StringEquals': {
+    //       'aws:ResourceTag/rootStackName': rootStack.stackName
+    //     }
+    //   }
+    // }))
 
-    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-      actions: [
-        'secretsmanager:GetSecretValue',
-      ],
-      resources: [`arn:aws:secretsmanager:${rootStack.region}:${rootStack.account}:secret:*`],
-      conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-        'StringEquals': {
-          'aws:ResourceTag/rootStackName': rootStack.stackName
-        }
-      }
-    }))
+    // configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+    //   actions: [
+    //     'secretsmanager:GetSecretValue',
+    //   ],
+    //   resources: [`arn:aws:secretsmanager:${rootStack.region}:${rootStack.account}:secret:*`],
+    //   conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+    //     'StringEquals': {
+    //       'aws:ResourceTag/rootStackName': rootStack.stackName
+    //     }
+    //   }
+    // }))
 
-    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-      actions: [
-        'athena:StartQueryExecution',
-      ],
-      resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:*`],
-      conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-        'StringEquals': {
-          'aws:ResourceTag/rootStackName': rootStack.stackName
-        }
-      }
-    }))
+    // configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+    //   actions: [
+    //     'athena:StartQueryExecution',
+    //   ],
+    //   resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:*`],
+    //   conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+    //     'StringEquals': {
+    //       'aws:ResourceTag/rootStackName': rootStack.stackName
+    //     }
+    //   }
+    // }))
     
     // Define a step function which waits for the cloudformation stackk to complete before executing a configureation update
     const waitForCfnStack = new stepfunctions_tasks.CallAwsService(this, 'WaitForCfnStack', {
@@ -181,32 +181,32 @@ export class AppConfigurator extends Construct {
       }),
     });
   
-    // Create a Custom Resource that invokes only if the dependencies change
-    new cr.AwsCustomResource(this, `TriggerOnDepChange`, {
-      onCreate: {
-        service: 'Lambda',
-        action: 'invoke',
-        parameters: {
-          FunctionName: configureProdDbFunction.functionName,
-          Payload: JSON.stringify({}), // No need to pass SQL here
-        },
-        physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
-      },
-      onUpdate: {
-        service: 'Lambda',
-        action: 'invoke',
-        parameters: {
-          FunctionName: configureProdDbFunction.functionName,
-          Payload: JSON.stringify({}), // No need to pass SQL here
-        },
-        physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
-      },
-      policy: cr.AwsCustomResourcePolicy.fromStatements([
-        new iam.PolicyStatement({
-          actions: ['lambda:InvokeFunction'],
-          resources: [configureProdDbFunction.functionArn],
-        }),
-      ]),
-    });
+    // // Create a Custom Resource that invokes only if the dependencies change
+    // new cr.AwsCustomResource(this, `TriggerOnDepChange`, {
+    //   onCreate: {
+    //     service: 'Lambda',
+    //     action: 'invoke',
+    //     parameters: {
+    //       FunctionName: configureProdDbFunction.functionName,
+    //       Payload: JSON.stringify({}), // No need to pass SQL here
+    //     },
+    //     physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
+    //   },
+    //   onUpdate: {
+    //     service: 'Lambda',
+    //     action: 'invoke',
+    //     parameters: {
+    //       FunctionName: configureProdDbFunction.functionName,
+    //       Payload: JSON.stringify({}), // No need to pass SQL here
+    //     },
+    //     physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
+    //   },
+    //   policy: cr.AwsCustomResourcePolicy.fromStatements([
+    //     new iam.PolicyStatement({
+    //       actions: ['lambda:InvokeFunction'],
+    //       resources: [configureProdDbFunction.functionArn],
+    //     }),
+    //   ]),
+    // });
   }
 }
