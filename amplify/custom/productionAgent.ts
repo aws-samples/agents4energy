@@ -205,7 +205,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ),
     });
 
-    //This serverless aurora cluster will store hydrocarbon production pressures and volumes
+    //This serverless aurora cluster will store hydrocarbon production pressures and volume
     const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'HydrocarbonProdDb', {
         engine: rds.DatabaseClusterEngine.auroraPostgres({
             version: rds.AuroraPostgresEngineVersion.VER_13_9,
@@ -218,7 +218,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         enableDataApi: true,
         defaultDatabaseName: defaultProdDatabaseName, // optional: create a database named "mydb"
         credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
-            secretName: `${rootStack.stackName}-proddb-credentials`
+            secretName: `a4e-proddb-credentials`
         }),
         vpc: props.vpc,
         vpcSubnets: {
@@ -264,7 +264,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         parameters: {
             DefaultConnectionString: jdbcConnectionString,
             LambdaFunctionName: postgressConnectorLambdaFunctionName,
-            SecretNamePrefix: `${rootStack.stackName}`,
+            SecretNamePrefix: `a4e`,
             SpillBucket: props.s3Bucket.bucketName,
             SpillPrefix: `athena-spill/${rootStack.stackName}`,
             SecurityGroupIds: props.vpc.vpcDefaultSecurityGroup,
@@ -352,8 +352,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             }
         }
     }))
-
-
 
     // Create a Custom Resource that invokes only if the dependencies change
     const invokeConfigureProdDbFunctionServiceCall: cr.AwsSdkCall = {

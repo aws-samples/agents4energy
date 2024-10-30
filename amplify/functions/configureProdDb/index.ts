@@ -56,7 +56,7 @@ export const handler = async (event: any, context: any, callback: any): Promise<
 
   console.log('All SQL statements executed successfully')
 
-  const tablesToExportDefinitionsOf: {tableName: string, database: string}[] = [
+  const tablesToExportDefinitionsOf: { tableName: string, database: string }[] = [
     {
       tableName: 'daily',
       database: 'production'
@@ -72,37 +72,38 @@ export const handler = async (event: any, context: any, callback: any): Promise<
   ]
 
   // Query to get all table definitions
-  const queryBuilder = (tableName: string) => (
+  const queryBuilder = (database: string, tableName: string) => (
     /* sql */`
-    DESCRIBE ${tableName}
+    DESCRIBE ${database}.${tableName}
   `);
 
-  await Promise.all(
-    tablesToExportDefinitionsOf.map(async ({tableName, database}) => {
-      const query = queryBuilder(tableName);
-      const queryExecutionId = await startQueryExecution(query, workgroup, database);
-      await waitForQueryToComplete(queryExecutionId, workgroup);
-      const results = await getQueryResults(queryExecutionId);
-      console.log('Athena Query Result:\n', results);
+  // await Promise.all(
+  tablesToExportDefinitionsOf.forEach(async ({ tableName, database }) => {
+    const query = queryBuilder(database, tableName);
+    console.log('Executing Athena Query:\n', query);
+    const queryExecutionId = await startQueryExecution(query, workgroup, database);
+    await waitForQueryToComplete(queryExecutionId, workgroup);
+    const results = await getQueryResults(queryExecutionId);
+    console.log('Athena Query Result:\n', results);
 
-      const describeTableResult = results.ResultSet?.Rows?.map((row) => {
-        if (row.Data && row.Data[0] && row.Data[0].VarCharValue !== undefined) return row.Data[0].VarCharValue
-      }
-      ).join('\n')
+    const describeTableResult = results.ResultSet?.Rows?.map((row) => {
+      if (row.Data && row.Data[0] && row.Data[0].VarCharValue !== undefined) return row.Data[0].VarCharValue
+    }
+    ).join('\n')
 
-      console.log('Athena Query Result Outputs:\n', describeTableResult);
+    console.log('Athena Query Result Outputs:\n', describeTableResult);
 
-      if (!describeTableResult) throw new Error(`No table definition found for table: ${tableName}`)
-      //Upload the describeTableResult to S3
-      await uploadStringToS3({
-        key: `production-agent/table-definitions/database=${database}/table-name=${tableName}.txt`,
-        content: describeTableResult,
-        contentType: 'text/plain'
-      })
-
-      return describeTableResult; // Return the results if you need them
+    if (!describeTableResult) throw new Error(`No table definition found for table: ${tableName}`)
+    //Upload the describeTableResult to S3
+    await uploadStringToS3({
+      key: `production-agent/table-definitions/database=${database}/table-name=${tableName}.txt`,
+      content: describeTableResult,
+      contentType: 'text/plain'
     })
-  );
+
+    return describeTableResult; // Return the results if you need them
+  })
+  // );
 
   return { statusCode: 200, body: 'All SQL statements executed successfully' };
 };
