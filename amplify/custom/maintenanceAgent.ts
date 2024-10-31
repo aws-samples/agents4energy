@@ -27,7 +27,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgen
         instruction: `You are an expert at understanding maintenance.`,
         description: `This knowledge base contains data and documents related to oil and gas related maintenance activities.`
     });
-    //const maintDocBucket = new s3.Bucket(scope, "MaintDocBucket");
+    //const maintDocBucket = new s3.Bucket(scope, "MaintDocBucket"); // don't need to create a separate bucket - will use the maintenance-agent prefix of the sampleData S3 bucket
     
     //Define the data source for the knowledge base.
     const maintDataSource = new bedrock.S3DataSource(scope, 'MaintDataSource', {

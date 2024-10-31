@@ -14,7 +14,7 @@ import { fileURLToPath } from 'url';
 import { CfnApplication } from 'aws-cdk-lib/aws-sam';
 
 interface ProductionAgentProps {
-    s3Bucket: s3.IBucket,
+    s3BucketName: string,
 }
 
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
