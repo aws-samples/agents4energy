@@ -165,7 +165,7 @@ applyTagsToRootStack()
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
+new s3Deployment.BucketDeployment(customStack, 'test-file-deployment-1', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
@@ -270,7 +270,7 @@ convertPdfToJsonFunctionDS.createResolver(
 
 // Create the Bedrock Managed Maintenance KB and Agent
 const { maintKb, maintDataSource, maintAgent } = maintenanceAgentBuilder(customStack, {
-  s3BucketName: backend.storage.resources.bucket.bucketName
+  s3Bucket: backend.storage.resources.bucket
 })
 
 

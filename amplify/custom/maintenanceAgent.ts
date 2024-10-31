@@ -7,7 +7,7 @@ import { bedrock } from '@cdklabs/generative-ai-cdk-constructs';
 
 
 interface MaintenanceAgentProps {
-    s3BucketName: string,
+    s3Bucket: s3.IBucket,
 }
 
 export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgentProps) {
@@ -22,17 +22,19 @@ export function maintenanceAgentBuilder(scope: Construct, props: MaintenanceAgen
 // === KNOWLEDGE BASE
     //This bedrock knowledgebase contains data and documents related to oil and gas maintenance activities.
     const maintKb = new bedrock.KnowledgeBase(scope, 'MaintKb', {
+        name: "a4e-Maintenance-KB",
         embeddingsModel: bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
-        instruction: `You are an expert at understanding mainteance.`,
+        instruction: `You are an expert at understanding maintenance.`,
         description: `This knowledge base contains data and documents related to oil and gas related maintenance activities.`
     });
-    const maintDocBucket = new s3.Bucket(scope, "MaintDocBucket");
+    //const maintDocBucket = new s3.Bucket(scope, "MaintDocBucket");
     
     //Define the data source for the knowledge base.
     const maintDataSource = new bedrock.S3DataSource(scope, 'MaintDataSource', {
-        bucket: maintDocBucket,
+        bucket: props.s3Bucket,
         knowledgeBase: maintKb,
-        dataSourceName: 'MaintData'
+        inclusionPrefixes: ['maintenance-agent'],
+        dataSourceName: 'MaintFiles'
       });
 
 

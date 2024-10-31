@@ -2,6 +2,7 @@
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib'
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
@@ -13,7 +14,7 @@ import { fileURLToPath } from 'url';
 import { CfnApplication } from 'aws-cdk-lib/aws-sam';
 
 interface ProductionAgentProps {
-    s3BucketName: string,
+    s3Bucket: s3.IBucket,
 }
 
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {

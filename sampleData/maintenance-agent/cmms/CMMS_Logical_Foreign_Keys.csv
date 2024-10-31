@@ -1,0 +1,2 @@
+logical_foreign_keys
+daily.wellid -> locations.locationid
