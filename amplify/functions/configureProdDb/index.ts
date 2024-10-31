@@ -1,3 +1,5 @@
+import { stringify } from 'yaml'
+
 import { RDSDataClient, ExecuteStatementCommand, ExecuteStatementCommandInput } from "@aws-sdk/client-rds-data";
 import {
   AthenaClient,
@@ -77,33 +79,40 @@ export const handler = async (event: any, context: any, callback: any): Promise<
     DESCRIBE ${database}.${tableName}
   `);
 
-  // await Promise.all(
-  tablesToExportDefinitionsOf.forEach(async ({ tableName, database }) => {
-    const query = queryBuilder(database, tableName);
-    console.log('Executing Athena Query:\n', query);
-    const queryExecutionId = await startQueryExecution(query, workgroup, database);
-    await waitForQueryToComplete(queryExecutionId, workgroup);
-    const results = await getQueryResults(queryExecutionId);
-    console.log('Athena Query Result:\n', results);
+  await Promise.all(
+    tablesToExportDefinitionsOf.map(async ({ tableName, database }) => {
+      const query = queryBuilder(database, tableName);
+      console.log('Executing Athena Query:\n', query);
+      const queryExecutionId = await startQueryExecution(query, workgroup, database);
+      await waitForQueryToComplete(queryExecutionId, workgroup);
+      const results = await getQueryResults(queryExecutionId);
+      console.log('Athena Query Result:\n', results);
 
-    const describeTableResult = results.ResultSet?.Rows?.map((row) => {
-      if (row.Data && row.Data[0] && row.Data[0].VarCharValue !== undefined) return row.Data[0].VarCharValue
-    }
-    ).join('\n')
+      const describeTableResult = results.ResultSet?.Rows?.map((row) => {
+        if (row.Data && row.Data[0] && row.Data[0].VarCharValue !== undefined) return row.Data[0].VarCharValue
+      }
+      ).join('\n')
 
-    console.log('Athena Query Result Outputs:\n', describeTableResult);
+      if (!describeTableResult) throw new Error(`No table definition found for table: ${tableName}`)
 
-    if (!describeTableResult) throw new Error(`No table definition found for table: ${tableName}`)
-    //Upload the describeTableResult to S3
-    await uploadStringToS3({
-      key: `production-agent/table-definitions/database=${database}/table-name=${tableName}.txt`,
-      content: describeTableResult,
-      contentType: 'text/plain'
+      const tableDefinitionString = stringify({
+        database: database,
+        tableName: tableName,
+        tableDefinition: describeTableResult
+      })
+
+      console.log('Table Definition:\n', tableDefinitionString);
+      
+      //Upload the describeTableResult to S3
+      await uploadStringToS3({
+        key: `production-agent/table-definitions/database=${database}/table-name=${tableName}.txt`,
+        content: tableDefinitionString,
+        contentType: 'text/plain'
+      })
+
+      return describeTableResult; // Return the results if you need them
     })
-
-    return describeTableResult; // Return the results if you need them
-  })
-  // );
+  );
 
   return { statusCode: 200, body: 'All SQL statements executed successfully' };
 };

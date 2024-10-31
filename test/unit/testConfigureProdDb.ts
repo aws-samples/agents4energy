@@ -10,118 +10,7 @@ import {
   ListStackResourcesCommand,
   // ListStackResourcesInput
 } from "@aws-sdk/client-cloudformation"
-
-// async function getDeployedResourceArn(
-//   stackName: string,
-//   logicalId: string
-// ): Promise<string> {
-//   const cloudformation = new CloudFormationClient();
-
-//   try {
-    // const response = await cloudformation.send(new DescribeStackResourceCommand({
-    //   StackName: stackName,
-    //   LogicalResourceId: logicalId,
-    // }))
-//     if (!response.StackResourceDetail?.PhysicalResourceId) {
-//       throw new Error(`Unable to get ARN for ${logicalId}`)
-//     }
-//     return response.StackResourceDetail?.PhysicalResourceId;
-//   } catch (error) {
-//     console.error('Error fetching resource ARN:', error);
-//     throw new Error(`Error fetching resource ARN: ${JSON.stringify(error, null, 2)}`);
-//   }
-// }
-
-// async function getDeployedResourceArn(
-//   rootStackName: string,
-//   logicalId: string,
-//   nestedStackLogicalId?: string
-// ): Promise<string> {
-//   const cloudformation = new CloudFormationClient();
-
-//   try {
-//     let stackName = rootStackName;
-    
-//     // If it's a nested stack, we need to get the physical ID of the nested stack first
-//     if (nestedStackLogicalId) {
-//       const nestedStackResource = await cloudformation.send(new DescribeStackResourceCommand({
-//         StackName: stackName,
-//         LogicalResourceId: logicalId,
-//       }))
-      
-//       if (!nestedStackResource.StackResourceDetail?.PhysicalResourceId) {
-//         throw new Error(`Unable to get ARN for ${logicalId}`)
-//       }
-
-//       stackName = nestedStackResource.StackResourceDetail?.PhysicalResourceId;
-      
-//       if (!stackName) {
-//         throw new Error(`Could not find nested stack with logical ID: ${nestedStackLogicalId}`);
-//       }
-//     }
-
-//     const response = await cloudformation.send(new DescribeStackResourceCommand({
-//       StackName: stackName,
-//       LogicalResourceId: logicalId,
-//     }))
-    
-//     if (!response.StackResourceDetail?.PhysicalResourceId) {
-//       throw new Error(`Unable to get ARN for ${logicalId}`)
-//     }
-
-//     return response.StackResourceDetail?.PhysicalResourceId;
-//   } catch (error) {
-//     console.error('Error fetching resource ARN:', error);
-//     throw new Error(`Error fetching resource ARN: ${JSON.stringify(error, null, 2)}`);
-//   }
-// }
-
-// async function getDeployedResourceArn(
-//   rootStackName: string,
-//   targetLogicalId: string
-// ): Promise<string> {
-//   const cloudformation = new CloudFormationClient();
-
-//   async function searchStack(stackName: string): Promise<string | undefined> {
-//     try {
-//       // Try to find the resource in the current stack
-//       const resourceResponse = await cloudformation.send(new DescribeStackResourceCommand({
-//         StackName: stackName,
-//         LogicalResourceId: targetLogicalId,
-//       }))
-
-//       if (resourceResponse.StackResourceDetail?.PhysicalResourceId) {
-//         return resourceResponse.StackResourceDetail.PhysicalResourceId;
-//       }
-//     } catch (error) {
-//       // Resource not found in this stack, continue to search nested stacks
-//     }
-
-//     // If not found, list all resources in the stack
-//     const resources = await cloudformation.send(new ListStackResourcesCommand({
-//       StackName: stackName,
-//     }))
-
-//     // Search through nested stacks
-//     for (const resource of resources.StackResourceSummaries || []) {
-//       if (resource.ResourceType === 'AWS::CloudFormation::Stack') {
-//         const nestedStackArn = resource.PhysicalResourceId;
-//         if (nestedStackArn) {
-//           const result = await searchStack(nestedStackArn);
-//           if (result) return result;
-//         }
-//       }
-//     }
-
-//     return undefined;
-//   }
-
-
-//   const resourceId = await searchStack(rootStackName)
-//   if (!resourceId) throw new Error(`Could not find resource with logical ID: ${targetLogicalId}`);
-  
-//   return resourceId;
-// }
+import { LambdaClient, GetFunctionConfigurationCommand } from "@aws-sdk/client-lambda";
 
 
 async function getDeployedResourceArn(
@@ -179,6 +68,41 @@ async function getDeployedResourceArn(
   return resourceId;
 }
 
+
+async function getLambdaEnvironmentVariables(functionName: string): Promise<void> {
+  try {
+      // Initialize the Lambda client
+      const client = new LambdaClient();
+      
+      // Create the command to get function configuration
+      const command = new GetFunctionConfigurationCommand({
+          FunctionName: functionName
+      });
+
+      // Get the function configuration
+      const response = await client.send(command);
+      
+      // Check if environment variables exist
+      if (response.Environment && response.Environment.Variables) {
+          const envVars = response.Environment.Variables;
+          
+          // Set each environment variable locally
+          for (const [key, value] of Object.entries(envVars)) {
+              if (value) {
+                  process.env[key] = value;
+                  console.log(`Set ${key} environment variable`);
+              }
+          }
+      } else {
+          console.log('No environment variables found for the specified Lambda function');
+      }
+      
+  } catch (error) {
+      console.error('Error retrieving Lambda environment variables:', error);
+      throw error;
+  }
+}
+
 // process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT = outputs.data.url
 // TODO: Get these values form the cloudformation template
 const rootStackName = outputs.custom.root_stack_name
@@ -205,13 +129,15 @@ const dummyContext: Context = {
 
 const main = async () => {
   process.env.ROOT_STACK_NAME = rootStackName
-  process.env.CLUSTER_ARN = await getDeployedResourceArn(rootStackName, 'HydrocarbonProdDb')
+
+  await getLambdaEnvironmentVariables(await getDeployedResourceArn(rootStackName, 'configureProdDbFunction'))
+  // process.env.CLUSTER_ARN = await getDeployedResourceArn(rootStackName, 'HydrocarbonProdDb')
   // console.log('CLUSTER_ARN: ', process.env.CLUSTER_ARN)
-  process.env.ATHENA_WORKGROUP_NAME = await getDeployedResourceArn(rootStackName, 'FedQueryWorkgroup')
-  process.env.SECRET_ARN = await getDeployedResourceArn(rootStackName, 'a4eHydrocarbonProdDbSecret')
-  process.env.DATABASE_NAME = 'proddb'
-  process.env.ATHENA_CATALOG_NAME = await getDeployedResourceArn(rootStackName, 'PostgresAthenaDataSource')
-  process.env.S3_BUCKET_NAME = outputs.storage.bucket_name
+  // process.env.ATHENA_WORKGROUP_NAME = await getDeployedResourceArn(rootStackName, 'FedQueryWorkgroup')
+  // process.env.SECRET_ARN = await getDeployedResourceArn(rootStackName, `${rootStackName}HydrocarbonProdDbSecret`)
+  // process.env.DATABASE_NAME = 'proddb'
+  // process.env.ATHENA_CATALOG_NAME = await getDeployedResourceArn(rootStackName, 'PostgresAthenaDataSource')
+  // process.env.S3_BUCKET_NAME = outputs.storage.bucket_name
 
   const response = await handler({}, dummyContext, () => null)
 

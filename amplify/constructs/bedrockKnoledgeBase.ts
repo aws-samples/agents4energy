@@ -102,7 +102,10 @@ export class AuroraBedrockKnoledgeBase extends Construct {
       },
       policy: cr.AwsCustomResourcePolicy.fromStatements([
         new iam.PolicyStatement({
-          actions: ['rds-data:ExecuteStatement'],
+          actions: [
+            'rds-data:ExecuteStatement',
+            'rds-data:BatchExecuteStatement'
+          ],
           resources: [vectorStorePostgresCluster.clusterArn],
         }),
         new iam.PolicyStatement({
@@ -134,6 +137,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
             new iam.PolicyStatement({
               actions: [
                 'rds-data:ExecuteStatement',
+                'rds-data:BatchExecuteStatement',
                 'rds:DescribeDBClusters'
               ],
               resources: [vectorStorePostgresCluster.clusterArn],

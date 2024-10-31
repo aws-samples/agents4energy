@@ -206,7 +206,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
 
     //This serverless aurora cluster will store hydrocarbon production pressures and volume
-    const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'HydrocarbonProdDb', {
+    const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'A4E-HydrocarbonProdDb', {
         engine: rds.DatabaseClusterEngine.auroraPostgres({
             version: rds.AuroraPostgresEngineVersion.VER_13_9,
         }),
@@ -217,9 +217,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
         enableDataApi: true,
         defaultDatabaseName: defaultProdDatabaseName, // optional: create a database named "mydb"
-        credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
-            secretName: `a4e-proddb-credentials`
-        }),
+        // credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
+        //     secretName: `a4e-proddb-credentials`
+        // }),
         vpc: props.vpc,
         vpcSubnets: {
             subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
@@ -238,7 +238,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
         ec2.Peer.securityGroupId(props.vpc.vpcDefaultSecurityGroup),
         ec2.Port.tcp(5432),
-        'Allow inbound traffic from VPC'
+        'Allow inbound traffic from default SG'
     );
 
     const athenaWorkgroup = new athena.CfnWorkGroup(scope, 'FedQueryWorkgroup', {
@@ -264,13 +264,17 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         parameters: {
             DefaultConnectionString: jdbcConnectionString,
             LambdaFunctionName: postgressConnectorLambdaFunctionName,
-            SecretNamePrefix: `a4e`,
+            SecretNamePrefix: `A4E`,
             SpillBucket: props.s3Bucket.bucketName,
             SpillPrefix: `athena-spill/${rootStack.stackName}`,
             SecurityGroupIds: props.vpc.vpcDefaultSecurityGroup,
             SubnetIds: props.vpc.privateSubnets.map(subnet => subnet.subnetId).join(',')
         }
     });
+
+    // // Get the Lambda function role
+    // const functionRole = iam.Role.fromRoleName(scope, 'ConnectorRole', postgressConnectorLambdaFunctionName + '-role');
+
 
     //Create an athena datasource for postgres databases
     const athenaPostgresCatalog = new athena.CfnDataCatalog(scope, 'PostgresAthenaDataSource', {
@@ -359,7 +363,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         action: 'invoke',
         parameters: {
             FunctionName: configureProdDbFunction.functionName,
-            Payload: JSON.stringify({}), // No need to pass SQL here
+            Payload: JSON.stringify({}), // No need to pass an event
         },
         physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
     }
