@@ -169,10 +169,10 @@ where LW.loctypeid = 'WEL'
 //     const lines = input.split('\n');
 //     let currentBlock: string[] = [];
 //     const results: string[] = [];
-    
+
 //     for (let i = 0; i < lines.length; i++) {
 //         const line = lines[i];
-        
+
 //         // Check if line starts with whitespace
 //         if (/^\s/.test(line)) {
 //             // If it starts with whitespace, add to current block
@@ -182,7 +182,7 @@ where LW.loctypeid = 'WEL'
 //             if (line.includes(';')) {
 //                 // Split the line by semicolon
 //                 const parts = line.split(';');
-                
+
 //                 // Add all parts except the last one (with their semicolons)
 //                 for (let j = 0; j < parts.length - 1; j++) {
 //                     const blockToAdd = [...currentBlock, parts[j] + ';'].join('\n');
@@ -191,7 +191,7 @@ where LW.loctypeid = 'WEL'
 //                     }
 //                     currentBlock = [];
 //                 }
-                
+
 //                 // Start new block with the last part
 //                 currentBlock = [parts[parts.length - 1]];
 //             } else {
@@ -200,7 +200,7 @@ where LW.loctypeid = 'WEL'
 //             }
 //         }
 //     }
-    
+
 //     // Add any remaining content
 //     if (currentBlock.length > 0) {
 //         const finalBlock = currentBlock.join('\n');
@@ -208,7 +208,7 @@ where LW.loctypeid = 'WEL'
 //             results.push(finalBlock);
 //         }
 //     }
-    
+
 //     return results;
 // }
 

@@ -4,15 +4,12 @@ import { Schema } from '@/../amplify/data/resource';
 import { STSClient } from "@aws-sdk/client-sts";
 import { generateAmplifyClientWrapper } from '@/../amplify/functions/utils/amplifyUtils'
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
-// '@/../utils/amplifyUtils'
+
+import { getDeployedResourceArn, getLambdaEnvironmentVariables } from "../utils";
 
 import outputs from '@/../amplify_outputs.json';
 
 const stsClient = new STSClient();
-
-process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT = outputs.data.url
-process.env.AWS_DEFAULT_REGION = outputs.auth.aws_region
-process.env.MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
 
 const dummyContext: Context = {
   callbackWaitsForEmptyEventLoop: true,
@@ -32,6 +29,13 @@ const dummyContext: Context = {
 };
 
 export const main = async () => {
+  const rootStackName = outputs.custom.root_stack_name
+  await getLambdaEnvironmentVariables(await getDeployedResourceArn(rootStackName, 'productionagentfunctionlambda'))
+
+  process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT = outputs.data.url
+  process.env.AWS_DEFAULT_REGION = outputs.auth.aws_region
+  process.env.MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
+
   const credentials = await stsClient.config.credentials()
   process.env.AWS_ACCESS_KEY_ID = credentials.accessKeyId
   process.env.AWS_SECRET_ACCESS_KEY = credentials.secretAccessKey
@@ -49,7 +53,8 @@ export const main = async () => {
 
   const testArguments = {
     "chatSessionId": testChatSession.data.createChatSession.id,
-    "input": "What is 5*67?"
+    "input": "Write a SQL query to get the average produciton over the last 12 weeks. Get the table definiton so you know what to include in the query."
+    // "input": "What is 1+54?"
   }
 
   const event: AppSyncResolverEvent<Schema['invokeProductionAgent']['args']> = {

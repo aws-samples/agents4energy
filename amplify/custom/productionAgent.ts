@@ -286,7 +286,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
     });
 
-    const productionKnowledgeBase = new AuroraBedrockKnoledgeBase(scope, "ProductionKnowledgeBase", {
+    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefBedrockKnoledgeBase", {
         vpc: props.vpc,
         bucket: props.s3Bucket
     })
@@ -300,7 +300,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 inclusionPrefixes: ['production-agent/table-definitions/']
             }
         },
-        knowledgeBaseId: productionKnowledgeBase.knowledgeBase.attrKnowledgeBaseId
+        knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
     })
 
     //////////////////////////////
@@ -386,7 +386,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         action: 'startIngestionJob',
         parameters: {
             dataSourceId: productionAgentTableDefDataSource.attrDataSourceId,
-            knowledgeBaseId: productionKnowledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
         },
         physicalResourceId: cr.PhysicalResourceId.of('startKbIngestion'),
     }
@@ -397,7 +397,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         policy: cr.AwsCustomResourcePolicy.fromStatements([
             new iam.PolicyStatement({
                 actions: ['bedrock:startIngestionJob'],
-                resources: [productionKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn],
+                resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn],
             }),
         ]),
     });
@@ -412,7 +412,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         convertPdfToJsonFunction: convertPdfToJsonFunction,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
-        // sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
+        sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
         athenaWorkgroup: athenaWorkgroup,
         athenaPostgresCatalog: athenaPostgresCatalog
     };

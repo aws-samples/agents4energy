@@ -104,21 +104,12 @@ export class AuroraBedrockKnoledgeBase extends Construct {
         new iam.PolicyStatement({
           actions: [
             'rds-data:ExecuteStatement',
-            'rds-data:BatchExecuteStatement'
           ],
           resources: [vectorStorePostgresCluster.clusterArn],
         }),
         new iam.PolicyStatement({
           actions: ['secretsmanager:GetSecretValue'],
           resources: [vectorStorePostgresCluster.secret!.secretArn],
-        }),
-        new iam.PolicyStatement({
-          actions: [
-            's3:*', //TODO scope this down
-            's3:ListBucket',
-            's3:GetObject'
-          ],
-          resources: [props.bucket.bucketArn],
         }),
       ]),
       // policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
@@ -149,6 +140,17 @@ export class AuroraBedrockKnoledgeBase extends Construct {
             new iam.PolicyStatement({
               actions: ['bedrock:InvokeModel'],
               resources: [this.embeddingModelArn],
+            }),
+            new iam.PolicyStatement({
+              actions: [
+                's3:*', //TODO scope this down
+                's3:ListBucket',
+                's3:GetObject'
+              ],
+              resources: [
+                props.bucket.bucketArn,
+                props.bucket.bucketArn + `/*`
+              ],
             }),
           ],
         })

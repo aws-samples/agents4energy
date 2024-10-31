@@ -1,9 +1,27 @@
+import { stringify } from 'yaml'
+import { z } from "zod";
+
 import { LambdaClient, InvokeCommand, InvokeCommandInput } from "@aws-sdk/client-lambda";
+import { BedrockAgentRuntimeClient, RetrieveCommand } from "@aws-sdk/client-bedrock-agent-runtime";
+import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
 
 import { tool } from "@langchain/core/tools";
-import { z } from "zod";
-import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
 import { env } from '$amplify/env/production-agent-function';
+
+// import { AmazonKnowledgeBaseRetriever } from "@langchain/aws";
+
+// const retriever = new AmazonKnowledgeBaseRetriever({
+//   topK: 5,
+//   knowledgeBaseId: env.AWS_KNOWLEDGE_BASE_ID,
+//   region: env.AWS_REGION,
+// //   clientOptions: {
+// //     credentials: {
+// //       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+// //       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+// //     },
+// //   },
+// });
+
 
 const calculatorSchema = z.object({
     operation: z
@@ -35,6 +53,100 @@ export const calculatorTool = tool(
     }
 );
 
+const getTableDefinitionsSchema = z.object({
+    tableFeatures: z.string().describe("Which features of the user's question should be looked for when picking which tables to query?"),
+});
+
+//////////////////////////////////////////
+////// Get table definiton tool //////////
+//////////////////////////////////////////
+
+async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: string }) {
+    const bedrockRuntimeClient = new BedrockAgentRuntimeClient();
+
+    const command = new RetrieveCommand({
+        knowledgeBaseId: props.knowledgeBaseId,
+        retrievalQuery: { text: props.query },
+        retrievalConfiguration: {
+            vectorSearchConfiguration: {
+                numberOfResults: 5 // Adjust based on your needs
+            }
+        }
+    });
+
+    try {
+        const response = await bedrockRuntimeClient.send(command);
+        return response.retrievalResults;
+    } catch (error) {
+        console.error('Error querying knowledge base:', error);
+        throw error;
+    }
+}
+
+//https://js.langchain.com/docs/integrations/retrievers/bedrock-knowledge-bases/
+export const getTableDefinitionsTool = tool(
+    async ({ tableFeatures }) => {
+        console.log('Getting relevant tables for table features:\n', tableFeatures)
+
+        const relevantTables = await queryKnowledgeBase({
+            knowledgeBaseId: env.AWS_KNOWLEDGE_BASE_ID,
+            query: tableFeatures
+        }
+        )
+
+        if (!relevantTables) throw new Error("No relevant tables found")
+        console.log("Text2Sql KB response:\n", relevantTables)
+
+
+        const outputBlurb = stringify(relevantTables.map((result) =>
+        ({
+            ...JSON.parse(result?.content?.text || ""),
+            score: result?.score
+        })))
+
+        console.log('Output Blurb:\n', outputBlurb)
+
+        // console.log(relevantTables.map((result) => stringify(JSON.parse(result?.content?.text || ""))).join('\n\n'))
+
+        return outputBlurb
+    },
+    {
+        name: "getTableDefinitionsTool",
+        description: "Can retrieve database table definitons which can help answer a user's question.",
+        schema: getTableDefinitionsSchema,
+    }
+);
+
+const testToSqlResponseSchema = z.object({
+    operation: z
+        .enum(["add", "subtract", "multiply", "divide", "squareRoot"])
+        .describe("The type of operation to execute."),
+    number1: z.number().describe("The first number to operate on."),
+    number2: z.number().describe("The second number to operate on."),
+});
+
+export const testToSqlResponseTool = tool(
+    async ({ operation, number1, number2 }) => {
+        // Functions must return strings
+        if (operation === "add") {
+            return `${number1 + number2}`;
+        } else if (operation === "subtract") {
+            return `${number1 - number2}`;
+        } else if (operation === "multiply") {
+            return `${number1 * number2}`;
+        } else if (operation === "divide") {
+            return `${number1 / number2}`;
+        } else {
+            throw new Error("Invalid operation.");
+        }
+    },
+    {
+        name: "calculator",
+        description: "Can perform mathematical operations.",
+        schema: testToSqlResponseSchema,
+    }
+);
+
 const convertPdfToJsonSchema = z.object({
     s3Key: z.string().describe("The S3 key of the PDF file to convert."),
 });
@@ -44,7 +156,7 @@ export const convertPdfToJsonTool = tool(
         const lambdaClient = new LambdaClient();
         const params: InvokeCommandInput = {
             FunctionName: env.CONVERT_PDF_TO_JSON_LAMBDA_ARN,
-            Payload: JSON.stringify({ arguments: {s3Key: s3Key} }),
+            Payload: JSON.stringify({ arguments: { s3Key: s3Key } }),
         };
         const response = await lambdaClient.send(new InvokeCommand(params));
         if (!response.Payload) throw new Error("No payload returned from Lambda")
@@ -53,7 +165,7 @@ export const convertPdfToJsonTool = tool(
         console.log('Json Content: ', jsonContent)
 
         // console.log(`Converting s3 key ${s3Key} into content blocks`)
-        
+
         // const pdfImageBuffers = await convertPdfToB64Strings({s3BucketName: env.DATA_BUCKET_NAME, s3Key: s3Key})
 
         return jsonContent
@@ -117,7 +229,7 @@ export const wellTableTool = tool(
         console.log('Step Function Response: ', sfnResponse)
 
         if (!sfnResponse.output) {
-            throw new Error(`No output from step function. Step function response:\n${JSON.stringify(sfnResponse, null,2)}`);
+            throw new Error(`No output from step function. Step function response:\n${JSON.stringify(sfnResponse, null, 2)}`);
         }
 
         // console.log('sfnResponse.output: ', sfnResponse.output)

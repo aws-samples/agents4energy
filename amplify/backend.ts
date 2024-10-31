@@ -197,9 +197,10 @@ const {
   convertPdfToJsonFunction, 
   defaultProdDatabaseName, 
   hydrocarbonProductionDb,
-  // sqlTableDefBedrockKnoledgeBase,
+  sqlTableDefBedrockKnoledgeBase,
   athenaWorkgroup,
-  athenaPostgresCatalog
+  athenaPostgresCatalog,
+
 } = productionAgentBuilder(customStack, {
   vpc: vpc,
   s3Bucket: uploadToS3Deployment.deployedBucket // This causes the assets here to not deploy until the s3 upload is complete.
@@ -208,6 +209,7 @@ const {
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
 backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_JSON_LAMBDA_ARN', convertPdfToJsonFunction.functionArn)
+backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
 // if (backend.data.apiKey) backend.productionAgentFunction.addEnvironment('API_KEY',backend.data.apiKey)
 
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(

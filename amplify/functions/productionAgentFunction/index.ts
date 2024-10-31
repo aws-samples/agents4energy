@@ -4,12 +4,13 @@ import { Schema } from '../../data/resource';
 import { ChatBedrockConverse } from "@langchain/aws";
 import { AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { calculatorTool, wellTableTool, convertPdfToJsonTool } from './toolBox';
 import { generateAmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
+import { calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool } from './toolBox';
+
 // Define the tools for the agent to use
-const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool];
+const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool];
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
 

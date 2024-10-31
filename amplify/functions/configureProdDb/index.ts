@@ -1,5 +1,3 @@
-import { stringify } from 'yaml'
-
 import { RDSDataClient, ExecuteStatementCommand, ExecuteStatementCommandInput } from "@aws-sdk/client-rds-data";
 import {
   AthenaClient,
@@ -95,11 +93,11 @@ export const handler = async (event: any, context: any, callback: any): Promise<
 
       if (!describeTableResult) throw new Error(`No table definition found for table: ${tableName}`)
 
-      const tableDefinitionString = stringify({
+      const tableDefinitionString = JSON.stringify({
         database: database,
         tableName: tableName,
         tableDefinition: describeTableResult
-      })
+      }, null, 2)
 
       console.log('Table Definition:\n', tableDefinitionString);
       
