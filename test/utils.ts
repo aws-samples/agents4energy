@@ -88,7 +88,7 @@ export async function getDeployedResourceArn(
             for (const [key, value] of Object.entries(envVars)) {
                 if (value) {
                     process.env[key] = value;
-                    console.log(`Set ${key} environment variable`);
+                    console.log(`Set ${key} environment variable to ${value}`);
                 }
             }
         } else {

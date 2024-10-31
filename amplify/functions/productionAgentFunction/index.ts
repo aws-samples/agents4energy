@@ -7,10 +7,10 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { generateAmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
-import { calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool } from './toolBox';
+import { calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool } from './toolBox';
 
 // Define the tools for the agent to use
-const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool];
+const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool];
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
 
@@ -78,7 +78,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 
                 // const chunkContent = streamEvent.data.chunk.kwargs.content
                 const chunkContent = getLangChainMessageTextContent(streamChunk)
-                console.log("chunkContent: ", chunkContent)
+                // console.log("chunkContent: ", chunkContent)
                 if (chunkContent) {
                     await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
                         query: publishResponseStreamChunk,

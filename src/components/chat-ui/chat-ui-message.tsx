@@ -6,6 +6,8 @@ import {
   StatusIndicator
 } from "@cloudscape-design/components";
 
+import { stringify, parse } from 'yaml'
+
 import remarkGfm from "remark-gfm";
 import ReactMarkdown from "react-markdown";
 
@@ -44,6 +46,15 @@ const getDataQualityCheckSchema = {
 function isValidJSON(str: string): boolean {
   try {
     JSON.parse(str);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isValidYAML(str: string): boolean {
+  try {
+    parse(str);
     return true;
   } catch {
     return false;
@@ -170,8 +181,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           ) : null
           }
 
-
-          {props.message.tool_name && !isValidJSON(props.message.content) ? (
+          {/* This will render a table */}
+          {props.message.tool_name && !isValidJSON(props.message.content) && !isValidYAML(props.message.content) ? (
             <div className={styles.btn_chabot_message_copy}>
               <Popover
                 size="medium"
@@ -220,7 +231,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               </div>
             ) : null
             }
-            {isValidJSON(props.message.content) ? (
+            {isValidJSON(props.message.content) || isValidYAML(props.message.content) ? (
               <pre
                 style={{ //Wrap long lines
                   whiteSpace: 'pre-wrap',
@@ -228,8 +239,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   overflowWrap: 'break-word',
                 }}
               >
-                {JSON.stringify(JSON.parse(props.message.content), null, 2)}
-              </pre>
+                {isValidJSON(props.message.content) ?
+                  stringify(JSON.parse(props.message.content)) :
+                  props.message.content
+                }
+              </pre>/* Render as YAML */
 
             ) : (
               <ReactMarkdown
@@ -276,7 +290,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             {props.message.tool_calls && typeof props.message.tool_calls === 'string' && JSON.parse(props.message.tool_calls).length > 0 ? (
               <div>
                 <strong>Tool Calls:</strong>
-                <pre>{JSON.stringify(JSON.parse(props.message.tool_calls), null, 2)}</pre>
+                <pre>{stringify(JSON.parse(props.message.tool_calls), null, 2)}</pre>
               </div>
             ) : null
             }

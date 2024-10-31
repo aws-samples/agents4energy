@@ -52,8 +52,8 @@ export const main = async () => {
   })
 
   const testArguments = {
-    "chatSessionId": testChatSession.data.createChatSession.id,
-    "input": "Write a SQL query to get the average produciton over the last 12 weeks. Get the table definiton so you know what to include in the query."
+    chatSessionId: testChatSession.data.createChatSession.id,
+    input: `Execute a SQL query to get the average produciton over the last 12 weeks. Get the table definiton so you know what to include in the query.`
     // "input": "What is 1+54?"
   }
 

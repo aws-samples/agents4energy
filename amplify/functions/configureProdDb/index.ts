@@ -1,23 +1,25 @@
 import { RDSDataClient, ExecuteStatementCommand, ExecuteStatementCommandInput } from "@aws-sdk/client-rds-data";
-import {
-  AthenaClient,
-  StartQueryExecutionInput,
-  StartQueryExecutionCommand,
-  GetQueryExecutionCommand,
-  GetQueryExecutionInput,
-  GetQueryResultsCommand,
-  GetQueryResultsOutput
-} from "@aws-sdk/client-athena"
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-// import { Athena, Bedrock } from 'aws-sdk';
-// const athena = new Athena();
-// const rds = new RDS();
-// const bedrock = new Bedrock();
+// import {
+//   AthenaClient,
+//   StartQueryExecutionInput,
+//   StartQueryExecutionCommand,
+//   GetQueryExecutionCommand,
+//   GetQueryExecutionInput,
+//   GetQueryResultsCommand,
+//   GetQueryResultsOutput
+// } from "@aws-sdk/client-athena"
+// import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+// // import { Athena, Bedrock } from 'aws-sdk';
+// // const athena = new Athena();
+// // const rds = new RDS();
+// // const bedrock = new Bedrock();
+
+import { startQueryExecution, waitForQueryToComplete, getQueryResults, uploadStringToS3 } from '../utils/sdkUtils'
 
 import sqlStatements from './sqlStatements'
 
 const rdsDataClient = new RDSDataClient();
-const athenaClient = new AthenaClient();
+// const athenaClient = new AthenaClient();
 
 export const handler = async (event: any, context: any, callback: any): Promise<{ statusCode: number; body: string }> => {
 
@@ -81,7 +83,12 @@ export const handler = async (event: any, context: any, callback: any): Promise<
     tablesToExportDefinitionsOf.map(async ({ tableName, database }) => {
       const query = queryBuilder(database, tableName);
       console.log('Executing Athena Query:\n', query);
-      const queryExecutionId = await startQueryExecution(query, workgroup, database);
+      const queryExecutionId = await startQueryExecution({
+        query: query, 
+        workgroup: workgroup, 
+        database: database, 
+        athenaCatalogaName: process.env.ATHENA_CATALOG_NAME!
+      });
       await waitForQueryToComplete(queryExecutionId, workgroup);
       const results = await getQueryResults(queryExecutionId);
       console.log('Athena Query Result:\n', results);
@@ -115,62 +122,62 @@ export const handler = async (event: any, context: any, callback: any): Promise<
   return { statusCode: 200, body: 'All SQL statements executed successfully' };
 };
 
-async function startQueryExecution(query: string, workgroup: string, database: string): Promise<string> {
-  const params: StartQueryExecutionInput = {
-    QueryString: query,
-    WorkGroup: workgroup,
-    QueryExecutionContext: {
-      Catalog: process.env.ATHENA_CATALOG_NAME,
-      Database: database
-    },
-  };
+// async function startQueryExecution(query: string, workgroup: string, database: string): Promise<string> {
+//   const params: StartQueryExecutionInput = {
+//     QueryString: query,
+//     WorkGroup: workgroup,
+//     QueryExecutionContext: {
+//       Catalog: process.env.ATHENA_CATALOG_NAME,
+//       Database: database
+//     },
+//   };
 
-  const result = await athenaClient.send(new StartQueryExecutionCommand(params))
+//   const result = await athenaClient.send(new StartQueryExecutionCommand(params))
 
-  // const result = await athenaClient.startQueryExecution(params).promise();
-  return result.QueryExecutionId!;
-}
+//   // const result = await athenaClient.startQueryExecution(params).promise();
+//   return result.QueryExecutionId!;
+// }
 
-async function waitForQueryToComplete(queryExecutionId: string, workgroup: string): Promise<void> {
-  while (true) {
+// async function waitForQueryToComplete(queryExecutionId: string, workgroup: string): Promise<void> {
+//   while (true) {
 
-    const result = await athenaClient.send(new GetQueryExecutionCommand({ QueryExecutionId: queryExecutionId }));
-    const state = result.QueryExecution!.Status!.State;
-    if (state === 'SUCCEEDED') return;
-    if (state === 'FAILED' || state === 'CANCELLED') {
-      throw new Error(`Query execution failed: ${JSON.stringify(result.QueryExecution!.Status)}`);
-    }
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-}
+//     const result = await athenaClient.send(new GetQueryExecutionCommand({ QueryExecutionId: queryExecutionId }));
+//     const state = result.QueryExecution!.Status!.State;
+//     if (state === 'SUCCEEDED') return;
+//     if (state === 'FAILED' || state === 'CANCELLED') {
+//       throw new Error(`Query execution failed: ${JSON.stringify(result.QueryExecution!.Status)}`);
+//     }
+//     await new Promise(resolve => setTimeout(resolve, 1000));
+//   }
+// }
 
-async function getQueryResults(queryExecutionId: string): Promise<GetQueryResultsOutput> {
-  return athenaClient.send(new GetQueryResultsCommand({
-    QueryExecutionId: queryExecutionId,
-  }));
-}
+// async function getQueryResults(queryExecutionId: string): Promise<GetQueryResultsOutput> {
+//   return athenaClient.send(new GetQueryResultsCommand({
+//     QueryExecutionId: queryExecutionId,
+//   }));
+// }
 
 
-async function uploadStringToS3(props: {
-  key: string,
-  content: string,
-  contentType?: string
-}
-): Promise<void> {
-  const s3Client = new S3Client();
+// async function uploadStringToS3(props: {
+//   key: string,
+//   content: string,
+//   contentType?: string
+// }
+// ): Promise<void> {
+//   const s3Client = new S3Client();
 
-  try {
-    const command = new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET_NAME,
-      Key: props.key,
-      Body: props.content,
-      ContentType: props.contentType || "text/plain",
-    });
+//   try {
+//     const command = new PutObjectCommand({
+//       Bucket: process.env.S3_BUCKET_NAME,
+//       Key: props.key,
+//       Body: props.content,
+//       ContentType: props.contentType || "text/plain",
+//     });
 
-    await s3Client.send(command);
-    console.log(`Successfully uploaded string to ${process.env.S3_BUCKET_NAME}/${props.key}`);
-  } catch (error) {
-    console.error("Error uploading string to S3:", error);
-    throw error;
-  }
-}
+//     await s3Client.send(command);
+//     console.log(`Successfully uploaded string to ${process.env.S3_BUCKET_NAME}/${props.key}`);
+//   } catch (error) {
+//     console.error("Error uploading string to S3:", error);
+//     throw error;
+//   }
+// }

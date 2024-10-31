@@ -8,20 +8,7 @@ import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
 import { tool } from "@langchain/core/tools";
 import { env } from '$amplify/env/production-agent-function';
 
-// import { AmazonKnowledgeBaseRetriever } from "@langchain/aws";
-
-// const retriever = new AmazonKnowledgeBaseRetriever({
-//   topK: 5,
-//   knowledgeBaseId: env.AWS_KNOWLEDGE_BASE_ID,
-//   region: env.AWS_REGION,
-// //   clientOptions: {
-// //     credentials: {
-// //       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-// //       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-// //     },
-// //   },
-// });
-
+import { startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
 const calculatorSchema = z.object({
     operation: z
@@ -53,13 +40,14 @@ export const calculatorTool = tool(
     }
 );
 
-const getTableDefinitionsSchema = z.object({
-    tableFeatures: z.string().describe("Which features of the user's question should be looked for when picking which tables to query?"),
-});
+
 
 //////////////////////////////////////////
 ////// Get table definiton tool //////////
 //////////////////////////////////////////
+const getTableDefinitionsSchema = z.object({
+    tableFeatures: z.string().describe("Which features of the user's question should be looked for when picking which tables to query?"),
+});
 
 async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: string }) {
     const bedrockRuntimeClient = new BedrockAgentRuntimeClient();
@@ -117,7 +105,52 @@ export const getTableDefinitionsTool = tool(
     }
 );
 
-const testToSqlResponseSchema = z.object({
+//////////////////////////////////////////
+////// Execute SQL Statement Tool ////////
+//////////////////////////////////////////
+
+const executeSQLQuerySchema = z.object({
+    query: z.string().describe("The Trino SQL query to be executed. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp"),
+    database: z.string().describe("The database in which the query will be executed."),
+});
+
+export const executeSQLQueryTool = tool(
+    async ({ query, database }) => {
+        console.log('Executing SQL Query:\n', query, '\nUsing workgroup: ', env.ATHENA_WORKGROUP_NAME)
+        try {
+            const queryExecutionId = await startQueryExecution({
+                query: query, 
+                workgroup: env.ATHENA_WORKGROUP_NAME, 
+                database: database, 
+                athenaCatalogaName: env.ATHENA_CATALOG_NAME
+              });
+            await waitForQueryToComplete(queryExecutionId, env.ATHENA_WORKGROUP_NAME);
+            const results = await getQueryResults(queryExecutionId);
+            console.log('Athena Query Result:\n', results);
+
+            if (!results.ResultSet?.Rows) throw new Error("No results returned from Athena")
+
+            const queryResponseData = transformResultSet(results.ResultSet)
+
+            return stringify(queryResponseData)
+        } catch (error) {
+            console.error('Error executing sql query:', error);
+            throw error;
+        }
+    },
+    {
+        name: "executeSQLQuery",
+        description: "Can execute a Trino SQL query and returns the results.",
+        schema: executeSQLQuerySchema,
+    }
+);
+
+
+//////////////////////////////////////////
+////// PDF 2 SQL Tool ////////////////////
+//////////////////////////////////////////
+
+const textToSqlResponseSchema = z.object({
     operation: z
         .enum(["add", "subtract", "multiply", "divide", "squareRoot"])
         .describe("The type of operation to execute."),
@@ -143,7 +176,7 @@ export const testToSqlResponseTool = tool(
     {
         name: "calculator",
         description: "Can perform mathematical operations.",
-        schema: testToSqlResponseSchema,
+        schema: textToSqlResponseSchema,
     }
 );
 

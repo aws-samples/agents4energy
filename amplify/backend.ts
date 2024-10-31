@@ -210,7 +210,9 @@ backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.stora
 backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
 backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_JSON_LAMBDA_ARN', convertPdfToJsonFunction.functionArn)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
-// if (backend.data.apiKey) backend.productionAgentFunction.addEnvironment('API_KEY',backend.data.apiKey)
+backend.productionAgentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', athenaWorkgroup.name)
+backend.productionAgentFunction.addEnvironment('DATABASE_NAME', defaultProdDatabaseName)
+backend.productionAgentFunction.addEnvironment('ATHENA_CATALOG_NAME', athenaPostgresCatalog.name)
 
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
@@ -222,6 +224,16 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
     ],
   })
 )
+
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    actions: ["bedrock:Retrieve"],
+    resources: [
+      sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn
+    ],
+  })
+)
+
 
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
@@ -247,6 +259,18 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
     ],
   }),
 )
+
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+  actions: [
+      'athena:StartQueryExecution',
+  ],
+  resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
+  // conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+  //     'StringEquals': {
+  //         'aws:ResourceTag/rootStackName': rootStack.stackName
+  //     }
+  // }
+}))
 
 //Create data sources and resolvers for the lambdas created in the production agent stack
 const convertPdfToImageDS = backend.data.addLambdaDataSource(
