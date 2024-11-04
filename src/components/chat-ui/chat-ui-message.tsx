@@ -83,15 +83,6 @@ function isValidJSON(str: string): boolean {
   }
 }
 
-// function isValidYAML(str: string): boolean {
-//   try {
-//     parse(str);
-//     return true;
-//   } catch {
-//     return false;
-//   }
-// }
-
 function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
   const minLength = Math.min(list1.length, list2.length);
   const result: { x: T, y: U }[] = [];
@@ -131,9 +122,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
   useEffect(() => {
     if (messageContentCategory === 'tool_plot') {
-      const { queryResponseData, columnNameFromQueryForXAxis } = JSON.parse(props.message.content) as {
+      const { queryResponseData, columnNameFromQueryForXAxis, chartTitle } = JSON.parse(props.message.content) as {
         queryResponseData: { [key: string]: (string | number)[] },
-        columnNameFromQueryForXAxis: string
+        columnNameFromQueryForXAxis: string,
+        chartTitle: string | undefined
       }
 
       const datasets = Object.keys(queryResponseData)
@@ -145,63 +137,83 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           label: columnName,
         }
         ))
-      
-        const options: ChartOptions<'scatter'> = {
-          scales: {
-            x: {
-              type: 'time' as const,
-              time: {
-                unit: 'day' as const,
-                tooltipFormat: 'PP',
-                displayFormats: {
-                  day: 'MMM d',
-                },
-              },
-              title: {
-                display: true,
-                text: columnNameFromQueryForXAxis,
-              },
-              adapters: {
-                date: {
-                  locale: enUS,
-                },
+
+      const options: ChartOptions<'scatter'> = {
+        scales: {
+          x: {
+            type: 'time' as const,
+            time: {
+              unit: 'day' as const,
+              tooltipFormat: 'PP',
+              displayFormats: {
+                day: 'MMM d',
               },
             },
-            y: {
-              type: 'logarithmic' as const,
-              title: {
-                display: true,
-                text: 'Value (log scale)',
+            title: {
+              display: true,
+              text: columnNameFromQueryForXAxis,
+            },
+            adapters: {
+              date: {
+                locale: enUS,
               },
             },
           },
-          plugins: {
+          y: {
+            type: 'logarithmic' as const,
+            title: {
+              display: true,
+              text: 'Value (log scale)',
+            },
+          },
+        },
+        plugins: {
+          // title: {
+          //   text: chartTitle,
+          //   display: true
+          // },
+          title: {
+            display: true,
+            text: 'Custom Chart Title'
+          },
+          zoom: {
+            pan: {
+              enabled: true,
+              modifierKey: "alt"
+            },
             zoom: {
-              pan: {
+              wheel: {
                 enabled: true,
-                modifierKey: "alt"
               },
-              zoom: {
-                wheel: {
-                  enabled: true,
-                },
-                drag: {
-                  enabled: true,
-                  modifierKey: "shift"
-                },
-              }
+              drag: {
+                enabled: true,
+                modifierKey: "shift"
+              },
             }
           }
-        };
+        }
+      };
 
-        setMessagePlot(() => (
+      setMessagePlot(() => (
+        <>
+          {/* <pre
+            style={{ //Wrap long lines
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+            }}
+          >
+            {stringify(JSON.parse(props.message.content))}
+          </pre> */}
           <Scatter
             data={{
               datasets: datasets,
             }}
             options={options}
           />
-        ))
+        </>
+
+      ))
 
 
     }
@@ -506,7 +518,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 //           enabled: true,
                 //           modifierKey: "shift"
                 //         },
-                        
+
                 //         // mode: 'xy',
                 //       }
                 //     }
@@ -524,8 +536,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   >
                     {JSON.stringify(datasets, null, 2)}
                   </pre> */}
-                  
-                  { messagePlot? messagePlot: null}
+
+                  {messagePlot ? messagePlot : null}
                 </>
 
               case 'tool_json':

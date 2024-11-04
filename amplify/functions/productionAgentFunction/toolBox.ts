@@ -140,22 +140,6 @@ const executeSQLQueryReturnPlotSchema = z.object({
     chartTitle: z.string().describe("The title of the plot."),
 });
 
-function zipLists<T, U>(list1: T[], list2: U[]): {x: T, y: U}[] {
-    const minLength = Math.min(list1.length, list2.length);
-    const result: {x: T, y: U}[] = [];
-
-    for (let i = 0; i < minLength; i++) {
-        result.push({x: list1[i], y: list2[i]});
-    }
-
-    return result;
-}
-
-function generateColor(index: number): string {
-    const hue = (index * 137.508) % 360; // Use golden angle approximation
-    return `hsl(${hue}, 70%, 60%)`;
-  }
-
 export const executeSQLQueryTool = tool(
     async ({ query, database, columnNameFromQueryForXAxis, chartTitle }) => {
         console.log('Executing SQL Query:\n', query, '\nUsing workgroup: ', env.ATHENA_WORKGROUP_NAME)
@@ -264,6 +248,7 @@ export const executeSQLQueryTool = tool(
                 messageContentType: 'tool_plot',
                 queryResponseData: queryResponseData,
                 columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
+                chartTitle: chartTitle
                 // plotData: plotData,
                 // plotLayout: plotLayout,
                 // plotConfig: plotConfig
