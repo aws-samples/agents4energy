@@ -10,7 +10,7 @@ import {
 // import { bedrock as cdkLabsBedrock } from "@cdklabs/generative-ai-cdk-constructs";
 import { Construct } from 'constructs';
 
-export interface StaticSiteProps {
+export interface KnowledgeBaseProps {
   vpc: ec2.Vpc;
   bucket: s3.IBucket;
 }
@@ -29,7 +29,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
   public readonly knowledgeBase: bedrock.CfnKnowledgeBase;
   public readonly embeddingModelArn: string
 
-  constructor(scope: Construct, id: string, props: StaticSiteProps) {
+  constructor(scope: Construct, id: string, props: KnowledgeBaseProps) {
     super(scope, id);
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
@@ -44,7 +44,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
         version: rds.AuroraPostgresEngineVersion.VER_13_9,
       }),
       scaling: {
-        autoPause: cdk.Duration.minutes(10), // default is to pause after 5 minutes
+        autoPause: cdk.Duration.minutes(60), // default is to pause after 60 minutes
         minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
         maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
       },

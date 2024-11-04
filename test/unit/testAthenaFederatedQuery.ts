@@ -13,7 +13,8 @@ async function main() {
             SELECT 
             oil ,
             gas , 
-            water 
+            water,
+            proddate
             FROM production.daily
             WHERE proddate >= date_add('week', -12, current_date)`,
 
@@ -26,7 +27,9 @@ async function main() {
         //     SELECT schema_name 
         //     FROM information_schema.schemata;
         // `,
-        database: "public"
+        database: "public",
+        columnNameFromQueryForXAxis: 'proddate',
+        chartTitle: "test chart"
     });
     console.log('result:\n', tableDefinitions);
 }

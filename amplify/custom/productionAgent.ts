@@ -211,7 +211,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             version: rds.AuroraPostgresEngineVersion.VER_13_9,
         }),
         scaling: {
-            autoPause: cdk.Duration.minutes(10), // default is to pause after 5 minutes
+            autoPause: cdk.Duration.minutes(60), // default is to pause after 5 minutes
             minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
             maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
         },
@@ -307,6 +307,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //// Configuration Assets ////
     //////////////////////////////
 
+    //TODO - Maker sure this correctly loads the table deffs in s3
     const configureProdDbFunction = new NodejsFunction(scope, 'configureProdDbFunction', {
         runtime: lambda.Runtime.NODEJS_LATEST,
         entry: path.join(__dirname, '..', 'functions', 'configureProdDb', 'index.ts'),
@@ -348,6 +349,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: [
             'athena:StartQueryExecution',
+            'athena:GetQueryExecution',
+            'athena:GetQueryResults',
+            'athena:GetDataCatalog'
         ],
         resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:*`],
         conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
@@ -356,6 +360,25 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             }
         }
     }))
+
+    //Executing athena queries requires the caller have these permissions
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            "s3:GetBucketLocation",
+            "s3:GetObject",
+            "s3:ListBucket",
+            "s3:ListBucketMultipartUploads",
+            "s3:ListMultipartUploadParts",
+            "s3:AbortMultipartUpload",
+            "s3:PutObject",
+        ],
+        resources: [
+            props.s3Bucket.bucketArn,
+            props.s3Bucket.arnForObjects("*")
+        ],
+    }))
+
+    
 
     // Create a Custom Resource that invokes only if the dependencies change
     const invokeConfigureProdDbFunctionServiceCall: cr.AwsSdkCall = {

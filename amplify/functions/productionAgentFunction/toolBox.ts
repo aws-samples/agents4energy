@@ -10,6 +10,20 @@ import { env } from '$amplify/env/production-agent-function';
 
 import { startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
+import * as Plotly from 'plotly.js';
+
+import { ToolMessageContentType } from '../../../src/utils/types'
+
+// type ToolMessageWithContentType = {
+//     messageContentType: string;
+//     [key: string]: any;
+// };
+
+
+//////////////////////////////////////////
+//////////// Calculator Tool /////////////
+//////////////////////////////////////////
+
 const calculatorSchema = z.object({
     operation: z
         .enum(["add", "subtract", "multiply", "divide", "squareRoot"])
@@ -86,17 +100,21 @@ export const getTableDefinitionsTool = tool(
         console.log("Text2Sql KB response:\n", relevantTables)
 
 
-        const outputBlurb = stringify(relevantTables.map((result) =>
+        const tableDefinitions = relevantTables.map((result) =>
         ({
             ...JSON.parse(result?.content?.text || ""),
             score: result?.score
-        })))
+        }))
 
-        console.log('Output Blurb:\n', outputBlurb)
+        console.log('Table Definitions:\n', tableDefinitions)
 
         // console.log(relevantTables.map((result) => stringify(JSON.parse(result?.content?.text || ""))).join('\n\n'))
 
-        return outputBlurb
+        // return outputBlurb
+        return {
+            messageContentType: 'tool_json',
+            tableDefinitions: tableDefinitions
+        } as ToolMessageContentType
     },
     {
         name: "getTableDefinitionsTool",
@@ -105,25 +123,31 @@ export const getTableDefinitionsTool = tool(
     }
 );
 
-//////////////////////////////////////////
-////// Execute SQL Statement Tool ////////
-//////////////////////////////////////////
+///////////////////////////////////////////////////
+///// Execute SQL Statement Return Plot Tool //////
+///////////////////////////////////////////////////
 
-const executeSQLQuerySchema = z.object({
-    query: z.string().describe("The Trino SQL query to be executed. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp"),
+const executeSQLQueryReturnPlotSchema = z.object({
+    query: z.string().describe(`
+        The Trino SQL query to be executed. 
+        Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp.
+        The result from executing this query will be plotted. One of the columns will be chosen for the X axis, and the others will be plotted on the Y axis.
+        `),
     database: z.string().describe("The database in which the query will be executed."),
+    columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
+    chartTitle: z.string().describe("The title of the plot."),
 });
 
 export const executeSQLQueryTool = tool(
-    async ({ query, database }) => {
+    async ({ query, database, columnNameFromQueryForXAxis, chartTitle }) => {
         console.log('Executing SQL Query:\n', query, '\nUsing workgroup: ', env.ATHENA_WORKGROUP_NAME)
         try {
             const queryExecutionId = await startQueryExecution({
-                query: query, 
-                workgroup: env.ATHENA_WORKGROUP_NAME, 
-                database: database, 
+                query: query,
+                workgroup: env.ATHENA_WORKGROUP_NAME,
+                database: database,
                 athenaCatalogaName: env.ATHENA_CATALOG_NAME
-              });
+            });
             await waitForQueryToComplete(queryExecutionId, env.ATHENA_WORKGROUP_NAME);
             const results = await getQueryResults(queryExecutionId);
             console.log('Athena Query Result:\n', results);
@@ -132,53 +156,83 @@ export const executeSQLQueryTool = tool(
 
             const queryResponseData = transformResultSet(results.ResultSet)
 
-            return stringify(queryResponseData)
+            if (!(columnNameFromQueryForXAxis in queryResponseData)) {
+                return {
+                    messageContentType: 'tool_json',
+                    error: `
+                    Column name "${columnNameFromQueryForXAxis}" is not present in the result of the SQL query column names: ${queryResponseData.keys}
+                    Be sure to select a column from the sql query for the x axis.
+                    `
+                } as ToolMessageContentType
+            }
+
+            // queryResponseData.filter((columnName) => )
+            const plotData: Plotly.Data[] = Object.keys(queryResponseData)
+                .filter(key => key !== columnNameFromQueryForXAxis)
+                .map((columnName) => (
+                    {
+                        x: queryResponseData[columnNameFromQueryForXAxis],
+                        y: queryResponseData[columnName],
+                        // type: 'scatter',
+                        mode: 'lines+markers',
+                        // marker: { color: 'blue' },
+                        name: columnName
+                    }
+
+                ))
+
+            // const plotData: Plotly.Data[] = [{
+            //     x: [1, 2, 3, 4, 5],
+            //     y: [1, 4, 9, 16, 25],
+            //     type: 'scatter',
+            //     mode: 'lines+markers',
+            //     marker: { color: 'blue' },
+            //     name: 'Square Function'
+            // }];
+
+            // Define the layout for the plot
+            const plotLayout: Partial<Plotly.Layout> = {
+                title: chartTitle,
+                xaxis: { title: columnNameFromQueryForXAxis },
+                yaxis: {
+                    title: 'Y Axis (Log Scale)',
+                    type: 'log'  // This sets the y-axis to log scale
+                },
+                showlegend: true
+            };
+
+            // Configuration options
+            const plotConfig: Partial<Plotly.Config> = {
+                responsive: true
+            };
+
+            return {
+                messageContentType: 'tool_plot',
+                queryResponse: queryResponseData,
+                plotData: plotData,
+                plotLayout: plotLayout,
+                plotConfig: plotConfig
+            } as ToolMessageContentType
+
+            // return stringify(queryResponseData)
         } catch (error) {
             console.error('Error executing sql query:', error);
-            throw error;
+            return {
+                messageContentType: 'tool_json',
+                error: error instanceof Error ? error.message : `An unknown error occurred.\n${JSON.stringify(error)}`
+            } as ToolMessageContentType
         }
     },
     {
-        name: "executeSQLQuery",
-        description: "Can execute a Trino SQL query and returns the results.",
-        schema: executeSQLQuerySchema,
+        name: "executeSQLQueryReturnPlot",
+        description: "Can execute a Trino SQL query and returns a plot of the results.",
+        schema: executeSQLQueryReturnPlotSchema,
     }
 );
 
-
 //////////////////////////////////////////
-////// PDF 2 SQL Tool ////////////////////
+/////////// PDF to JSON Tool /////////////
 //////////////////////////////////////////
-
-const textToSqlResponseSchema = z.object({
-    operation: z
-        .enum(["add", "subtract", "multiply", "divide", "squareRoot"])
-        .describe("The type of operation to execute."),
-    number1: z.number().describe("The first number to operate on."),
-    number2: z.number().describe("The second number to operate on."),
-});
-
-export const testToSqlResponseTool = tool(
-    async ({ operation, number1, number2 }) => {
-        // Functions must return strings
-        if (operation === "add") {
-            return `${number1 + number2}`;
-        } else if (operation === "subtract") {
-            return `${number1 - number2}`;
-        } else if (operation === "multiply") {
-            return `${number1 * number2}`;
-        } else if (operation === "divide") {
-            return `${number1 / number2}`;
-        } else {
-            throw new Error("Invalid operation.");
-        }
-    },
-    {
-        name: "calculator",
-        description: "Can perform mathematical operations.",
-        schema: textToSqlResponseSchema,
-    }
-);
 
 const convertPdfToJsonSchema = z.object({
     s3Key: z.string().describe("The S3 key of the PDF file to convert."),
@@ -201,7 +255,10 @@ export const convertPdfToJsonTool = tool(
 
         // const pdfImageBuffers = await convertPdfToB64Strings({s3BucketName: env.DATA_BUCKET_NAME, s3Key: s3Key})
 
-        return jsonContent
+        return {
+            messageContentType: 'tool_json',
+            content: jsonContent,
+        } as ToolMessageContentType
     },
     {
         name: "convertPdfToJson",
@@ -209,6 +266,10 @@ export const convertPdfToJsonTool = tool(
         schema: convertPdfToJsonSchema,
     }
 );
+
+//////////////////////////////////////////
+//////// PDF Reports to Table Tool ///////
+//////////////////////////////////////////
 
 const wellTableSchema = z.object({
     dataToExclude: z.string().optional().describe("List of criteria to exclude data from the table"),
@@ -323,7 +384,12 @@ export const wellTableTool = tool(
         dataRows.sort((a, b) => a[0].localeCompare(b[0]));
         tableRows.push(...dataRows.map(row => row.join(' | ')))
 
-        return tableRows.map(val => '|' + val + '|').join('\n')
+        const outputTable = tableRows.map(val => '|' + val + '|').join('\n')
+
+        return {
+            messageContentType: 'tool_table',
+            outputTableDef: outputTable
+        } as ToolMessageContentType
         // return [tableHeader, tableDivider, dummyData, dummyData].map(val => '|' + val + '|').join('\n')
     },
     {

@@ -86,7 +86,7 @@ bedrockRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
     resources: [
       `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
     ],
-    actions: ["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],
+    actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
   })
 );
 
@@ -191,11 +191,11 @@ const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'tes
   // destinationKeyPrefix: '/'
 });
 
-const { 
-  queryImagesStateMachineArn, 
-  getInfoFromPdfFunction, 
-  convertPdfToJsonFunction, 
-  defaultProdDatabaseName, 
+const {
+  queryImagesStateMachineArn,
+  getInfoFromPdfFunction,
+  convertPdfToJsonFunction,
+  defaultProdDatabaseName,
   hydrocarbonProductionDb,
   sqlTableDefBedrockKnoledgeBase,
   athenaWorkgroup,
@@ -216,7 +216,7 @@ backend.productionAgentFunction.addEnvironment('ATHENA_CATALOG_NAME', athenaPost
 
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
-    actions: ["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],
+    actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
     resources: [
       `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
       `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
@@ -242,34 +242,61 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   })
 )
 
+//https://repost.aws/knowledge-center/athena-output-bucket-error
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
-    actions: ["s3:GetObject"],
+    actions: [
+      "s3:GetBucketLocation",
+      "s3:GetObject",
+      "s3:ListBucket",
+      "s3:ListBucketMultipartUploads",
+      "s3:ListMultipartUploadParts",
+      "s3:AbortMultipartUpload",
+      "s3:PutObject"
+    ],
     resources: [
-      `arn:aws:s3:::${backend.storage.resources.bucket.bucketName}/*`
+      backend.storage.resources.bucket.bucketArn,
+      backend.storage.resources.bucket.arnForObjects("*")
     ],
   }),
 )
 
+// The function must be able to invoke the lambda function used as a datasource for the federated Athena Query.
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["lambda:InvokeFunction"],
     resources: [
-      convertPdfToJsonFunction.functionArn
+      // convertPdfToJsonFunction.functionArn,
+      `arn:aws:lambda:${rootStack.region}:${rootStack.account}:*`
     ],
+    conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+      'StringEquals': {
+        'aws:ResourceTag/rootStackName': rootStack.stackName
+      }
+    }
   }),
 )
 
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
   actions: [
-      'athena:StartQueryExecution',
+    'athena:StartQueryExecution',
+    'athena:GetQueryExecution',
+    'athena:GetQueryResults',
   ],
   resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
-  // conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-  //     'StringEquals': {
-  //         'aws:ResourceTag/rootStackName': rootStack.stackName
-  //     }
-  // }
+}))
+
+
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+  actions: [
+    'athena:GetDataCatalog'
+  ],
+  resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:datacatalog/*`],
+  conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+    'StringEquals': {
+      'aws:ResourceTag/rootStackName': rootStack.stackName
+    }
+  }
 }))
 
 //Create data sources and resolvers for the lambdas created in the production agent stack
