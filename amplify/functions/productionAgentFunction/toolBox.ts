@@ -10,7 +10,8 @@ import { env } from '$amplify/env/production-agent-function';
 
 import { startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
-import * as Plotly from 'plotly.js';
+// import * as Plotly from 'plotly.js';
+import { ChartData } from 'chart.js';
 
 import { ToolMessageContentType } from '../../../src/utils/types'
 
@@ -130,18 +131,47 @@ export const getTableDefinitionsTool = tool(
 const executeSQLQueryReturnPlotSchema = z.object({
     query: z.string().describe(`
         The Trino SQL query to be executed. 
-        Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp.
-        The result from executing this query will be plotted. One of the columns will be chosen for the X axis, and the others will be plotted on the Y axis.
+        Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
+        The result from executing this query will be plotted. 
+        One of the columns will be chosen for the X axis, and the others will be plotted on the Y axis.
         `),
     database: z.string().describe("The database in which the query will be executed."),
     columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
     chartTitle: z.string().describe("The title of the plot."),
 });
 
+function zipLists<T, U>(list1: T[], list2: U[]): {x: T, y: U}[] {
+    const minLength = Math.min(list1.length, list2.length);
+    const result: {x: T, y: U}[] = [];
+
+    for (let i = 0; i < minLength; i++) {
+        result.push({x: list1[i], y: list2[i]});
+    }
+
+    return result;
+}
+
+function generateColor(index: number): string {
+    const hue = (index * 137.508) % 360; // Use golden angle approximation
+    return `hsl(${hue}, 70%, 60%)`;
+  }
+
 export const executeSQLQueryTool = tool(
     async ({ query, database, columnNameFromQueryForXAxis, chartTitle }) => {
         console.log('Executing SQL Query:\n', query, '\nUsing workgroup: ', env.ATHENA_WORKGROUP_NAME)
         try {
+
+            // See if the string date_sub is in the query sting
+            if (query.toLowerCase().includes("date_sub")) {
+                return {
+                    messageContentType: 'tool_json',
+                    error: `
+                    DATE_SUB is not allowed in the SQL query. 
+                    Re-write the query and use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp.
+                    `
+                } as ToolMessageContentType
+            }
+
             const queryExecutionId = await startQueryExecution({
                 query: query,
                 workgroup: env.ATHENA_WORKGROUP_NAME,
@@ -166,20 +196,44 @@ export const executeSQLQueryTool = tool(
                 } as ToolMessageContentType
             }
 
-            // queryResponseData.filter((columnName) => )
-            const plotData: Plotly.Data[] = Object.keys(queryResponseData)
-                .filter(key => key !== columnNameFromQueryForXAxis)
-                .map((columnName) => (
-                    {
-                        x: queryResponseData[columnNameFromQueryForXAxis],
-                        y: queryResponseData[columnName],
-                        // type: 'scatter',
-                        mode: 'lines+markers',
-                        // marker: { color: 'blue' },
-                        name: columnName
-                    }
+            // const datasets = Object.keys(queryResponseData)
+            // .filter(key => key !== columnNameFromQueryForXAxis)
+            // .map((columnName, index) => ( {
+            //         // x: queryResponseData[columnNameFromQueryForXAxis],
+            //         // y: queryResponseData[columnName],
+            //         data: zipLists(queryResponseData[columnNameFromQueryForXAxis], queryResponseData[columnName]),
+            //         // type: 'scatter',
+            //         mode: 'lines+markers',
+            //         backgroundColor: generateColor(index),
+            //         name: columnName
+            //     }
+            // ))
 
-                ))
+            
+
+            // queryResponseData.filter((columnName) => )
+            // const plotData: ChartData = {
+            //     datasets: datasets
+            //     // [{
+            //     //     label: 'Scatter Dataset',
+            //     //     data: [{
+            //     //       x: -10,
+            //     //       y: 0
+            //     //     }, {
+            //     //       x: 0,
+            //     //       y: 10
+            //     //     }, {
+            //     //       x: 10,
+            //     //       y: 5
+            //     //     }, {
+            //     //       x: 0.5,
+            //     //       y: 5.5
+            //     //     },
+            //     //     ],
+            //     //     backgroundColor: 'rgb(255, 99, 132)'
+            //     //   }]
+            // }
+
 
             // const plotData: Plotly.Data[] = [{
             //     x: [1, 2, 3, 4, 5],
@@ -190,28 +244,29 @@ export const executeSQLQueryTool = tool(
             //     name: 'Square Function'
             // }];
 
-            // Define the layout for the plot
-            const plotLayout: Partial<Plotly.Layout> = {
-                title: chartTitle,
-                xaxis: { title: columnNameFromQueryForXAxis },
-                yaxis: {
-                    title: 'Y Axis (Log Scale)',
-                    type: 'log'  // This sets the y-axis to log scale
-                },
-                showlegend: true
-            };
+            // // Define the layout for the plot
+            // const plotLayout: Partial<Plotly.Layout> = {
+            //     title: chartTitle,
+            //     xaxis: { title: columnNameFromQueryForXAxis },
+            //     yaxis: {
+            //         title: 'Y Axis (Log Scale)',
+            //         type: 'log'  // This sets the y-axis to log scale
+            //     },
+            //     showlegend: true
+            // };
 
-            // Configuration options
-            const plotConfig: Partial<Plotly.Config> = {
-                responsive: true
-            };
+            // // Configuration options
+            // const plotConfig: Partial<Plotly.Config> = {
+            //     responsive: true
+            // };
 
             return {
                 messageContentType: 'tool_plot',
-                queryResponse: queryResponseData,
-                plotData: plotData,
-                plotLayout: plotLayout,
-                plotConfig: plotConfig
+                queryResponseData: queryResponseData,
+                columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
+                // plotData: plotData,
+                // plotLayout: plotLayout,
+                // plotConfig: plotConfig
             } as ToolMessageContentType
 
             // return stringify(queryResponseData)

@@ -1,3 +1,4 @@
+"use client"
 import {
   Button,
   Container,
@@ -15,13 +16,38 @@ import { formatDate } from "@/utils/date-utils";
 import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
 
 import styles from "@/styles/chat-ui.module.scss";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Message, messageContentType, ToolMessageContentType } from "../../utils/types";
 
-// import Plot from 'react-plotly.js';
-import Plotly from "plotly.js";
-import createPlotlyComponent from "react-plotly.js/factory";
-const Plot = createPlotlyComponent(Plotly);
+// import PlotComponent from '../PlotComponent'
+import { Scatter } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  LinearScale,
+  LogarithmicScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+  TimeScale,
+  // ChartData,
+  // Point,
+  ChartOptions
+} from 'chart.js';
+// import zoomPlugin from 'chartjs-plugin-zoom';
+import 'chartjs-adapter-date-fns';
+import { enUS } from 'date-fns/locale';
+
+ChartJS.register(
+  LinearScale,
+  LogarithmicScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+  TimeScale,
+  // zoomPlugin
+);
 
 export interface ChatUIMessageProps {
   // message: Schema["ChatMessage"]["type"];
@@ -66,6 +92,22 @@ function isValidJSON(str: string): boolean {
 //   }
 // }
 
+function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
+  const minLength = Math.min(list1.length, list2.length);
+  const result: { x: T, y: U }[] = [];
+
+  for (let i = 0; i < minLength; i++) {
+    result.push({ x: list1[i], y: list2[i] });
+  }
+
+  return result;
+}
+
+function generateColor(index: number): string {
+  const hue = (index * 137.508) % 360; // Use golden angle approximation
+  return `hsl(${hue}, 70%, 60%)`;
+}
+
 function getMessageCatigory(message: Message): messageContentType {
   if (!message.tool_name) {
     //This is an AI message
@@ -82,9 +124,88 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
   const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
+  const [messagePlot, setMessagePlot] = useState<React.FC>()
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
   const messageContentCategory = getMessageCatigory(props.message);
+
+  useEffect(() => {
+    if (messageContentCategory === 'tool_plot') {
+      const { queryResponseData, columnNameFromQueryForXAxis } = JSON.parse(props.message.content) as {
+        queryResponseData: { [key: string]: (string | number)[] },
+        columnNameFromQueryForXAxis: string
+      }
+
+      const datasets = Object.keys(queryResponseData)
+        .filter(key => key !== columnNameFromQueryForXAxis)
+        .map((columnName, index) => ({
+          data: zipLists(queryResponseData[columnNameFromQueryForXAxis], queryResponseData[columnName]),
+          mode: 'lines+markers',
+          backgroundColor: generateColor(index),
+          label: columnName,
+        }
+        ))
+      
+        const options: ChartOptions<'scatter'> = {
+          scales: {
+            x: {
+              type: 'time' as const,
+              time: {
+                unit: 'day' as const,
+                tooltipFormat: 'PP',
+                displayFormats: {
+                  day: 'MMM d',
+                },
+              },
+              title: {
+                display: true,
+                text: columnNameFromQueryForXAxis,
+              },
+              adapters: {
+                date: {
+                  locale: enUS,
+                },
+              },
+            },
+            y: {
+              type: 'logarithmic' as const,
+              title: {
+                display: true,
+                text: 'Value (log scale)',
+              },
+            },
+          },
+          // plugins: {
+          //   zoom: {
+          //     pan: {
+          //       enabled: true,
+          //       modifierKey: "alt"
+          //     },
+          //     zoom: {
+          //       wheel: {
+          //         enabled: true,
+          //       },
+          //       drag: {
+          //         enabled: true,
+          //         modifierKey: "shift"
+          //       },
+          //     }
+          //   }
+          // }
+        };
+
+        setMessagePlot(() => (
+          <Scatter
+            data={{
+              datasets: datasets,
+            }}
+            options={options}
+          />
+        ))
+
+
+    }
+  }, [props.message, messageContentCategory])
 
   // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
   async function getGlossary(message: Message) {
@@ -258,15 +379,140 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           {(() => {
             switch (messageContentCategory) {
               case 'tool_plot':
-                const { plotData, plotLayout, plotConfig } = JSON.parse(props.message.content) as {
-                  plotData: Plotly.Data[],
-                  plotLayout: Partial<Plotly.Layout>,
-                  plotConfig: Partial<Plotly.Config>
-                }
+                // const { queryResponseData, columnNameFromQueryForXAxis } = JSON.parse(props.message.content) as {
+                //   // plotData: ChartData,
+                //   queryResponseData: { [key: string]: (string | number)[] },
+                //   columnNameFromQueryForXAxis: string
+                //   // plotLayout: Partial<Plotly.Layout>,
+                //   // plotConfig: Partial<Plotly.Config>
+                // }
+
+                // const datasets = Object.keys(queryResponseData)
+                //   .filter(key => key !== columnNameFromQueryForXAxis)
+                //   .map((columnName, index) => ({
+                //     data: zipLists(queryResponseData[columnNameFromQueryForXAxis], queryResponseData[columnName]),
+                //     mode: 'lines+markers',
+                //     backgroundColor: generateColor(index),
+                //     // name: columnName
+                //     label: columnName,
+                //   }
+                //   ))
 
                 // const layout = { title: "Chart Title", showlegend: true };
 
                 // return <Plot data={data} layout={layout} />;
+
+                // const rawData = {
+                //   datasets: [
+                //     {
+                //       label: 'Scatter Dataset',
+                //       data: [{
+                //         x: '2022-02-01',
+                //         y: 0
+                //       }, {
+                //         x: '2022-02-02',
+                //         y: 10
+                //       }, {
+                //         x: '2022-02-03',
+                //         y: 5
+                //       }, {
+                //         x: '2022-02-04',
+                //         y: 5.5
+                //       },
+                //       ],
+                //       backgroundColor: 'rgb(255, 99, 132)'
+                //     },
+                //     // {
+                //     //   label: 'Scatter Dataset 2',
+                //     //   data: [{
+                //     //     x: -10,
+                //     //     y: 10
+                //     //   }, {
+                //     //     x: 0,
+                //     //     y: 14
+                //     //   }, {
+                //     //     x: 10,
+                //     //     y: 1
+                //     //   }, {
+                //     //     x: 0.5,
+                //     //     y: 3
+                //     //   },
+                //     //   ],
+                //     //   backgroundColor: 'rgb(100, 99, 132)'
+                //     // }
+                //   ],
+                // };
+
+                // //If an x data point has string type, convert it into a date
+                // const data = { // : ChartData<'scatter'>
+                //   datasets: plotData.datasets.map(dataset => ({
+                //     ...dataset,
+                //     data: dataset.data.map(point => {
+                //       if (typeof point === 'object' && point !== null && 'x' in point && 'y' in point) {
+                //         const typedPoint = point as Point;
+                //         const pointWithDateTypeXAxis = {
+                //           y: typedPoint.y,
+                //           x: typeof typedPoint.x === 'string' ? new Date(typedPoint.x) : typedPoint.x
+                //         };
+                //         return pointWithDateTypeXAxis
+                //       }
+                //       else {
+                //         return { x: 0, y: 0 }
+                //       }
+                //     })
+                //   }))
+                // };
+
+                // const options: ChartOptions<'scatter'> = {
+                //   scales: {
+                //     x: {
+                //       type: 'time' as const,
+                //       time: {
+                //         unit: 'day' as const,
+                //         tooltipFormat: 'PP',
+                //         displayFormats: {
+                //           day: 'MMM d',
+                //         },
+                //       },
+                //       title: {
+                //         display: true,
+                //         text: columnNameFromQueryForXAxis,
+                //       },
+                //       adapters: {
+                //         date: {
+                //           locale: enUS,
+                //         },
+                //       },
+                //     },
+                //     y: {
+                //       type: 'logarithmic' as const,
+                //       title: {
+                //         display: true,
+                //         text: 'Value (log scale)',
+                //       },
+                //     },
+                //   },
+                //   plugins: {
+                //     zoom: {
+                //       pan: {
+                //         enabled: true,
+                //         modifierKey: "alt"
+                //       },
+                //       zoom: {
+                //         wheel: {
+                //           enabled: true,
+                //         },
+                //         drag: {
+                //           enabled: true,
+                //           modifierKey: "shift"
+                //         },
+                        
+                //         // mode: 'xy',
+                //       }
+                //     }
+                //   }
+                // };
+
 
                 return <>
                   {/* <pre
@@ -276,90 +522,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                       overflowWrap: 'break-word',
                     }}
                   >
-                    {JSON.stringify(JSON.parse(props.message.content), null, 2)}
+                    {JSON.stringify(datasets, null, 2)}
                   </pre> */}
-
-                  <Plot
-                    data={plotData}
-                    layout={plotLayout}
-                    config={plotConfig}
-                    style={{ width: '100%', height: '400px' }}
-                  />
+                  
+                  { messagePlot? messagePlot: null}
                 </>
 
-              // return (<>
-              //   <Plot
-              //     data={data}
-              //     layout={{ width: 320, height: 240, title: 'A Fancy Plot' }}
-              //   />
-              //   </>
-              // );
-
-
-              // return (
-              //   <Plot
-              //     data={[
-              //       {
-              //         x: [1, 2, 3],
-              //         y: [2, 6, 3],
-              //         type: 'scatter',
-              //         mode: 'lines+markers',
-              //         marker: { color: 'red' },
-              //       },
-              //       { type: 'bar', x: [1, 2, 3], y: [2, 5, 3] },
-              //     ]}
-              //     layout={{ width: 320, height: 240, title: 'A Fancy Plot' }}
-              //   />
-              // );
-
-              // const data = [{
-              //   x: [1, 2, 3, 4, 5],
-              //   y: [1, 4, 9, 16, 25],
-              //   type: 'scatter',
-              //   mode: 'lines+markers',
-              //   marker: { color: 'blue' },
-              //   name: 'Square Function'
-              // }];
-
-              // const layout = {
-              //   title: 'Fruit Consumption',
-              //   xaxis: { title: 'Fruit' },
-              //   yaxis: { title: 'Amount Eaten' }
-              // };
-
-              // return (
-              //   <Plot
-              //     data={data}
-              //     layout={layout}
-              //     style={{ width: '100%', height: '400px' }}
-              //   />
-              // );
-
-
-
-              // const { data, layout, config } = JSON.parse(props.message.content) as {
-              //   data: Plotly.Data[],
-              //   layout: Partial<Plotly.Layout>,
-              //   config: Partial<Plotly.Config>
-              // }
-              // return <>
-              //   <pre
-              //     style={{ //Wrap long lines
-              //       whiteSpace: 'pre-wrap',
-              //       wordWrap: 'break-word',
-              //       overflowWrap: 'break-word',
-              //     }}
-              //   >
-              //     {stringify(JSON.parse(props.message.content))}
-              //   </pre>
-
-              //   <Plot
-              //     data={data}
-              //     layout={layout}
-              //     // config={config}
-              //     style={{ width: '100%', height: '400px' }}
-              //   />
-              // </>
               case 'tool_json':
                 return <pre
                   style={{ //Wrap long lines

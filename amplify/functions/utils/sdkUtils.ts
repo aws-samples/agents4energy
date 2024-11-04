@@ -82,7 +82,7 @@ export function transformResultSet(resultSet: ResultSet) {
     );
 
     // Initialize result object with empty arrays for each column
-    const result: { [key: string]: any[] } = {};
+    const result: { [key: string]: (string | number)[] } = {};
     columnNames.forEach(name => {
         result[name] = [];
     });
@@ -96,7 +96,7 @@ export function transformResultSet(resultSet: ResultSet) {
         row.Data.forEach((cell, columnIndex) => {
             const columnName = columnNames[columnIndex];
             if (columnName) {
-                result[columnName].push(cell.VarCharValue || null);
+                result[columnName].push(cell.VarCharValue || "");
             }
         });
     });
