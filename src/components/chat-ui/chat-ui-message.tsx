@@ -34,7 +34,7 @@ import {
   // Point,
   ChartOptions
 } from 'chart.js';
-// import zoomPlugin from 'chartjs-plugin-zoom';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import 'chartjs-adapter-date-fns';
 import { enUS } from 'date-fns/locale';
 
@@ -46,7 +46,7 @@ ChartJS.register(
   Tooltip,
   Legend,
   TimeScale,
-  // zoomPlugin
+  zoomPlugin
 );
 
 export interface ChatUIMessageProps {
@@ -175,23 +175,23 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               },
             },
           },
-          // plugins: {
-          //   zoom: {
-          //     pan: {
-          //       enabled: true,
-          //       modifierKey: "alt"
-          //     },
-          //     zoom: {
-          //       wheel: {
-          //         enabled: true,
-          //       },
-          //       drag: {
-          //         enabled: true,
-          //         modifierKey: "shift"
-          //       },
-          //     }
-          //   }
-          // }
+          plugins: {
+            zoom: {
+              pan: {
+                enabled: true,
+                modifierKey: "alt"
+              },
+              zoom: {
+                wheel: {
+                  enabled: true,
+                },
+                drag: {
+                  enabled: true,
+                  modifierKey: "shift"
+                },
+              }
+            }
+          }
         };
 
         setMessagePlot(() => (
