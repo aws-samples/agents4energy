@@ -388,6 +388,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         parameters: {
             FunctionName: configureProdDbFunction.functionName,
             Payload: JSON.stringify({}), // No need to pass an event
+            InvocationType: 'Event',
         },
         physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
     }
