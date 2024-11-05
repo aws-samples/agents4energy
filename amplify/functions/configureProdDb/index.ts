@@ -1,18 +1,4 @@
 import { RDSDataClient, ExecuteStatementCommand, ExecuteStatementCommandInput } from "@aws-sdk/client-rds-data";
-// import {
-//   AthenaClient,
-//   StartQueryExecutionInput,
-//   StartQueryExecutionCommand,
-//   GetQueryExecutionCommand,
-//   GetQueryExecutionInput,
-//   GetQueryResultsCommand,
-//   GetQueryResultsOutput
-// } from "@aws-sdk/client-athena"
-// import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-// // import { Athena, Bedrock } from 'aws-sdk';
-// // const athena = new Athena();
-// // const rds = new RDS();
-// // const bedrock = new Bedrock();
 
 import { startQueryExecution, waitForQueryToComplete, getQueryResults, uploadStringToS3 } from '../utils/sdkUtils'
 
@@ -58,7 +44,8 @@ export const handler = async (event: any, context: any, callback: any): Promise<
 
   console.log('All SQL statements executed successfully')
 
-  const tablesToExportDefinitionsOf: { tableName: string, database: string }[] = [
+  const dataSoruce = process.env.ATHENA_SAMPLE_DATA_SOURCE_NAME
+  const tablesToExportDefinitionsOf: {tableName: string, database: string }[] = [
     {
       tableName: 'daily',
       database: 'production'
@@ -76,7 +63,7 @@ export const handler = async (event: any, context: any, callback: any): Promise<
   // Query to get all table definitions
   const queryBuilder = (database: string, tableName: string) => (
     /* sql */`
-    DESCRIBE ${database}.${tableName}
+    DESCRIBE ${dataSoruce}.${database}.${tableName}
   `);
 
   await Promise.all(
@@ -86,8 +73,8 @@ export const handler = async (event: any, context: any, callback: any): Promise<
       const queryExecutionId = await startQueryExecution({
         query: query, 
         workgroup: workgroup, 
-        database: database, 
-        athenaCatalogaName: process.env.ATHENA_CATALOG_NAME!
+        // database: database, 
+        // athenaCatalogaName: process.env.ATHENA_CATALOG_NAME!
       });
       await waitForQueryToComplete(queryExecutionId, workgroup);
       const results = await getQueryResults(queryExecutionId);
@@ -101,6 +88,7 @@ export const handler = async (event: any, context: any, callback: any): Promise<
       if (!describeTableResult) throw new Error(`No table definition found for table: ${tableName}`)
 
       const tableDefinitionString = JSON.stringify({
+        dataSource: dataSoruce,
         database: database,
         tableName: tableName,
         tableDefinition: describeTableResult
@@ -110,7 +98,7 @@ export const handler = async (event: any, context: any, callback: any): Promise<
       
       //Upload the describeTableResult to S3
       await uploadStringToS3({
-        key: `production-agent/table-definitions/database=${database}/table-name=${tableName}.txt`,
+        key: `production-agent/table-definitions/dataSource=${dataSoruce}/database=${database}/table-name=${tableName}.txt`,
         content: tableDefinitionString,
         contentType: 'text/plain'
       })
@@ -121,63 +109,3 @@ export const handler = async (event: any, context: any, callback: any): Promise<
 
   return { statusCode: 200, body: 'All SQL statements executed successfully' };
 };
-
-// async function startQueryExecution(query: string, workgroup: string, database: string): Promise<string> {
-//   const params: StartQueryExecutionInput = {
-//     QueryString: query,
-//     WorkGroup: workgroup,
-//     QueryExecutionContext: {
-//       Catalog: process.env.ATHENA_CATALOG_NAME,
-//       Database: database
-//     },
-//   };
-
-//   const result = await athenaClient.send(new StartQueryExecutionCommand(params))
-
-//   // const result = await athenaClient.startQueryExecution(params).promise();
-//   return result.QueryExecutionId!;
-// }
-
-// async function waitForQueryToComplete(queryExecutionId: string, workgroup: string): Promise<void> {
-//   while (true) {
-
-//     const result = await athenaClient.send(new GetQueryExecutionCommand({ QueryExecutionId: queryExecutionId }));
-//     const state = result.QueryExecution!.Status!.State;
-//     if (state === 'SUCCEEDED') return;
-//     if (state === 'FAILED' || state === 'CANCELLED') {
-//       throw new Error(`Query execution failed: ${JSON.stringify(result.QueryExecution!.Status)}`);
-//     }
-//     await new Promise(resolve => setTimeout(resolve, 1000));
-//   }
-// }
-
-// async function getQueryResults(queryExecutionId: string): Promise<GetQueryResultsOutput> {
-//   return athenaClient.send(new GetQueryResultsCommand({
-//     QueryExecutionId: queryExecutionId,
-//   }));
-// }
-
-
-// async function uploadStringToS3(props: {
-//   key: string,
-//   content: string,
-//   contentType?: string
-// }
-// ): Promise<void> {
-//   const s3Client = new S3Client();
-
-//   try {
-//     const command = new PutObjectCommand({
-//       Bucket: process.env.S3_BUCKET_NAME,
-//       Key: props.key,
-//       Body: props.content,
-//       ContentType: props.contentType || "text/plain",
-//     });
-
-//     await s3Client.send(command);
-//     console.log(`Successfully uploaded string to ${process.env.S3_BUCKET_NAME}/${props.key}`);
-//   } catch (error) {
-//     console.error("Error uploading string to S3:", error);
-//     throw error;
-//   }
-// }

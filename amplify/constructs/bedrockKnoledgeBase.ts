@@ -37,24 +37,16 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     this.embeddingModelArn = `arn:aws:bedrock:${rootStack.region}::foundation-model/cohere.embed-multilingual-v3`
 
-    
-
     const vectorStorePostgresCluster = new rds.ServerlessCluster(this, 'VectorStoreAuroraCluster', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
         version: rds.AuroraPostgresEngineVersion.VER_13_9,
       }),
       scaling: {
-        autoPause: cdk.Duration.minutes(60), // default is to pause after 60 minutes
+        autoPause: cdk.Duration.minutes(300),
         minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
         maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
       },
       defaultDatabaseName: defaultDatabaseName,
-      // parameterGroup: new rds.ParameterGroup(this, 'ParameterGroup', {
-      //     engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_14_6 }),
-      //     parameters: {
-      //       'shared_preload_libraries': 'pgvector',
-      //     },
-      //   }),
       enableDataApi: true,
       // credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
       //     secretName: `${rootStack.stackName}-proddb-credentials`

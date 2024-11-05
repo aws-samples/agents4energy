@@ -8,6 +8,7 @@ import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
 import { tool } from "@langchain/core/tools";
 import { env } from '$amplify/env/production-agent-function';
 
+import { AmplifyClientWrapper } from '../utils/amplifyUtils'
 import { startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
 // import * as Plotly from 'plotly.js';
@@ -125,23 +126,19 @@ export const getTableDefinitionsTool = tool(
 );
 
 ///////////////////////////////////////////////////
-///// Execute SQL Statement Return Plot Tool //////
+///// Execute SQL Statement Tool //////////////////
 ///////////////////////////////////////////////////
 
-const executeSQLQueryReturnPlotSchema = z.object({
+const executeSQLQuerySchema = z.object({
     query: z.string().describe(`
         The Trino SQL query to be executed. 
         Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
-        The result from executing this query will be plotted. 
-        One of the columns will be chosen for the X axis, and the others will be plotted on the Y axis.
+        Include the dataSource, database, and tableName in the FROM element (ex: FROM postgres_sample_992.production.daily)
         `),
-    database: z.string().describe("The database in which the query will be executed."),
-    columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
-    chartTitle: z.string().describe("The title of the plot."),
 });
 
 export const executeSQLQueryTool = tool(
-    async ({ query, database, columnNameFromQueryForXAxis, chartTitle }) => {
+    async ({ query }) => {
         console.log('Executing SQL Query:\n', query, '\nUsing workgroup: ', env.ATHENA_WORKGROUP_NAME)
         try {
 
@@ -159,8 +156,6 @@ export const executeSQLQueryTool = tool(
             const queryExecutionId = await startQueryExecution({
                 query: query,
                 workgroup: env.ATHENA_WORKGROUP_NAME,
-                database: database,
-                athenaCatalogaName: env.ATHENA_CATALOG_NAME
             });
             await waitForQueryToComplete(queryExecutionId, env.ATHENA_WORKGROUP_NAME);
             const results = await getQueryResults(queryExecutionId);
@@ -170,91 +165,11 @@ export const executeSQLQueryTool = tool(
 
             const queryResponseData = transformResultSet(results.ResultSet)
 
-            if (!(columnNameFromQueryForXAxis in queryResponseData)) {
-                return {
-                    messageContentType: 'tool_json',
-                    error: `
-                    Column name "${columnNameFromQueryForXAxis}" is not present in the result of the SQL query column names: ${queryResponseData.keys}
-                    Be sure to select a column from the sql query for the x axis.
-                    `
-                } as ToolMessageContentType
-            }
-
-            // const datasets = Object.keys(queryResponseData)
-            // .filter(key => key !== columnNameFromQueryForXAxis)
-            // .map((columnName, index) => ( {
-            //         // x: queryResponseData[columnNameFromQueryForXAxis],
-            //         // y: queryResponseData[columnName],
-            //         data: zipLists(queryResponseData[columnNameFromQueryForXAxis], queryResponseData[columnName]),
-            //         // type: 'scatter',
-            //         mode: 'lines+markers',
-            //         backgroundColor: generateColor(index),
-            //         name: columnName
-            //     }
-            // ))
-
-            
-
-            // queryResponseData.filter((columnName) => )
-            // const plotData: ChartData = {
-            //     datasets: datasets
-            //     // [{
-            //     //     label: 'Scatter Dataset',
-            //     //     data: [{
-            //     //       x: -10,
-            //     //       y: 0
-            //     //     }, {
-            //     //       x: 0,
-            //     //       y: 10
-            //     //     }, {
-            //     //       x: 10,
-            //     //       y: 5
-            //     //     }, {
-            //     //       x: 0.5,
-            //     //       y: 5.5
-            //     //     },
-            //     //     ],
-            //     //     backgroundColor: 'rgb(255, 99, 132)'
-            //     //   }]
-            // }
-
-
-            // const plotData: Plotly.Data[] = [{
-            //     x: [1, 2, 3, 4, 5],
-            //     y: [1, 4, 9, 16, 25],
-            //     type: 'scatter',
-            //     mode: 'lines+markers',
-            //     marker: { color: 'blue' },
-            //     name: 'Square Function'
-            // }];
-
-            // // Define the layout for the plot
-            // const plotLayout: Partial<Plotly.Layout> = {
-            //     title: chartTitle,
-            //     xaxis: { title: columnNameFromQueryForXAxis },
-            //     yaxis: {
-            //         title: 'Y Axis (Log Scale)',
-            //         type: 'log'  // This sets the y-axis to log scale
-            //     },
-            //     showlegend: true
-            // };
-
-            // // Configuration options
-            // const plotConfig: Partial<Plotly.Config> = {
-            //     responsive: true
-            // };
-
             return {
-                messageContentType: 'tool_plot',
+                messageContentType: 'tool_table',
                 queryResponseData: queryResponseData,
-                columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
-                chartTitle: chartTitle
-                // plotData: plotData,
-                // plotLayout: plotLayout,
-                // plotConfig: plotConfig
             } as ToolMessageContentType
 
-            // return stringify(queryResponseData)
         } catch (error) {
             console.error('Error executing sql query:', error);
             return {
@@ -264,11 +179,71 @@ export const executeSQLQueryTool = tool(
         }
     },
     {
-        name: "executeSQLQueryReturnPlot",
-        description: "Can execute a Trino SQL query and returns a plot of the results.",
-        schema: executeSQLQueryReturnPlotSchema,
+        name: "executeSQLQuery",
+        description: "Can execute a Trino SQL query and returns the results as a table.",
+        schema: executeSQLQuerySchema,
     }
 );
+
+///////////////////////////////////////////////////
+////////// Plot Table Tool ////////////////////////
+///////////////////////////////////////////////////
+
+const plotTableFromToolResponseSchema = z.object({
+    // toolCallId: z.string().describe("The tool call ID which produced the table to plot. Ex: tooluse_xxxxxxx"),
+    columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
+    chartTitle: z.string().describe("The title of the plot."),
+});
+
+
+export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
+    async ({ columnNameFromQueryForXAxis, chartTitle }) => {
+
+        // // // Get the most recent set of chat messages, including tool messages created since the last user message
+        // await amplifyClientWrapper.getChatMessageHistory({}) //TODO - Push the messages directly to amplifyClientWrapper.chatMessages, instead of going through the api here. Better Performance.
+        
+        console.log('Messages:\n', amplifyClientWrapper.chatMessages)
+
+        const toolResponseMessages = amplifyClientWrapper.chatMessages.filter(
+            (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
+        )
+
+        console.log('Tool Response Messages:\n', toolResponseMessages)
+
+        const selectedToolMessage = toolResponseMessages.slice(-1)[0]
+        
+        console.log("Selected message: ", selectedToolMessage)
+        
+        const queryResponseData = JSON.parse(selectedToolMessage.content as string).queryResponseData
+        
+        console.log('data object: ', queryResponseData)
+
+        // Functions must return strings
+        if (!(columnNameFromQueryForXAxis in queryResponseData)) {
+            return {
+                messageContentType: 'tool_json',
+                error: `
+                    Column name "${columnNameFromQueryForXAxis}" is not present in the result of the SQL query column names: ${queryResponseData.keys}
+                    Be sure to select a column from the sql query for the x axis.
+                    `
+            } as ToolMessageContentType
+        }
+
+        return {
+            messageContentType: 'tool_plot',
+            columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
+            chartTitle: chartTitle,
+            chartData: queryResponseData
+        } as ToolMessageContentType
+
+    },
+    {
+        name: "plotTableFromToolResponseToolBuilder",
+        description: "Plots tabular data returned from a previous tool call",
+        schema: plotTableFromToolResponseSchema,
+    }
+);
+
 
 //////////////////////////////////////////
 /////////// PDF to JSON Tool /////////////
@@ -320,6 +295,14 @@ const wellTableSchema = z.object({
     })).describe("The column name and description for each column of the table."),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
 });
+
+function pivotLists<T>(lists: T[][]): T[][] {
+    if (lists.length === 0) return [];
+    
+    return lists[0].map((_, colIndex) => 
+        lists.map(row => row[colIndex])
+    );
+}
 
 export const wellTableTool = tool(
     async ({ dataToInclude, tableColumns, wellApiNumber, dataToExclude }) => {
@@ -398,7 +381,7 @@ export const wellTableTool = tool(
                     columnNames.forEach((key) => {
                         if (key === 's3Key') {
                             //Add the link the the s3 source
-                            newRow.push(`[${s3ObjectResult.document_source_s3_key}](/files/${s3ObjectResult.document_source_s3_key})`)
+                            newRow.push(`${s3ObjectResult.document_source_s3_key}`)
                         }
                         else {
                             // If the key exists in content, remove all non-printable characters and add the data to the new row
@@ -422,13 +405,21 @@ export const wellTableTool = tool(
         // console.log('dataRows: ', dataRows)
         //Sort the data rows by date (first column)
         dataRows.sort((a, b) => a[0].localeCompare(b[0]));
-        tableRows.push(...dataRows.map(row => row.join(' | ')))
 
-        const outputTable = tableRows.map(val => '|' + val + '|').join('\n')
+        const dataRowsPivoted = pivotLists(dataRows)
+
+        const dataObject = tableColumns.reduce((acc, columnDefinition, index) => {
+            acc[columnDefinition.columnName] = dataRowsPivoted[index];
+            return acc;
+        }, {} as Record<string, string[]>)
+
+        // tableRows.push(...dataRows.map(row => row.join(' | ')))
+
+        // const outputTable = tableRows.map(val => '|' + val + '|').join('\n')
 
         return {
             messageContentType: 'tool_table',
-            outputTableDef: outputTable
+            queryResponseData: dataObject
         } as ToolMessageContentType
         // return [tableHeader, tableDivider, dummyData, dummyData].map(val => '|' + val + '|').join('\n')
     },

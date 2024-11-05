@@ -1,4 +1,6 @@
 "use client"
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+
 import {
   Button,
   Container,
@@ -94,6 +96,33 @@ function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
   return result;
 }
 
+type InputData = {
+  [key: string]: (string | number)[]
+};
+
+type OutputData = {
+  id: string;
+  [key: string]: string;
+};
+
+function transformDataToRows(input: InputData): OutputData[] {
+  const keys = Object.keys(input);
+  const firstArrayLength = input[keys[0]].length;
+
+  // Check if all arrays have the same length
+  if (!keys.every(key => input[key].length === firstArrayLength)) {
+    throw new Error("All arrays must have the same length");
+  }
+
+  return Array.from({ length: firstArrayLength }, (_, i) =>
+    keys.reduce((obj, key) => {
+      obj["id"] = `${i}`
+      obj[key] = `${input[key][i]}`;
+      return obj;
+    }, {} as OutputData)
+  );
+}
+
 function generateColor(index: number): string {
   const hue = (index * 137.508) % 360; // Use golden angle approximation
   return `hsl(${hue}, 70%, 60%)`;
@@ -116,104 +145,177 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   const [messagePlot, setMessagePlot] = useState<React.FC>()
+  const [messageTable, setMessageTable] = useState<React.FC>()
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
   const messageContentCategory = getMessageCatigory(props.message);
 
   useEffect(() => {
-    if (messageContentCategory === 'tool_plot') {
-      const { queryResponseData, columnNameFromQueryForXAxis, chartTitle } = JSON.parse(props.message.content) as {
-        queryResponseData: { [key: string]: (string | number)[] },
-        columnNameFromQueryForXAxis: string,
-        chartTitle: string | undefined
-      }
-
-      const datasets = Object.keys(queryResponseData)
-        .filter(key => key !== columnNameFromQueryForXAxis)
-        .map((columnName, index) => ({
-          data: zipLists(queryResponseData[columnNameFromQueryForXAxis], queryResponseData[columnName]),
-          mode: 'lines+markers',
-          backgroundColor: generateColor(index),
-          label: columnName,
+    switch (messageContentCategory) {
+      case 'tool_plot':
+        const { chartData, columnNameFromQueryForXAxis, chartTitle } = JSON.parse(props.message.content) as {
+          chartData: { [key: string]: (string | number)[] },
+          columnNameFromQueryForXAxis: string,
+          chartTitle: string | undefined
         }
-        ))
 
-      const options: ChartOptions<'scatter'> = {
-        scales: {
-          x: {
-            type: 'time' as const,
-            time: {
-              unit: 'day' as const,
-              tooltipFormat: 'PP',
-              displayFormats: {
-                day: 'MMM d',
+        const datasets = Object.keys(chartData)
+          .filter(key => key !== columnNameFromQueryForXAxis)
+          .map((columnName, index) => ({
+            data: zipLists(chartData[columnNameFromQueryForXAxis], chartData[columnName]),
+            mode: 'lines+markers',
+            backgroundColor: generateColor(index),
+            label: columnName,
+          }
+          ))
+
+        const options: ChartOptions<'scatter'> = {
+          scales: {
+            x: {
+              type: 'time' as const,
+              time: {
+                unit: 'day' as const,
+                tooltipFormat: 'PP',
+                displayFormats: {
+                  day: 'MMM d',
+                },
+              },
+              title: {
+                display: true,
+                text: columnNameFromQueryForXAxis,
+              },
+              adapters: {
+                date: {
+                  locale: enUS,
+                },
               },
             },
-            title: {
-              display: true,
-              text: columnNameFromQueryForXAxis,
-            },
-            adapters: {
-              date: {
-                locale: enUS,
+            y: {
+              type: 'logarithmic' as const,
+              title: {
+                display: true,
+                text: 'Value (log scale)',
               },
             },
           },
-          y: {
-            type: 'logarithmic' as const,
+          plugins: {
             title: {
-              display: true,
-              text: 'Value (log scale)',
+              text: chartTitle,
+              display: true
             },
-          },
-        },
-        plugins: {
-          // title: {
-          //   text: chartTitle,
-          //   display: true
-          // },
-          title: {
-            display: true,
-            text: 'Custom Chart Title'
-          },
-          zoom: {
-            pan: {
-              enabled: true,
-              modifierKey: "alt"
-            },
+            // title: {
+            //   display: true,
+            //   text: 'Custom Chart Title'
+            // },
             zoom: {
-              wheel: {
+              pan: {
                 enabled: true,
+                modifierKey: "alt"
               },
-              drag: {
-                enabled: true,
-                modifierKey: "shift"
-              },
+              zoom: {
+                wheel: {
+                  enabled: true,
+                },
+                drag: {
+                  enabled: true,
+                  modifierKey: "shift"
+                },
+              }
             }
           }
+        };
+
+        setMessagePlot(() => (
+          <>
+            {/* <pre
+              style={{ //Wrap long lines
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+              }}
+            >
+              {stringify(JSON.parse(props.message.content))}
+            </pre> */}
+            <Scatter
+              data={{
+                datasets: datasets,
+              }}
+              options={options}
+            />
+          </>
+
+        ))
+      case 'tool_table':
+        // https://mui.com/x/react-data-grid/
+        const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
+
+        if (!queryResponseData) {
+          console.log('no query response data')
+          return
         }
-      };
 
-      setMessagePlot(() => (
-        <>
-          {/* <pre
-            style={{ //Wrap long lines
-              whiteSpace: 'pre-wrap',
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
-            }}
-          >
-            {stringify(JSON.parse(props.message.content))}
-          </pre> */}
-          <Scatter
-            data={{
-              datasets: datasets,
-            }}
-            options={options}
-          />
-        </>
+        console.log('Query Response Data: ', queryResponseData)
 
-      ))
+        const columnNames = Object.keys(queryResponseData)
+
+
+        const columns: GridColDef<OutputData>[] = columnNames.map((name) => ({
+          field: `${name}`,
+          headerName: `${name}`,
+          width: 150,
+          type: 'string'
+        }));
+
+        // const columns = columnNames.map((name) => ({
+        //   field: name,
+        //   headerName: name,
+        //   width: 150,
+        //   type: 'number'
+        // }))
+        columns.push({ field: 'id', headerName: 'ID', width: 90, type: 'number' })
+
+        const rowData = transformDataToRows(queryResponseData)
+
+        console.log('Row Data: ', rowData)
+
+        setMessageTable(() => (
+          <>
+            {/* <pre
+              style={{ //Wrap long lines
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+              }}
+            >
+              {stringify(JSON.parse(props.message.content))}
+            </pre> */}
+            <DataGrid
+              rows={rowData}
+              columns={columns}
+              initialState={{
+                pagination: {
+                  paginationModel: {
+                    pageSize: 5,
+                  },
+                },
+              }}
+              pageSizeOptions={[5]}
+              checkboxSelection
+              disableRowSelectionOnClick
+            />
+          </>
+
+        ))
+
+
+      // const rows: {id: string}[] = data.date.map((date, index) => ({
+      //   id: index,
+      //   date: date,
+      //   value: data.value[index],
+      // }));
+
+      // const columns: GridColDef<(typeof rows)[number]>[] = []
+
 
 
     }
@@ -391,141 +493,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           {(() => {
             switch (messageContentCategory) {
               case 'tool_plot':
-                // const { queryResponseData, columnNameFromQueryForXAxis } = JSON.parse(props.message.content) as {
-                //   // plotData: ChartData,
-                //   queryResponseData: { [key: string]: (string | number)[] },
-                //   columnNameFromQueryForXAxis: string
-                //   // plotLayout: Partial<Plotly.Layout>,
-                //   // plotConfig: Partial<Plotly.Config>
-                // }
-
-                // const datasets = Object.keys(queryResponseData)
-                //   .filter(key => key !== columnNameFromQueryForXAxis)
-                //   .map((columnName, index) => ({
-                //     data: zipLists(queryResponseData[columnNameFromQueryForXAxis], queryResponseData[columnName]),
-                //     mode: 'lines+markers',
-                //     backgroundColor: generateColor(index),
-                //     // name: columnName
-                //     label: columnName,
-                //   }
-                //   ))
-
-                // const layout = { title: "Chart Title", showlegend: true };
-
-                // return <Plot data={data} layout={layout} />;
-
-                // const rawData = {
-                //   datasets: [
-                //     {
-                //       label: 'Scatter Dataset',
-                //       data: [{
-                //         x: '2022-02-01',
-                //         y: 0
-                //       }, {
-                //         x: '2022-02-02',
-                //         y: 10
-                //       }, {
-                //         x: '2022-02-03',
-                //         y: 5
-                //       }, {
-                //         x: '2022-02-04',
-                //         y: 5.5
-                //       },
-                //       ],
-                //       backgroundColor: 'rgb(255, 99, 132)'
-                //     },
-                //     // {
-                //     //   label: 'Scatter Dataset 2',
-                //     //   data: [{
-                //     //     x: -10,
-                //     //     y: 10
-                //     //   }, {
-                //     //     x: 0,
-                //     //     y: 14
-                //     //   }, {
-                //     //     x: 10,
-                //     //     y: 1
-                //     //   }, {
-                //     //     x: 0.5,
-                //     //     y: 3
-                //     //   },
-                //     //   ],
-                //     //   backgroundColor: 'rgb(100, 99, 132)'
-                //     // }
-                //   ],
-                // };
-
-                // //If an x data point has string type, convert it into a date
-                // const data = { // : ChartData<'scatter'>
-                //   datasets: plotData.datasets.map(dataset => ({
-                //     ...dataset,
-                //     data: dataset.data.map(point => {
-                //       if (typeof point === 'object' && point !== null && 'x' in point && 'y' in point) {
-                //         const typedPoint = point as Point;
-                //         const pointWithDateTypeXAxis = {
-                //           y: typedPoint.y,
-                //           x: typeof typedPoint.x === 'string' ? new Date(typedPoint.x) : typedPoint.x
-                //         };
-                //         return pointWithDateTypeXAxis
-                //       }
-                //       else {
-                //         return { x: 0, y: 0 }
-                //       }
-                //     })
-                //   }))
-                // };
-
-                // const options: ChartOptions<'scatter'> = {
-                //   scales: {
-                //     x: {
-                //       type: 'time' as const,
-                //       time: {
-                //         unit: 'day' as const,
-                //         tooltipFormat: 'PP',
-                //         displayFormats: {
-                //           day: 'MMM d',
-                //         },
-                //       },
-                //       title: {
-                //         display: true,
-                //         text: columnNameFromQueryForXAxis,
-                //       },
-                //       adapters: {
-                //         date: {
-                //           locale: enUS,
-                //         },
-                //       },
-                //     },
-                //     y: {
-                //       type: 'logarithmic' as const,
-                //       title: {
-                //         display: true,
-                //         text: 'Value (log scale)',
-                //       },
-                //     },
-                //   },
-                //   plugins: {
-                //     zoom: {
-                //       pan: {
-                //         enabled: true,
-                //         modifierKey: "alt"
-                //       },
-                //       zoom: {
-                //         wheel: {
-                //           enabled: true,
-                //         },
-                //         drag: {
-                //           enabled: true,
-                //           modifierKey: "shift"
-                //         },
-
-                //         // mode: 'xy',
-                //       }
-                //     }
-                //   }
-                // };
-
-
                 return <>
                   {/* <pre
                     style={{ //Wrap long lines
@@ -539,7 +506,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
                   {messagePlot ? messagePlot : null}
                 </>
-
+              case 'tool_table':
+                return <>
+                  {messageTable ? messageTable : null}
+                </>
               case 'tool_json':
                 return <pre
                   style={{ //Wrap long lines
@@ -550,39 +520,39 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 >
                   {stringify(JSON.parse(props.message.content))}
                 </pre>/* Render as YAML */;
-              case 'tool_table':
-                return <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    table: ({ ...props }) => (
-                      <table className={styles.markdownTable} {...props} />
-                    ),
-                    tr: ({ ...props }) => {
+              // case 'tool_table':
+              //   return <ReactMarkdown
+              //     remarkPlugins={[remarkGfm]}
+              //     components={{
+              //       table: ({ ...props }) => (
+              //         <table className={styles.markdownTable} {...props} />
+              //       ),
+              //       tr: ({ ...props }) => {
 
-                      //Get the value of the relevance score in each table row
-                      const children = React.Children.toArray(props.children);
+              //         //Get the value of the relevance score in each table row
+              //         const children = React.Children.toArray(props.children);
 
-                      const relevanceScoreTd = children[children.length - 2]; // should be second from the last
+              //         const relevanceScoreTd = children[children.length - 2]; // should be second from the last
 
-                      if (!(React.isValidElement(relevanceScoreTd))) throw new Error("Invalid second from last <td> element");
+              //         if (!(React.isValidElement(relevanceScoreTd))) throw new Error("Invalid second from last <td> element");
 
-                      const relevanceScoreTdValue = relevanceScoreTd?.props?.children || '10'; // Here you can impliment conditional hiding of rows
+              //         const relevanceScoreTdValue = relevanceScoreTd?.props?.children || '10'; // Here you can impliment conditional hiding of rows
 
-                      // console.log("relevanceScore <td> value:", relevanceScoreTdValue); // This will log the value
+              //         // console.log("relevanceScore <td> value:", relevanceScoreTdValue); // This will log the value
 
-                      //Hide rows with a low relevanceScore
-                      if (hideRows && parseInt(relevanceScoreTdValue) < 4) return <tr className={styles.hiddenRow} {...props} />
+              //         //Hide rows with a low relevanceScore
+              //         if (hideRows && parseInt(relevanceScoreTdValue) < 4) return <tr className={styles.hiddenRow} {...props} />
 
-                      // Add a 📄 to the second from the last child in props
-                      // children.splice(children.length - 2, 0, ' ���');
-                      // children[children.length - 2].props?.children = 'hello'
+              //         // Add a 📄 to the second from the last child in props
+              //         // children.splice(children.length - 2, 0, ' ���');
+              //         // children[children.length - 2].props?.children = 'hello'
 
-                      else return <tr {...props} />
-                    },
-                  }}
-                >
-                  {props.message.content}
-                </ReactMarkdown>;
+              //         else return <tr {...props} />
+              //       },
+              //     }}
+              //   >
+              //     {props.message.content}
+              //   </ReactMarkdown>;
               default: //Default will be to render markdown
                 return <ReactMarkdown
                   remarkPlugins={[remarkGfm]}

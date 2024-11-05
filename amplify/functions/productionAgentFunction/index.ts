@@ -4,13 +4,13 @@ import { Schema } from '../../data/resource';
 import { ChatBedrockConverse } from "@langchain/aws";
 import { AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { generateAmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
+import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
-import { calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool } from './toolBox';
+import { calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool, plotTableFromToolResponseToolBuilder } from './toolBox';
 
 // Define the tools for the agent to use
-const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool];
+// const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool];
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
 
@@ -19,20 +19,34 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     // console.log('Amplify env: ', env)
     // console.log('process.env: ', process.env)
 
-    const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
+    // const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
+    
 
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
     if (!('sub' in event.identity)) throw new Error("Event does not contain user");
 
+    const amplifyClientWrapper = new AmplifyClientWrapper({
+        chatSessionId: event.arguments.chatSessionId,
+        env: process.env
+    })
+
+    const agentTools = [
+        calculatorTool, 
+        wellTableTool, 
+        convertPdfToJsonTool, 
+        getTableDefinitionsTool, 
+        executeSQLQueryTool, 
+        plotTableFromToolResponseToolBuilder(amplifyClientWrapper)
+    ];
+
     try {
         console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
-        const messages = await amplifyClientWrapper.getChatMessageHistory({
-            chatSessionId: event.arguments.chatSessionId,
+        await amplifyClientWrapper.getChatMessageHistory({
             latestHumanMessageText: event.arguments.input
         })
 
-        console.log("mesages in langchain form: ", messages)
+        // console.log("mesages in langchain form: ", amplifyClientWrapper.chatMessages)
 
         const agentModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
@@ -45,24 +59,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
         });
 
         const input = {
-            messages: messages,
+            messages: amplifyClientWrapper.chatMessages,
         }
-
-
-        // await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-        //     query: publishResponseStreamChunk,
-        //     variables: {
-        //         chatSessionId: event.arguments.chatSessionId,
-        //         chunk: "Test data. "
-        //     }
-        // })
-        // await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-        //     query: publishResponseStreamChunk,
-        //     variables: {
-        //         chatSessionId: event.arguments.chatSessionId,
-        //         chunk: "Test data 2. "
-        //     }
-        // })
 
         // https://js.langchain.com/v0.2/docs/how_to/chat_streaming/#stream-events
         // https://js.langchain.com/v0.2/docs/how_to/streaming/#using-stream-events
@@ -91,7 +89,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 
             } else if (streamEvent.event === 'on_tool_end') {
                 const streamChunk = streamEvent.data.output as ToolMessage
-                console.log('Tool Output: ', streamChunk)
+                // console.log('Tool Output: ', streamChunk)
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
                     owner: event.identity.sub,
@@ -101,7 +99,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             } else if (streamEvent.event === "on_chat_model_end") { //When there is a full response from the chat model
                 // console.log('Message Output Chunk: ', streamEvent.data.output)
                 const streamChunk = streamEvent.data.output as AIMessageChunk
-                console.log('Message Output Chunk as AIMessageChunk: ', streamChunk)
+                // console.log('Message Output Chunk as AIMessageChunk: ', streamChunk)
 
                 if (!streamChunk) throw new Error("No output chunk found")
                 const streamChunkAIMessage = new AIMessage({ 
@@ -110,7 +108,6 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 })
 
                 // console.log('Publishing AI Message: ', streamChunkAIMessage, '. Content: ', streamChunkAIMessage.content)
-
 
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,

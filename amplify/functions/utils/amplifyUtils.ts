@@ -1,5 +1,5 @@
 import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/data';
+import { generateClient, Client } from 'aws-amplify/data';
 import * as APITypes from "../graphql/API";
 import { listChatMessageByChatSessionIdAndCreatedAt } from "../graphql/queries"
 import { Schema } from '../../data/resource';
@@ -66,49 +66,58 @@ export function getLangChainMessageTextContent(message: HumanMessage | AIMessage
 
 }
 
-export function generateAmplifyClientWrapper(env: any) {
-    console.log('AMPLIFY_DATA_GRAPHQL_ENDPOINT from env: ', env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
-    // console.log('env: ', env)
-    Amplify.configure(
-        {
-            API: {
-                GraphQL: {
-                    endpoint: env.AMPLIFY_DATA_GRAPHQL_ENDPOINT, // replace with your defineData name
-                    region: env.AWS_REGION,
-                    defaultAuthMode: 'identityPool',
-                    apiKey: env.A
+export type PublishMessageCommandInput = { chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage }
+
+type GeneratedClient = ReturnType<typeof generateClient<Schema>>;
+export class AmplifyClientWrapper {
+    // private env: any;
+    public amplifyClient: GeneratedClient;
+    public chatMessages: BaseMessage[];
+    public chatSessionId: string
+
+    constructor(props:{env: any, chatSessionId?: string}) {
+        this.chatMessages = [];
+        this.chatSessionId = props.chatSessionId || "";
+        console.log('AMPLIFY_DATA_GRAPHQL_ENDPOINT from env: ', props.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
+        //   this.env = env;
+        Amplify.configure(
+            {
+                API: {
+                    GraphQL: {
+                        endpoint: props.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT, // replace with your defineData name
+                        region: props.env.AWS_REGION,
+                        defaultAuthMode: 'identityPool',
+                    }
                 }
-            }
-        },
-        {
-            Auth: {
-                credentialsProvider: {
-                    getCredentialsAndIdentityId: async () => ({
-                        credentials: {
-                            // accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-                            // secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
-                            // sessionToken: process.env.AWS_SESSION_TOKEN || "",
-                            accessKeyId: env.AWS_ACCESS_KEY_ID,
-                            secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-                            sessionToken: env.AWS_SESSION_TOKEN,
+            },
+            {
+                Auth: {
+                    credentialsProvider: {
+                        getCredentialsAndIdentityId: async () => ({
+                            credentials: {
+                                accessKeyId: props.env.AWS_ACCESS_KEY_ID,
+                                secretAccessKey: props.env.AWS_SECRET_ACCESS_KEY,
+                                sessionToken: props.env.AWS_SESSION_TOKEN,
+                            },
+                        }),
+                        clearCredentialsAndIdentityId: () => {
+                            /* noop */
                         },
-                    }),
-                    clearCredentialsAndIdentityId: () => {
-                        /* noop */
                     },
                 },
-            },
-        }
-    );
-
-    const amplifyClient = generateClient<Schema>()
+            }
+        );
 
 
+        this.amplifyClient = generateClient<Schema>()
+    }
 
 
 
-    type PublishMessagePropsType = { chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage }
-    async function publishMessage(props: PublishMessagePropsType) {
+    public async publishMessage(props: PublishMessageCommandInput) {
+        // Add the most recent message to the stored chat messages
+        this.chatMessages.push(props.message)
+        // console.log('chatMessages: ', this.chatMessages)
 
         const messageTextContent = getLangChainMessageTextContent(props.message)
 
@@ -137,7 +146,7 @@ export function generateAmplifyClientWrapper(env: any) {
 
         console.log('Publishing mesage with input: ', input)
 
-        await amplifyClient.graphql({
+        await this.amplifyClient.graphql({
             query: createChatMessage,
             variables: {
                 input: input,
@@ -150,8 +159,7 @@ export function generateAmplifyClientWrapper(env: any) {
 
     // If you use the amplifyClient: Client type, you get the error below
     //Excessive stack depth comparing types 'Prettify<DeepReadOnlyObject<RestoreArrays<UnionToIntersection<DeepPickFromPath<FlatModel, ?[number]>>, FlatModel>>>' and 'Prettify<DeepReadOnlyObject<RestoreArrays<UnionToIntersection<DeepPickFromPath<FlatModel, ?[number]>>, FlatModel>>>'.ts(2321)
-    async function getChatMessageHistory(props: { chatSessionId: string, latestHumanMessageText: string }) {
-
+    public async getChatMessageHistory(props: {latestHumanMessageText?: string }): Promise<void> {
         // console.log('event: ', event)
         // console.log('context: ', context)
         // console.log('Amplify env: ', env)
@@ -159,11 +167,11 @@ export function generateAmplifyClientWrapper(env: any) {
         // if (!(props.chatSessionId)) throw new Error("Event does not contain chatSessionId");
 
         // Get the chat messages from the chat session
-        const chatSessionMessages = await amplifyClient.graphql({ //listChatMessageByChatSessionIdAndCreatedAt
+        const chatSessionMessages = await this.amplifyClient.graphql({ //listChatMessageByChatSessionIdAndCreatedAt
             query: listChatMessageByChatSessionIdAndCreatedAt,
             variables: {
                 limit: 20,
-                chatSessionId: props.chatSessionId,
+                chatSessionId: this.chatSessionId,
                 sortDirection: APITypes.ModelSortDirection.DESC
             }
         })
@@ -205,9 +213,11 @@ export function generateAmplifyClientWrapper(env: any) {
 
         // If the last message is from AI, add the latestHumanMessageText to the end of the messages.
         if (
-            messages.length === 0 || (
-                messages[messages.length - 1] &&
-                !(messages[messages.length - 1] instanceof HumanMessage)
+            props.latestHumanMessageText && (
+                messages.length === 0 || (
+                    messages[messages.length - 1] &&
+                    !(messages[messages.length - 1] instanceof HumanMessage)
+                )
             )
         ) {
             messages.push(
@@ -220,7 +230,22 @@ export function generateAmplifyClientWrapper(env: any) {
         }
 
         console.log("mesages in langchain form: ", messages)
-        return messages
+        // return messages
+        this.chatMessages = messages
+        // }
+
+        // async function testFunction(props: {chatSessionId: string, latestHumanMessageText: string }) {
+        //     const convertPdfToImagesResponse = await amplifyClient.graphql({
+        //         query: convertPdfToImages,
+        //         variables: {
+        //             s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf"
+        //         }
+        //     })
+        //     return JSON.parse(convertPdfToImagesResponse.data.convertPdfToImages || "").imageMessaggeContentBlocks
+        // }
+
+
+        // }
     }
 
     // async function testFunction(props: {chatSessionId: string, latestHumanMessageText: string }) {
@@ -234,10 +259,10 @@ export function generateAmplifyClientWrapper(env: any) {
     // }
 
 
-    return {
-        amplifyClient: amplifyClient,
-        getChatMessageHistory: getChatMessageHistory,
-        publishMessage: publishMessage
-    };
+    // return {
+    //     amplifyClient: amplifyClient,
+    //     getChatMessageHistory: getChatMessageHistory,
+    //     publishMessage: publishMessage
+    // };
 
 }

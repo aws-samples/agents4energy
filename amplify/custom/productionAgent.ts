@@ -211,7 +211,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             version: rds.AuroraPostgresEngineVersion.VER_13_9,
         }),
         scaling: {
-            autoPause: cdk.Duration.minutes(60), // default is to pause after 5 minutes
+            autoPause: cdk.Duration.minutes(300), // default is to pause after 5 minutes
             minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
             maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
         },
@@ -278,7 +278,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     //Create an athena datasource for postgres databases
     const athenaPostgresCatalog = new athena.CfnDataCatalog(scope, 'PostgresAthenaDataSource', {
-        name: `${rootStack.stackName}-postgres`.slice(-64),
+        name: `postgres_sample_${rootStack.stackName.slice(-3)}`,
         type: 'LAMBDA',
         description: 'Athena data source for postgres',
         parameters: {
@@ -318,7 +318,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             DATABASE_NAME: defaultProdDatabaseName,
             ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
             ATHENA_CATALOG_NAME: athenaPostgresCatalog.name,
-            S3_BUCKET_NAME: props.s3Bucket.bucketName
+            S3_BUCKET_NAME: props.s3Bucket.bucketName,
+            ATHENA_SAMPLE_DATA_SOURCE_NAME: athenaPostgresCatalog.name
         },
     });
 

@@ -11,14 +11,14 @@ import {
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 const athenaClient = new AthenaClient();
 
-export async function startQueryExecution(props:{query: string, workgroup: string, database: string, athenaCatalogaName: string}): Promise<string> {
+export async function startQueryExecution(props:{query: string, workgroup: string, database?: string, athenaCatalogaName?: string}): Promise<string> {
     const params: StartQueryExecutionInput = {
         QueryString: props.query,
         WorkGroup: props.workgroup,
-        QueryExecutionContext: {
-            Catalog: props.athenaCatalogaName,
-            Database: props.database
-        },
+        // QueryExecutionContext: {
+        //     Catalog: props.athenaCatalogaName,
+        //     Database: props.database
+        // },
     };
 
     const result = await athenaClient.send(new StartQueryExecutionCommand(params))

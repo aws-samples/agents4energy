@@ -2,7 +2,7 @@ import { handler } from "@/../amplify/functions/productionAgentFunction/index"
 import { AppSyncResolverEvent, Context, AppSyncIdentity } from 'aws-lambda';
 import { Schema } from '@/../amplify/data/resource';
 import { STSClient } from "@aws-sdk/client-sts";
-import { generateAmplifyClientWrapper } from '@/../amplify/functions/utils/amplifyUtils'
+import { AmplifyClientWrapper } from '@/../amplify/functions/utils/amplifyUtils'
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
 
 import { getDeployedResourceArn, getLambdaEnvironmentVariables } from "../utils";
@@ -41,7 +41,9 @@ export const main = async () => {
   process.env.AWS_SECRET_ACCESS_KEY = credentials.secretAccessKey
   process.env.AWS_SESSION_TOKEN = credentials.sessionToken
 
-  const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
+  const amplifyClientWrapper = new AmplifyClientWrapper({
+    env: process.env
+  })
 
   //Create a new chat session for testing
   const testChatSession = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
@@ -53,10 +55,17 @@ export const main = async () => {
 
   const testArguments = {
     chatSessionId: testChatSession.data.createChatSession.id,
+
     input: `
-    Execute a SQL query and plot the result to get the production over the last 12 weeks. 
+    Execute a SQL query and plot the result to get the oil production over the last 12 weeks. 
     Get the table definition so you know what to include in the query.
+    Plot the result of this query.
     `
+
+    // input: `
+    // Execute a SQL query and plot the result to get the production over the last 12 weeks. 
+    // Get the table definition so you know what to include in the query.
+    // `
     // "input": "What is 1+54?"
   }
 
