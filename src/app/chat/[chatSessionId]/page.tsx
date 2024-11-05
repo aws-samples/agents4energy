@@ -480,45 +480,52 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     }
                 </Box>
             </Drawer>
-            <div style={{ marginLeft: '260px', padding: '20px' }}>
-                <Toolbar />
-                <Box>
-                    <Typography variant="h4" gutterBottom>
-                        Chat with {activeChatSession?.aiBotInfo?.aiBotName}
-                    </Typography>
-                </Box>
-                <Box>
-                    <DynamicChatUI
-                        onSendMessage={addUserChatMessage}
-                        messages={[
-                            ...messages,
-                            ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
-                        ]}
-                        running={isLoading}
-                    />
-                </Box>
-                <Box sx={{ mt: 5 }}>
-                    {
-                        !isLoading && (suggestedPrompts.length || !messages.length) ? (
-                            <Typography variant="body2">
-                                Suggested Follow Ups:
-                            </Typography>
-                        ) : (
-                            <CircularProgress />
-                        )
-                    }
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    {!isLoading && suggestedPrompts.map((prompt) => (
-                        <div key={prompt}>
-                            <Button onClick={() => addUserChatMessage(prompt)} >
-                                {prompt}
-                            </Button>
-                        </div>
-                    ))
-                    }
-                </Box>
-            </div>
+            {params ? //Show the chat UI if there is an active chat session
+                <div style={{ marginLeft: '260px', padding: '20px' }}>
+                    <Toolbar />
+
+                    <Box>
+                        <Typography variant="h4" gutterBottom>
+                            Chat with {activeChatSession?.aiBotInfo?.aiBotName}
+                        </Typography>
+                    </Box>
+                    <Box>
+
+                        <DynamicChatUI
+                            onSendMessage={addUserChatMessage}
+                            messages={[
+                                ...messages,
+                                ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                            ]}
+                            running={isLoading}
+                        />
+
+
+                    </Box>
+                    <Box sx={{ mt: 5 }}>
+                        {
+                            !isLoading && (suggestedPrompts.length || !messages.length) ? (
+                                <Typography variant="body2">
+                                    Suggested Follow Ups:
+                                </Typography>
+                            ) : (
+                                <CircularProgress />
+                            )
+                        }
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {!isLoading && suggestedPrompts.map((prompt) => (
+                            <div key={prompt}>
+                                <Button onClick={() => addUserChatMessage(prompt)} >
+                                    {prompt}
+                                </Button>
+                            </div>
+                        ))
+                        }
+                    </Box>
+
+                </div>
+                : null}
         </div>
 
     );
