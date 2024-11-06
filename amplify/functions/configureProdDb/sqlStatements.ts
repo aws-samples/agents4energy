@@ -156,61 +156,13 @@ END $$;
 /* sql */`
 -- Create index for quicker SQL queries
 CREATE INDEX ON production.daily (wellid, proddate);
-
--- CREATE OR REPLACE VIEW production.well_list AS
-SELECT LW.locationid wellid, LW.locname well_name, LW.facility wellpadid, LP.locname well_pad_name
-from locations LW
-join (select locationid, locname from locations where loctypeid='WPD') LP on LP.locationid = CAST(LW.facility as INT)
-where LW.loctypeid = 'WEL'
+`,
+/* sql */`
+CREATE OR REPLACE VIEW production.well_list AS
+    SELECT LW.locationid wellid, LW.locname well_name, LW.facility wellpadid, LP.locname well_pad_name
+    from locations LW
+    join (select locationid, locname from locations where loctypeid='WPD') LP on LP.locationid = CAST(LW.facility as INT)
+    where LW.loctypeid = 'WEL'
 `]
 
-// function splitByTopLevelSemicolon(input: string): string[] {
-//     // Split the input into lines
-//     const lines = input.split('\n');
-//     let currentBlock: string[] = [];
-//     const results: string[] = [];
-
-//     for (let i = 0; i < lines.length; i++) {
-//         const line = lines[i];
-
-//         // Check if line starts with whitespace
-//         if (/^\s/.test(line)) {
-//             // If it starts with whitespace, add to current block
-//             currentBlock.push(line);
-//         } else {
-//             // If it doesn't start with whitespace, check for semicolon
-//             if (line.includes(';')) {
-//                 // Split the line by semicolon
-//                 const parts = line.split(';');
-
-//                 // Add all parts except the last one (with their semicolons)
-//                 for (let j = 0; j < parts.length - 1; j++) {
-//                     const blockToAdd = [...currentBlock, parts[j] + ';'].join('\n');
-//                     if (blockToAdd.trim()) {
-//                         results.push(blockToAdd);
-//                     }
-//                     currentBlock = [];
-//                 }
-
-//                 // Start new block with the last part
-//                 currentBlock = [parts[parts.length - 1]];
-//             } else {
-//                 // No semicolon, just add to current block
-//                 currentBlock.push(line);
-//             }
-//         }
-//     }
-
-//     // Add any remaining content
-//     if (currentBlock.length > 0) {
-//         const finalBlock = currentBlock.join('\n');
-//         if (finalBlock.trim()) {
-//             results.push(finalBlock);
-//         }
-//     }
-
-//     return results;
-// }
-
-// export default splitByTopLevelSemicolon(sqlStatements).filter((stmt) => stmt.trim() !== '')
 export default sqlStatements

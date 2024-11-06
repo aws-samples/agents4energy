@@ -17,7 +17,7 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 // import { bedrock } from '@cdklabs/generative-ai-cdk-constructs'
 
 export interface AppConfiguratorProps {
-    hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster,
+    hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
     defaultProdDatabaseName: string,
     athenaWorkgroup: cdk.aws_athena.CfnWorkGroup,
     athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
@@ -53,18 +53,10 @@ export class AppConfigurator extends Construct {
         'appsync:ListTagsForResource',
       ],
       resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
-      // TODO: the condition breaks the list command. Fix this.
-      // conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed. 
-      //   'StringEquals': {
-      //     'aws:ResourceTag/rootStackName': rootStack.stackName
-      //   }
-      // }
     }))
 
     addIamDirectiveFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
       actions: [
-        // 'appsync:ListGraphqlApis',
-        // 'appsync:ListTagsForResource',
         'appsync:GetIntrospectionSchema',
         'appsync:StartSchemaCreation',
         'appsync:GetSchemaCreationStatus',

@@ -107,5 +107,5 @@ export const handler = async (event: any, context: any, callback: any): Promise<
     })
   );
 
-  return { statusCode: 200, body: 'All SQL statements executed successfully' };
+  return { statusCode: 200, body: 'All SQL statements executed and table definitions exported successfully.' };
 };

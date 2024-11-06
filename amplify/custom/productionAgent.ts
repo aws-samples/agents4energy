@@ -30,7 +30,7 @@ const defaultProdDatabaseName = 'proddb'
 interface ProductionAgentProps {
     vpc: ec2.Vpc,
     s3Bucket: s3.IBucket,
-    
+
 }
 
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
@@ -205,27 +205,47 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ),
     });
 
-    //This serverless aurora cluster will store hydrocarbon production pressures and volume
-    const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'A4E-HydrocarbonProdDb', {
+    //https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
+    const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
         engine: rds.DatabaseClusterEngine.auroraPostgres({
-            version: rds.AuroraPostgresEngineVersion.VER_13_9,
+            version: rds.AuroraPostgresEngineVersion.VER_16_4,
         }),
-        scaling: {
-            autoPause: cdk.Duration.minutes(300), // default is to pause after 5 minutes
-            minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
-            maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
-        },
+        defaultDatabaseName: defaultProdDatabaseName,
         enableDataApi: true,
-        defaultDatabaseName: defaultProdDatabaseName, // optional: create a database named "mydb"
-        // credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
-        //     secretName: `a4e-proddb-credentials`
-        // }),
-        vpc: props.vpc,
+        writer: rds.ClusterInstance.serverlessV2('writer'),
+        serverlessV2MinCapacity: 0.5,
+        serverlessV2MaxCapacity: 2,
         vpcSubnets: {
             subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
         },
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        vpc: props.vpc,
+        port: 2000,
+        removalPolicy: cdk.RemovalPolicy.DESTROY
     });
+
+    // //This serverless aurora cluster will store hydrocarbon production pressures and volume
+    // // const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'A4E-HydrocarbonProdDb-1', {
+    // const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
+    //     engine: rds.DatabaseClusterEngine.auroraPostgres({
+    //         version: rds.AuroraPostgresEngineVersion.VER_16_4,
+    //     }),
+
+    //     // scaling: {
+    //     //     autoPause: cdk.Duration.minutes(300), // default is to pause after 5 minutes
+    //     //     minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
+    //     //     maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
+    //     // },
+    //     enableDataApi: true,
+    //     defaultDatabaseName: defaultProdDatabaseName, // optional: create a database named "mydb"
+    //     // credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
+    //     //     secretName: `a4e-proddb-credentials`
+    //     // }),
+    //     vpc: props.vpc,
+    //     vpcSubnets: {
+    //         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+    //     },
+    //     removalPolicy: cdk.RemovalPolicy.DESTROY,
+    // });
 
     // //Create an inbound rule for the db's security group which allows inbound traffic from the vpc
     // hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
@@ -285,7 +305,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
     });
 
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefBedrockKnoledgeBase", {
+    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefBedrockKnoledgeBase-1", {
         vpc: props.vpc,
         bucket: props.s3Bucket
     })
@@ -378,7 +398,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ],
     }))
 
-    
+
 
     // Create a Custom Resource that invokes only if the dependencies change
     const invokeConfigureProdDbFunctionServiceCall: cr.AwsSdkCall = {
