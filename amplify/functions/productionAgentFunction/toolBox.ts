@@ -12,7 +12,7 @@ import { AmplifyClientWrapper } from '../utils/amplifyUtils'
 import { startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
 // import * as Plotly from 'plotly.js';
-import { ChartData } from 'chart.js';
+// import { ChartData } from 'chart.js';
 
 import { ToolMessageContentType } from '../../../src/utils/types'
 
@@ -62,7 +62,10 @@ export const calculatorTool = tool(
 ////// Get table definiton tool //////////
 //////////////////////////////////////////
 const getTableDefinitionsSchema = z.object({
-    tableFeatures: z.string().describe("Which features of the user's question should be looked for when picking which tables to query?"),
+    tableFeatures: z.string().describe(`
+        Which features of the user's question should be looked for when picking which tables to query? 
+        Include key words and likely SQL query column names.
+        `),
 });
 
 async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: string }) {
@@ -110,9 +113,6 @@ export const getTableDefinitionsTool = tool(
 
         console.log('Table Definitions:\n', tableDefinitions)
 
-        // console.log(relevantTables.map((result) => stringify(JSON.parse(result?.content?.text || ""))).join('\n\n'))
-
-        // return outputBlurb
         return {
             messageContentType: 'tool_json',
             tableDefinitions: tableDefinitions
@@ -137,6 +137,28 @@ const executeSQLQuerySchema = z.object({
         `),
 });
 
+function doesFromLineContainOneDot(sqlQuery: string): boolean {
+    // Split the query into lines
+    const lines = sqlQuery.split('\n');
+  
+    // Find the line that starts with "FROM" (case-insensitive)
+    const fromLine = lines.find(line => line.trim().toUpperCase().startsWith('FROM'));
+  
+    // If there's no FROM line, return false
+    if (!fromLine) {
+      return false;
+    }
+  
+    // Extract the part after "FROM"
+    const afterFrom = fromLine.trim().substring(4).trim();
+  
+    // Count the number of dots
+    const dotCount = (afterFrom.match(/\./g) || []).length;
+  
+    // Return true if there's exactly one dot
+    return dotCount === 1;
+  }
+
 export const executeSQLQueryTool = tool(
     async ({ query }) => {
         console.log('Executing SQL Query:\n', query, '\nUsing workgroup: ', env.ATHENA_WORKGROUP_NAME)
@@ -149,6 +171,17 @@ export const executeSQLQueryTool = tool(
                     error: `
                     DATE_SUB is not allowed in the SQL query. 
                     Re-write the query and use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp.
+                    `
+                } as ToolMessageContentType
+            }
+
+            //Check if the datasource is included in the query
+            if (doesFromLineContainOneDot(query)) {
+                return {
+                    messageContentType: 'tool_json',
+                    error: `
+                    The FROM line in the SQL query does not the data source.
+                    Include the dataSource, database, and tableName in the FROM element (ex: FROM postgres_sample_992.production.daily)
                     `
                 } as ToolMessageContentType
             }

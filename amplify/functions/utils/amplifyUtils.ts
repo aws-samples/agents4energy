@@ -115,6 +115,8 @@ export class AmplifyClientWrapper {
 
 
     public async publishMessage(props: PublishMessageCommandInput) {
+        if (!this.chatSessionId) throw new Error('Publish message called and chat session ID is not set')
+
         // Add the most recent message to the stored chat messages
         this.chatMessages.push(props.message)
         // console.log('chatMessages: ', this.chatMessages)

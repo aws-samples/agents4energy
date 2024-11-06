@@ -68,7 +68,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
         console.log('Listening for stream events')
         for await (const streamEvent of stream) {
-            // console.log(`${JSON.stringify(streamEvent, null, 2)}\n---`);
+            console.log(`${JSON.stringify(streamEvent, null, 2)}\n---`);
 
             if (streamEvent.event === "on_chat_model_stream"){
                 // console.log('Message Chunk: ', streamEvent.data.chunk)
