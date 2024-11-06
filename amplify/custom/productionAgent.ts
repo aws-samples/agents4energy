@@ -254,7 +254,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
     const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
-    // const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?${hydrocarbonProductionDb.secret?.secretName}` 
     const postgressConnectorLambdaFunctionName = `${rootStack.stackName}-query-postgres`.slice(-64)
     const prodDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
         location: {
@@ -388,7 +387,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         parameters: {
             FunctionName: configureProdDbFunction.functionName,
             Payload: JSON.stringify({}), // No need to pass an event
-            InvocationType: 'Event',
+            InvocationType: 'Event', // Call the lambda funciton asynchronously
         },
         physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
     }

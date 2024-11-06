@@ -64,8 +64,9 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
         // https://js.langchain.com/v0.2/docs/how_to/chat_streaming/#stream-events
         // https://js.langchain.com/v0.2/docs/how_to/streaming/#using-stream-events
-        const stream = await agent.streamEvents(input, { version: "v2" });
+        const stream = agent.streamEvents(input, { version: "v2" });
 
+        console.log('Listening for stream events')
         for await (const streamEvent of stream) {
             // console.log(`${JSON.stringify(streamEvent, null, 2)}\n---`);
 
