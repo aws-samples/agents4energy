@@ -425,7 +425,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             }),
         ]),
     });
-    prodTableKbIngestionJobTrigger.node.addDependency(productionAgentTableDefDataSource)
+    // prodTableKbIngestionJobTrigger.node.addDependency(productionAgentTableDefDataSource)
+    prodTableKbIngestionJobTrigger.node.addDependency(prodDbConfigurator)
 
 
     return {
