@@ -224,10 +224,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
     const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
-    //Make the subnets automatically delete.
-    hydrocarbonProductionDb.vpcSubnets!.subnets!.forEach(subnet => {
-        subnet.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
-    });
+    // //Make the subnets automatically delete.
+    // hydrocarbonProductionDb.vpcSubnets!.subnets!.forEach(subnet => {
+    //     subnet.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
+    // });
     // //This serverless aurora cluster will store hydrocarbon production pressures and volume
     // // const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'A4E-HydrocarbonProdDb-1', {
     // const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
