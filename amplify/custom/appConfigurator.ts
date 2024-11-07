@@ -51,23 +51,26 @@ export class AppConfigurator extends Construct {
       actions: [
         'appsync:ListGraphqlApis',
         'appsync:ListTagsForResource',
-      ],
-      resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
-    }))
-
-    addIamDirectiveFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-      actions: [
         'appsync:GetIntrospectionSchema',
         'appsync:StartSchemaCreation',
         'appsync:GetSchemaCreationStatus',
       ],
       resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
-      conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed. 
-        'StringEquals': {
-          'aws:ResourceTag/rootStackName': rootStack.stackName
-        }
-      }
     }))
+
+    // addIamDirectiveFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+    //   actions: [
+    //     'appsync:GetIntrospectionSchema',
+    //     'appsync:StartSchemaCreation',
+    //     'appsync:GetSchemaCreationStatus',
+    //   ],
+    //   resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
+    //   // conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed. 
+    //   //   'StringEquals': {
+    //   //     'aws:ResourceTag/rootStackName': rootStack.stackName
+    //   //   }
+    //   // }
+    // }))
 
     // const configureProdDbFunction = new NodejsFunction(this, 'configureProdDbFunction', {
     //   runtime: lambda.Runtime.NODEJS_LATEST,

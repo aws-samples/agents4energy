@@ -170,6 +170,7 @@ const vpc = new ec2.Vpc(customStack, 'A4E-VPC', {
     },
   ],
 });
+// Delete the VPC when the cloudformation  
 vpc.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY)
 
 function applyTagsToRootStack() {

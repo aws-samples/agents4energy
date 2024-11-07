@@ -229,7 +229,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     subnet.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
     // });
 
-    
+
     // //This serverless aurora cluster will store hydrocarbon production pressures and volume
     // // const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'A4E-HydrocarbonProdDb-1', {
     // const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
@@ -384,6 +384,22 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             }
         }
     }))
+
+    //Allow the function to invoke the lambda used to connect Athena to the postgres db
+    configureProdDbFunction.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ["lambda:InvokeFunction"],
+          resources: [
+            // convertPdfToJsonFunction.functionArn,
+            `arn:aws:lambda:${rootStack.region}:${rootStack.account}:*`
+          ],
+          conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+            'StringEquals': {
+              'aws:ResourceTag/rootStackName': rootStack.stackName
+            }
+          }
+        }),
+      )
 
     //Executing athena queries requires the caller have these permissions
     configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
