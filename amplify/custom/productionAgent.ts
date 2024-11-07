@@ -219,7 +219,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
         },
         vpc: props.vpc,
-        port: 2000,
+        port: 5432,
         removalPolicy: cdk.RemovalPolicy.DESTROY
     });
     const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
@@ -275,7 +275,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
     const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
-    const postgressConnectorLambdaFunctionName = `${rootStack.stackName}-query-postgres`.slice(-64)
+    
+    const postgressConnectorLambdaFunctionName = `query-postgres-${rootStack.stackName.slice(0,40)}`
     const prodDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
         location: {
             applicationId: `arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaPostgreSQLConnector`,
@@ -292,10 +293,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }
     });
 
-    // // Get the Lambda function role
-    // const functionRole = iam.Role.fromRoleName(scope, 'ConnectorRole', postgressConnectorLambdaFunctionName + '-role');
-
-
     //Create an athena datasource for postgres databases
     const athenaPostgresCatalog = new athena.CfnDataCatalog(scope, 'PostgresAthenaDataSource', {
         name: `postgres_sample_${rootStack.stackName.slice(-3)}`,
@@ -306,7 +303,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
     });
 
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefBedrockKnoledgeBase-1", {
+    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefBedrockKnoledgeBase", {
         vpc: props.vpc,
         bucket: props.s3Bucket
     })
@@ -423,7 +420,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             }),
         ]),
     });
-
     prodDbConfigurator.node.addDependency(writerNode)
 
     // Start the knowledge base ingestion job

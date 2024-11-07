@@ -84,7 +84,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
       // backtrackWindow: cdk.Duration.hours(1),
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
-    
+
     // Wait until this writer node is created before running sql queries against the db
     const writerNode = vectorStorePostgresCluster.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
@@ -470,6 +470,8 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     });
 
     this.knowledgeBase.node.addDependency(createIndex);
+
+
   }
 }
 

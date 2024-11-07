@@ -509,7 +509,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                     Suggested Follow Ups:
                                 </Typography>
                             ) : (
-                                <CircularProgress />
+                                null
+                                // <CircularProgress />
                             )
                         }
                     </Box>

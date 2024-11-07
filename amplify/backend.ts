@@ -210,6 +210,7 @@ backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.stora
 backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
 backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_JSON_LAMBDA_ARN', convertPdfToJsonFunction.functionArn)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
+// backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', "")
 backend.productionAgentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', athenaWorkgroup.name)
 backend.productionAgentFunction.addEnvironment('DATABASE_NAME', defaultProdDatabaseName)
 backend.productionAgentFunction.addEnvironment('ATHENA_CATALOG_NAME', athenaPostgresCatalog.name)
