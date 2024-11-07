@@ -170,6 +170,7 @@ const vpc = new ec2.Vpc(customStack, 'A4E-VPC', {
     },
   ],
 });
+vpc.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY)
 
 function applyTagsToRootStack() {
   if (!rootStack) throw new Error('Root stack not found')
