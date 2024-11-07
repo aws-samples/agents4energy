@@ -10,6 +10,7 @@ import {
   productionAgentFunction,
   // addIamDirectiveFunction
 } from './data/resource';
+import { preSignUp } from './functions/preSignUp/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
@@ -32,8 +33,7 @@ const backend = defineBackend({
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
-  // addIamDirectiveFunction,
-  // convertPdfToImagesAndAddMessagesFunction
+  preSignUp
 });
 
 // backend.addOutput({
@@ -337,5 +337,6 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   // sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
   athenaWorkgroup: athenaWorkgroup,
   athenaPostgresCatalog: athenaPostgresCatalog,
-  s3Bucket: backend.storage.resources.bucket
+  s3Bucket: backend.storage.resources.bucket,
+  preSignUpFunction: backend.preSignUp.resources.lambda
 })

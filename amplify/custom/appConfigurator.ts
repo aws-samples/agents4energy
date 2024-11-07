@@ -1,28 +1,37 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import {
+  aws_stepfunctions as sfn,
+  aws_stepfunctions_tasks as sfn_tasks,
+  aws_lambda as lambda,
+  custom_resources as cr,
+  aws_logs as logs,
+} from 'aws-cdk-lib'
+
 // import { Construct } from "@aws-cdk/core";
 import * as cdk from 'aws-cdk-lib';
-import * as stepfunctions from 'aws-cdk-lib/aws-stepfunctions';
-import * as stepfunctions_tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
+// import * as stepfunctions from 'aws-cdk-lib/aws-stepfunctions';
+// import * as stepfunctions_tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
+// import * as lambda from 'aws-cdk-lib/aws-lambda';
 // import * as cloudformation from 'aws-cdk-lib/aws-cloudformation';
 import { Construct } from 'constructs';
-import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
+// import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 // import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-import * as cr from 'aws-cdk-lib/custom-resources';
-import * as logs from 'aws-cdk-lib/aws-logs';
+// import * as cr from 'aws-cdk-lib/custom-resources';
+// import * as logs from 'aws-cdk-lib/aws-logs';
 // import * as iam from 'aws-cdk-lib/aws-iam';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 // import { bedrock } from '@cdklabs/generative-ai-cdk-constructs'
 
 export interface AppConfiguratorProps {
-    hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
-    defaultProdDatabaseName: string,
-    athenaWorkgroup: cdk.aws_athena.CfnWorkGroup,
-    athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
-    s3Bucket: cdk.aws_s3.IBucket
-    // sqlTableDefBedrockKnoledgeBase: bedrock.KnowledgeBase
+  hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
+  defaultProdDatabaseName: string,
+  athenaWorkgroup: cdk.aws_athena.CfnWorkGroup,
+  athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
+  s3Bucket: cdk.aws_s3.IBucket
+  preSignUpFunction: lambda.IFunction
+  // sqlTableDefBedrockKnoledgeBase: bedrock.KnowledgeBase
 }
 
 
@@ -45,7 +54,7 @@ export class AppConfigurator extends Construct {
         ROOT_STACK_NAME: rootStack.stackName
       },
     });
-    
+
 
     addIamDirectiveFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
       actions: [
@@ -58,73 +67,8 @@ export class AppConfigurator extends Construct {
       resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
     }))
 
-    // addIamDirectiveFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-    //   actions: [
-    //     'appsync:GetIntrospectionSchema',
-    //     'appsync:StartSchemaCreation',
-    //     'appsync:GetSchemaCreationStatus',
-    //   ],
-    //   resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
-    //   // conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed. 
-    //   //   'StringEquals': {
-    //   //     'aws:ResourceTag/rootStackName': rootStack.stackName
-    //   //   }
-    //   // }
-    // }))
-
-    // const configureProdDbFunction = new NodejsFunction(this, 'configureProdDbFunction', {
-    //   runtime: lambda.Runtime.NODEJS_LATEST,
-    //   entry: path.join(rootDir, 'functions', 'configureProdDb','index.ts'),
-    //   timeout: cdk.Duration.seconds(300),
-    //   environment: {
-    //     CLUSTER_ARN: props.hydrocarbonProductionDb.clusterArn,
-    //     SECRET_ARN: props.hydrocarbonProductionDb.secret!.secretArn,
-    //     DATABASE_NAME: props.defaultProdDatabaseName,
-    //     ATHENA_WORKGROUP_NAME: props.athenaWorkgroup.name,
-    //     ATHENA_CATALOG_NAME: props.athenaPostgresCatalog.name,
-    //     S3_BUCKET_NAME: props.s3Bucket.bucketName
-    //     // TABLE_DEF_KB_ID: props.sqlTableDefBedrockKnoledgeBase.knowledgeBaseId
-    //   },
-    // });
-
-    // configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-    //   actions: [
-    //     'rds-data:ExecuteStatement',
-    //   ],
-    //   resources: [`arn:aws:rds:${rootStack.region}:${rootStack.account}:*`],
-    //   conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-    //     'StringEquals': {
-    //       'aws:ResourceTag/rootStackName': rootStack.stackName
-    //     }
-    //   }
-    // }))
-
-    // configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-    //   actions: [
-    //     'secretsmanager:GetSecretValue',
-    //   ],
-    //   resources: [`arn:aws:secretsmanager:${rootStack.region}:${rootStack.account}:secret:*`],
-    //   conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-    //     'StringEquals': {
-    //       'aws:ResourceTag/rootStackName': rootStack.stackName
-    //     }
-    //   }
-    // }))
-
-    // configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-    //   actions: [
-    //     'athena:StartQueryExecution',
-    //   ],
-    //   resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:*`],
-    //   conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-    //     'StringEquals': {
-    //       'aws:ResourceTag/rootStackName': rootStack.stackName
-    //     }
-    //   }
-    // }))
-    
     // Define a step function which waits for the cloudformation stackk to complete before executing a configureation update
-    const waitForCfnStack = new stepfunctions_tasks.CallAwsService(this, 'WaitForCfnStack', {
+    const waitForCfnStack = new sfn_tasks.CallAwsService(this, 'WaitForCfnStack', {
       service: 'cloudformation',
       action: 'describeStacks',
       parameters: {
@@ -134,18 +78,61 @@ export class AppConfigurator extends Construct {
       resultPath: '$.StackStatus',
     });
 
-    const checkStackStatus = new stepfunctions.Choice(this, 'Check Stack Status')
-      .when(stepfunctions.Condition.or(
-        stepfunctions.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'CREATE_COMPLETE'),
-        stepfunctions.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'UPDATE_COMPLETE'),
-        stepfunctions.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'UPDATE_ROLLBACK_COMPLETE'),
-        stepfunctions.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'ROLLBACK_COMPLETE')
+
+
+    // This step will add the iam directive to the graphql schema
+    const invokeAddIamDirectiveFunction = new sfn_tasks.LambdaInvoke(this, 'InvokeLambda', {
+      lambdaFunction: addIamDirectiveFunction,
+    })
+
+    // // These steps will set up the pre-sign-up lambda trigger
+    // // Step 1: List Cognito User Pools
+    // const listUserPools = new sfn_tasks.CallAwsService(this, 'ListUserPools', {
+    //   service: 'cognitoidentityserviceprovider',
+    //   action: 'listUserPools',
+    //   parameters: {
+    //     MaxResults: 60,
+    //   },
+    //   iamResources: ['*'],
+    // });
+
+    // // Step 2: Find User Pool with tag
+    // const findUserPool = new sfn.Map(this, 'FindUserPool', {
+    //   maxConcurrency: 1,
+    //   itemsPath: sfn.JsonPath.stringAt('$.UserPools'),
+    // }).itemProcessor(new sfn.Choice(this, 'CheckUserPoolTag')
+    //   .when(sfn.Condition.stringEquals('$.Tags[?(@.Key=="rootStackName")].Value[0]', rootStack.stackName),
+    //     new sfn.Succeed(this, 'FoundUserPool'))
+    //   .otherwise(new sfn.Fail(this, 'UserPoolNotFound'))
+    // );
+
+    // // Step 3: Update User Pool with pre-sign-up trigger
+    // const updateUserPool = new sfn_tasks.CallAwsService(this, 'UpdateUserPool', {
+    //   service: 'cognitoidentityserviceprovider',
+    //   action: 'updateUserPool',
+    //   parameters: {
+    //     UserPoolId: sfn.JsonPath.stringAt('$.Id'),
+    //     LambdaConfig: {
+    //       PreSignUp: props.preSignUpFunction.functionArn,
+    //     },
+    //   },
+    //   iamResources: ['*'],
+    // });
+
+    const checkStackStatus = new sfn.Choice(this, 'Check Stack Status')
+      .when(sfn.Condition.or(
+        sfn.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'CREATE_COMPLETE'),
+        sfn.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'UPDATE_COMPLETE'),
+        sfn.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'UPDATE_ROLLBACK_COMPLETE'),
+        sfn.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'ROLLBACK_COMPLETE')
       ),
-        new stepfunctions_tasks.LambdaInvoke(this, 'InvokeLambda', {
-          lambdaFunction: addIamDirectiveFunction,
-        }))
-      .otherwise(new stepfunctions.Wait(this, 'Wait', {
-        time: stepfunctions.WaitTime.duration(cdk.Duration.seconds(5)),
+        invokeAddIamDirectiveFunction
+          // .next(listUserPools)
+          // .next(findUserPool)
+          // .next(updateUserPool)
+      )
+      .otherwise(new sfn.Wait(this, 'Wait', {
+        time: sfn.WaitTime.duration(cdk.Duration.seconds(5)),
       }).next(waitForCfnStack));
 
     const definition = waitForCfnStack
@@ -173,7 +160,7 @@ export class AppConfigurator extends Construct {
         action: 'startExecution',
         parameters: {
           stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
-          input: JSON.stringify({ action: 'create'}),
+          input: JSON.stringify({ action: 'create' }),
         },
         physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
       },
@@ -182,7 +169,7 @@ export class AppConfigurator extends Construct {
         action: 'startExecution',
         parameters: {
           stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
-          input: JSON.stringify({ action: 'update'}),
+          input: JSON.stringify({ action: 'update' }),
         },
         physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
       },
@@ -190,7 +177,7 @@ export class AppConfigurator extends Construct {
         resources: [appConfiguratorStateMachine.stateMachineArn],
       }),
     });
-  
+
     // // Create a Custom Resource that invokes only if the dependencies change
     // new cr.AwsCustomResource(this, `TriggerOnDepChange`, {
     //   onCreate: {
