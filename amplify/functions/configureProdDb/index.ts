@@ -20,6 +20,7 @@ export const handler = async (event: any, context: any, callback: any): Promise<
   const workgroup = process.env.ATHENA_WORKGROUP_NAME
   // const knowledgeBaseId = process.env.TABLE_DEF_KB_ID || 'default'
 
+
   for (const sql of sqlStatements) {
     console.log('Executing SQL:', sql)
 

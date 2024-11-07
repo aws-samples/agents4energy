@@ -222,6 +222,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         port: 2000,
         removalPolicy: cdk.RemovalPolicy.DESTROY
     });
+    const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
     // //This serverless aurora cluster will store hydrocarbon production pressures and volume
     // // const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'A4E-HydrocarbonProdDb-1', {
@@ -422,6 +423,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             }),
         ]),
     });
+
+    prodDbConfigurator.node.addDependency(writerNode)
 
     // Start the knowledge base ingestion job
     //// https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/BedrockAgent.html#startIngestionJob-property

@@ -67,44 +67,44 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     this.embeddingModelArn = `arn:aws:bedrock:${rootStack.region}::foundation-model/cohere.embed-multilingual-v3`
 
-    // const vectorStorePostgresCluster = new rds.DatabaseCluster(scope, 'VectorStoreAuroraCluster-1', {
-    //   engine: rds.DatabaseClusterEngine.auroraPostgres({
-    //     version: rds.AuroraPostgresEngineVersion.VER_16_4,
-    //   }),
-    //   enableDataApi: true,
-    //   defaultDatabaseName: defaultDatabaseName,
-    //   writer: rds.ClusterInstance.serverlessV2('writer'),
-    //   serverlessV2MinCapacity: 0.5,
-    //   serverlessV2MaxCapacity: 2,
-    //   vpcSubnets: {
-    //     subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-    //   },
-    //   vpc: props.vpc,
-    //   port: 2000,
-    //   // backtrackWindow: cdk.Duration.hours(1),
-    //   removalPolicy: cdk.RemovalPolicy.DESTROY
-    // });
-
-    const vectorStorePostgresCluster = new rds.ServerlessCluster(this, 'VectorStoreAuroraCluster', {
+    const vectorStorePostgresCluster = new rds.DatabaseCluster(scope, 'VectorStoreAuroraCluster-1', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
-        version: rds.AuroraPostgresEngineVersion.VER_13_9,
+        version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
-      scaling: {
-        autoPause: cdk.Duration.minutes(300),
-        minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
-        maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
-      },
-      defaultDatabaseName: defaultDatabaseName,
       enableDataApi: true,
-      // credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
-      //     secretName: `${rootStack.stackName}-proddb-credentials`
-      // }),
-      vpc: props.vpc,
+      defaultDatabaseName: defaultDatabaseName,
+      writer: rds.ClusterInstance.serverlessV2('writer'),
+      serverlessV2MinCapacity: 0.5,
+      serverlessV2MaxCapacity: 2,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       },
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      vpc: props.vpc,
+      port: 2000,
+      // backtrackWindow: cdk.Duration.hours(1),
+      removalPolicy: cdk.RemovalPolicy.DESTROY
     });
+    
+    // Wait until this writer node is created before running sql queries against the db
+    const writerNode = vectorStorePostgresCluster.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
+
+    // const vectorStorePostgresCluster = new rds.ServerlessCluster(this, 'VectorStoreAuroraCluster', {
+    //   engine: rds.DatabaseClusterEngine.auroraPostgres({
+    //     version: rds.AuroraPostgresEngineVersion.VER_13_9,
+    //   }),
+    //   scaling: {
+    //     autoPause: cdk.Duration.minutes(300),
+    //     minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
+    //     maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
+    //   },
+    //   defaultDatabaseName: defaultDatabaseName,
+    //   enableDataApi: true,
+    //   vpc: props.vpc,
+    //   vpcSubnets: {
+    //     subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+    //   },
+    //   removalPolicy: cdk.RemovalPolicy.DESTROY,
+    // });
 
     // https://github.com/awslabs/generative-ai-cdk-constructs/blob/main/lambda/amazon-aurora-pgvector-custom-resources/custom_resources/amazon_aurora_pgvector.py
 
@@ -126,10 +126,10 @@ export class AuroraBedrockKnoledgeBase extends Construct {
       `
     ]
 
-    const runSQLStatements = ExecuteSQLStatementRescource(this, 'createPGExtenstion', {
-      vectorStorePostgresCluster: vectorStorePostgresCluster,
-      sql_command: sqlStatements.join('\n\n')
-    })
+    // const runSQLStatements = ExecuteSQLStatementRescource(this, 'createPGExtenstion', {
+    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
+    //   sql_command: sqlStatements.join('\n\n')
+    // })
 
     // // Custom Resource to run SQL statements
     // const sqlStatements = `
@@ -202,43 +202,44 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     //   serviceToken: sqlLambdaProvider.serviceToken,
     // });
 
-    // //// Here we execute the sql statements sequentially.
-    // const createPGExtenstion = ExecuteSQLStatementRescource(this, 'createPGExtenstion', {
-    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
-    //   sql_command: /* sql */`
-    //     CREATE EXTENSION IF NOT EXISTS vector;
-    //     `
-    // })
+    //// Here we execute the sql statements sequentially.
+    const createPGExtenstion = ExecuteSQLStatementRescource(this, 'createPGExtenstion', {
+      vectorStorePostgresCluster: vectorStorePostgresCluster,
+      sql_command: /* sql */`
+        CREATE EXTENSION IF NOT EXISTS vector;
+        `
+    })
+    createPGExtenstion.node.addDependency(writerNode)
 
-    // const createSchema = ExecuteSQLStatementRescource(this, 'createSchema', {
-    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
-    //   sql_command: /* sql */`
-    //     CREATE SCHEMA ${schemaName};
-    //     `
-    // })
-    // createSchema.node.addDependency(createPGExtenstion)
+    const createSchema = ExecuteSQLStatementRescource(this, 'createSchema', {
+      vectorStorePostgresCluster: vectorStorePostgresCluster,
+      sql_command: /* sql */`
+        CREATE SCHEMA ${schemaName};
+        `
+    })
+    createSchema.node.addDependency(createPGExtenstion)
 
-    // const createVectorTable = ExecuteSQLStatementRescource(this, 'createVectorTable', {
-    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
-    //   sql_command: /* sql */`
-    //     CREATE TABLE ${schemaName}.${tableName} (
-    //     ${primaryKeyField} uuid PRIMARY KEY,
-    //     ${vectorField} vector(${vectorDimensions}),
-    //     ${textField} text, 
-    //     ${metadataField} json
-    //   );
-    //     `
-    // })
-    // createVectorTable.node.addDependency(createSchema)
+    const createVectorTable = ExecuteSQLStatementRescource(this, 'createVectorTable', {
+      vectorStorePostgresCluster: vectorStorePostgresCluster,
+      sql_command: /* sql */`
+        CREATE TABLE ${schemaName}.${tableName} (
+        ${primaryKeyField} uuid PRIMARY KEY,
+        ${vectorField} vector(${vectorDimensions}),
+        ${textField} text, 
+        ${metadataField} json
+      );
+        `
+    })
+    createVectorTable.node.addDependency(createSchema)
 
-    // const createIndex = ExecuteSQLStatementRescource(this, 'createIndex', {
-    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
-    //   sql_command: /* sql */`
-    //     CREATE INDEX on ${schemaName}.${tableName}
-    //     USING hnsw (${vectorField} vector_cosine_ops);
-    //     `
-    // })
-    // createIndex.node.addDependency(createVectorTable)
+    const createIndex = ExecuteSQLStatementRescource(this, 'createIndex', {
+      vectorStorePostgresCluster: vectorStorePostgresCluster,
+      sql_command: /* sql */`
+        CREATE INDEX on ${schemaName}.${tableName}
+        USING hnsw (${vectorField} vector_cosine_ops);
+        `
+    })
+    createIndex.node.addDependency(createVectorTable)
 
 
 
@@ -468,7 +469,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
       }
     });
 
-    this.knowledgeBase.node.addDependency(runSQLStatements);
+    this.knowledgeBase.node.addDependency(createIndex);
   }
 }
 
