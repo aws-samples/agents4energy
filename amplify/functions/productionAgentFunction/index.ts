@@ -4,13 +4,34 @@ import { Schema } from '../../data/resource';
 import { ChatBedrockConverse } from "@langchain/aws";
 import { AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
+// import { Pregel } from "@langchain/langgraph/pregel";
+
 import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
 import { calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool, plotTableFromToolResponseToolBuilder } from './toolBox';
 
-// Define the tools for the agent to use
-// const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool];
+async function retryOperation<T>(
+    operation: () => Promise<T>,
+    retries: number = 3,
+    delay: number = 1000 // delay in milliseconds
+): Promise<T> {
+    let attempt = 0;
+    while (attempt < retries) {
+        try {
+            return await operation();
+        } catch (error) {
+            attempt++;
+            if (attempt >= retries) {
+                throw error;
+            }
+            console.warn(`Retrying... Attempt ${attempt}/${retries}`);
+            await new Promise(res => setTimeout(res, delay));
+        }
+    }
+    // Fallback, should not be reached
+    throw new Error("Operation failed after maximum retries");
+}
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
 
@@ -20,7 +41,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     // console.log('process.env: ', process.env)
 
     // const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
-    
+
 
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
@@ -32,11 +53,11 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     })
 
     const agentTools = [
-        calculatorTool, 
-        wellTableTool, 
-        convertPdfToJsonTool, 
-        getTableDefinitionsTool, 
-        executeSQLQueryTool, 
+        calculatorTool,
+        wellTableTool,
+        convertPdfToJsonTool,
+        getTableDefinitionsTool,
+        executeSQLQueryTool,
         plotTableFromToolResponseToolBuilder(amplifyClientWrapper)
     ];
 
@@ -53,10 +74,19 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             temperature: 0
         });
 
-        const agent = createReactAgent({
+        // const agent2 = createReactAgent({
+        //     llm: agentModel,
+        //     tools: agentTools,
+        // });
+
+
+        //Add retry to the agent
+        const agent = await retryOperation(async () => createReactAgent({
             llm: agentModel,
             tools: agentTools,
-        });
+        }));
+
+        // agent.nodes['agent'] = langchainNodeWithRetry(agent.nodes['agent'], 3, 1000);
 
         const input = {
             messages: amplifyClientWrapper.chatMessages,
@@ -70,11 +100,11 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
         for await (const streamEvent of stream) {
             console.log(`${JSON.stringify(streamEvent, null, 2)}\n---`);
 
-            if (streamEvent.event === "on_chat_model_stream"){
+            if (streamEvent.event === "on_chat_model_stream") {
                 // console.log('Message Chunk: ', streamEvent.data.chunk)
 
                 const streamChunk = streamEvent.data.chunk as AIMessageChunk
-                
+
                 // const chunkContent = streamEvent.data.chunk.kwargs.content
                 const chunkContent = getLangChainMessageTextContent(streamChunk)
                 // console.log("chunkContent: ", chunkContent)
@@ -86,8 +116,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                             chunk: chunkContent
                         }
                     })
-                }                
-                
+                }
+
             } else if (streamEvent.event === 'on_tool_end') {
                 const streamChunk = streamEvent.data.output as ToolMessage
                 // console.log('Tool Output: ', streamChunk)
@@ -103,8 +133,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 // console.log('Message Output Chunk as AIMessageChunk: ', streamChunk)
 
                 if (!streamChunk) throw new Error("No output chunk found")
-                const streamChunkAIMessage = new AIMessage({ 
-                    content: streamChunk.content, 
+                const streamChunkAIMessage = new AIMessage({
+                    content: streamChunk.content,
                     tool_calls: streamChunk.tool_calls
                 })
 
@@ -120,7 +150,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
         }
 
-        
+
         // agent.streamEvents
 
         // for await (
@@ -132,15 +162,15 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
         //     if (!(newMessage instanceof HumanMessage)) {
         //         console.log('new message: ', newMessage)
-                
+
 
         //         console.log('publishMessageStreamChunkResponse: ', publishMessageStreamChunkResponse)
 
-                // await amplifyClientWrapper.publishMessage({
-                //     chatSessionId: event.arguments.chatSessionId,
-                //     owner: event.identity.sub,
-                //     message: newMessage
-                // })
+        // await amplifyClientWrapper.publishMessage({
+        //     chatSessionId: event.arguments.chatSessionId,
+        //     owner: event.identity.sub,
+        //     message: newMessage
+        // })
 
 
 
