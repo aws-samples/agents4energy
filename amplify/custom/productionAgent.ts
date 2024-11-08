@@ -456,9 +456,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         physicalResourceId: cr.PhysicalResourceId.of('startKbIngestion'),
     }
 
-    const prodTableKbIngestionJobTrigger = new cr.AwsCustomResource(scope, `startKbIngestion`, {
+    const prodTableKbIngestionJobTrigger = new cr.AwsCustomResource(scope, `startKbIngestion1`, {
         onCreate: startIngestionJobResourceCall,
-        onUpdate: startIngestionJobResourceCall,
+        // onUpdate: startIngestionJobResourceCall,
         policy: cr.AwsCustomResourcePolicy.fromStatements([
             new iam.PolicyStatement({
                 actions: ['bedrock:startIngestionJob'],
