@@ -7,8 +7,6 @@ import {
   aws_iam as iam,
   custom_resources as cr
 } from 'aws-cdk-lib';
-// import * as lambda from 'aws-cdk-lib/aws-lambda';
-// import { bedrock as cdkLabsBedrock } from "@cdklabs/generative-ai-cdk-constructs";
 import { Construct } from 'constructs';
 
 export interface KnowledgeBaseProps {
@@ -27,7 +25,7 @@ const vectorDimensions = 1024
 
 const ExecuteSQLStatementRescource = (scope: Construct, id: string, props: {
   vectorStorePostgresCluster: rds.DatabaseCluster | rds.ServerlessCluster,
-  sql_command: string
+  sqlCommand: string
 }) => (
   new cr.AwsCustomResource(scope, id, {
     onCreate: {
@@ -36,7 +34,7 @@ const ExecuteSQLStatementRescource = (scope: Construct, id: string, props: {
       parameters: {
         resourceArn: props.vectorStorePostgresCluster.clusterArn,
         database: defaultDatabaseName,
-        sql: props.sql_command,
+        sql: props.sqlCommand,
         secretArn: props.vectorStorePostgresCluster.secret!.secretArn,
       },
       physicalResourceId: cr.PhysicalResourceId.of(id),
@@ -84,7 +82,6 @@ export class AuroraBedrockKnoledgeBase extends Construct {
       // backtrackWindow: cdk.Duration.hours(1),
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
-
     // Wait until this writer node is created before running sql queries against the db
     const writerNode = vectorStorePostgresCluster.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
@@ -108,23 +105,23 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     // https://github.com/awslabs/generative-ai-cdk-constructs/blob/main/lambda/amazon-aurora-pgvector-custom-resources/custom_resources/amazon_aurora_pgvector.py
 
-    const sqlStatements = [
-         /* sql */`
-      CREATE EXTENSION IF NOT EXISTS vector;
-      `, /* sql */`
-      CREATE SCHEMA ${schemaName};
-      `, /* sql */`
-      CREATE TABLE ${schemaName}.${tableName} (
-        ${primaryKeyField} uuid PRIMARY KEY,
-        ${vectorField} vector(${vectorDimensions}),
-        ${textField} text, 
-        ${metadataField} json
-      );
-      `, /* sql */`
-      CREATE INDEX on ${schemaName}.${tableName}
-      USING hnsw (${vectorField} vector_cosine_ops);
-      `
-    ]
+    // const sqlStatements = [
+    //      /* sql */`
+    //   CREATE EXTENSION IF NOT EXISTS vector;
+    //   `, /* sql */`
+    //   CREATE SCHEMA ${schemaName};
+    //   `, /* sql */`
+    //   CREATE TABLE ${schemaName}.${tableName} (
+    //     ${primaryKeyField} uuid PRIMARY KEY,
+    //     ${vectorField} vector(${vectorDimensions}),
+    //     ${textField} text, 
+    //     ${metadataField} json
+    //   );
+    //   `, /* sql */`
+    //   CREATE INDEX on ${schemaName}.${tableName}
+    //   USING hnsw (${vectorField} vector_cosine_ops);
+    //   `
+    // ]
 
     // const runSQLStatements = ExecuteSQLStatementRescource(this, 'createPGExtenstion', {
     //   vectorStorePostgresCluster: vectorStorePostgresCluster,
@@ -205,7 +202,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     //// Here we execute the sql statements sequentially.
     const createPGExtenstion = ExecuteSQLStatementRescource(this, 'createPGExtenstion', {
       vectorStorePostgresCluster: vectorStorePostgresCluster,
-      sql_command: /* sql */`
+      sqlCommand: /* sql */`
         CREATE EXTENSION IF NOT EXISTS vector;
         `
     })
@@ -213,7 +210,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     const createSchema = ExecuteSQLStatementRescource(this, 'createSchema', {
       vectorStorePostgresCluster: vectorStorePostgresCluster,
-      sql_command: /* sql */`
+      sqlCommand: /* sql */`
         CREATE SCHEMA ${schemaName};
         `
     })
@@ -221,7 +218,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     const createVectorTable = ExecuteSQLStatementRescource(this, 'createVectorTable', {
       vectorStorePostgresCluster: vectorStorePostgresCluster,
-      sql_command: /* sql */`
+      sqlCommand: /* sql */`
         CREATE TABLE ${schemaName}.${tableName} (
         ${primaryKeyField} uuid PRIMARY KEY,
         ${vectorField} vector(${vectorDimensions}),
@@ -234,7 +231,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     const createIndex = ExecuteSQLStatementRescource(this, 'createIndex', {
       vectorStorePostgresCluster: vectorStorePostgresCluster,
-      sql_command: /* sql */`
+      sqlCommand: /* sql */`
         CREATE INDEX on ${schemaName}.${tableName}
         USING hnsw (${vectorField} vector_cosine_ops);
         `
@@ -468,7 +465,6 @@ export class AuroraBedrockKnoledgeBase extends Construct {
         },
       }
     });
-
     this.knowledgeBase.node.addDependency(createIndex);
 
 

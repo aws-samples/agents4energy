@@ -338,5 +338,6 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   athenaWorkgroup: athenaWorkgroup,
   athenaPostgresCatalog: athenaPostgresCatalog,
   s3Bucket: backend.storage.resources.bucket,
-  preSignUpFunction: backend.preSignUp.resources.lambda
+  preSignUpFunction: backend.preSignUp.resources.lambda,
+  cognitoUserPool: backend.auth.resources.userPool,
 })

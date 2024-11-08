@@ -31,6 +31,7 @@ export interface AppConfiguratorProps {
   athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
   s3Bucket: cdk.aws_s3.IBucket
   preSignUpFunction: lambda.IFunction
+  cognitoUserPool: cdk.aws_cognito.IUserPool
   // sqlTableDefBedrockKnoledgeBase: bedrock.KnowledgeBase
 }
 
@@ -45,6 +46,16 @@ export class AppConfigurator extends Construct {
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
 
+    // // Grant the user pool the authorization to invoke the pre sign up lambda function
+    // props.cognitoUserPool.grant(props.preSignUpFunction, 'lambda:InvokeFunction')
+
+    props.preSignUpFunction.grantInvoke(new cdk.aws_iam.ServicePrincipal('cognito-idp.amazonaws.com'))
+
+    // preSignUpFunction.addPermission('AllowCognitoInvoke', {
+    //   principal: new iam.ServicePrincipal('cognito-idp.amazonaws.com'),
+    //   sourceArn: userPool.userPoolArn,
+    // });
+
     // This function and custom resource will update the GraphQL schema to allow for @aws_iam access to all resources 
     const addIamDirectiveFunction = new NodejsFunction(scope, 'addIamDirective', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -54,7 +65,6 @@ export class AppConfigurator extends Construct {
         ROOT_STACK_NAME: rootStack.stackName
       },
     });
-
 
     addIamDirectiveFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
       actions: [
@@ -67,6 +77,7 @@ export class AppConfigurator extends Construct {
       resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
     }))
 
+
     // Define a step function which waits for the cloudformation stackk to complete before executing a configureation update
     const waitForCfnStack = new sfn_tasks.CallAwsService(this, 'WaitForCfnStack', {
       service: 'cloudformation',
@@ -78,46 +89,39 @@ export class AppConfigurator extends Construct {
       resultPath: '$.StackStatus',
     });
 
+    // Define a step to get the current user pool configuration
+    const getUserPoolConfiguration = new sfn_tasks.CallAwsService(this, 'GetUserPoolConfiguration', {
+      service: 'cognitoidentityprovider',
+      action: 'describeUserPool',
+      parameters: {
+        UserPoolId: props.cognitoUserPool.userPoolId
+      },
+      iamResources: [props.cognitoUserPool.userPoolArn],
+      resultPath: '$.UserPoolConfig'
+    });
 
+    // Define that configuration with the pre sign up lambda function
+    const updateUserPoolTask = new sfn_tasks.CallAwsService(this, 'UpdateUserPool', {
+      service: 'cognitoidentityprovider',
+      action: 'updateUserPool',
+      parameters: {
+        UserPoolId: props.cognitoUserPool.userPoolId,
+        AutoVerifiedAttributes: sfn.JsonPath.stringAt('$.UserPoolConfig.UserPool.AutoVerifiedAttributes'),
+        EmailVerificationMessage: sfn.JsonPath.stringAt('$.UserPoolConfig.UserPool.EmailVerificationMessage'),
+        EmailVerificationSubject: sfn.JsonPath.stringAt('$.UserPoolConfig.UserPool.EmailVerificationSubject'),
+        Policies: sfn.JsonPath.objectAt('$.UserPoolConfig.UserPool.Policies'),
+        VerificationMessageTemplate: sfn.JsonPath.objectAt('$.UserPoolConfig.UserPool.VerificationMessageTemplate'),
+        LambdaConfig: {
+          PreSignUp: props.preSignUpFunction.functionArn
+        }
+      },
+      iamResources: [props.cognitoUserPool.userPoolArn]
+    });
 
     // This step will add the iam directive to the graphql schema
     const invokeAddIamDirectiveFunction = new sfn_tasks.LambdaInvoke(this, 'InvokeLambda', {
       lambdaFunction: addIamDirectiveFunction,
     })
-
-    // // These steps will set up the pre-sign-up lambda trigger
-    // // Step 1: List Cognito User Pools
-    // const listUserPools = new sfn_tasks.CallAwsService(this, 'ListUserPools', {
-    //   service: 'cognitoidentityserviceprovider',
-    //   action: 'listUserPools',
-    //   parameters: {
-    //     MaxResults: 60,
-    //   },
-    //   iamResources: ['*'],
-    // });
-
-    // // Step 2: Find User Pool with tag
-    // const findUserPool = new sfn.Map(this, 'FindUserPool', {
-    //   maxConcurrency: 1,
-    //   itemsPath: sfn.JsonPath.stringAt('$.UserPools'),
-    // }).itemProcessor(new sfn.Choice(this, 'CheckUserPoolTag')
-    //   .when(sfn.Condition.stringEquals('$.Tags[?(@.Key=="rootStackName")].Value[0]', rootStack.stackName),
-    //     new sfn.Succeed(this, 'FoundUserPool'))
-    //   .otherwise(new sfn.Fail(this, 'UserPoolNotFound'))
-    // );
-
-    // // Step 3: Update User Pool with pre-sign-up trigger
-    // const updateUserPool = new sfn_tasks.CallAwsService(this, 'UpdateUserPool', {
-    //   service: 'cognitoidentityserviceprovider',
-    //   action: 'updateUserPool',
-    //   parameters: {
-    //     UserPoolId: sfn.JsonPath.stringAt('$.Id'),
-    //     LambdaConfig: {
-    //       PreSignUp: props.preSignUpFunction.functionArn,
-    //     },
-    //   },
-    //   iamResources: ['*'],
-    // });
 
     const checkStackStatus = new sfn.Choice(this, 'Check Stack Status')
       .when(sfn.Condition.or(
@@ -127,9 +131,8 @@ export class AppConfigurator extends Construct {
         sfn.Condition.stringEquals('$.StackStatus.Stacks[0].StackStatus', 'ROLLBACK_COMPLETE')
       ),
         invokeAddIamDirectiveFunction
-          // .next(listUserPools)
-          // .next(findUserPool)
-          // .next(updateUserPool)
+          .next(getUserPoolConfiguration)
+          .next(updateUserPoolTask)
       )
       .otherwise(new sfn.Wait(this, 'Wait', {
         time: sfn.WaitTime.duration(cdk.Duration.seconds(5)),
@@ -153,26 +156,29 @@ export class AppConfigurator extends Construct {
       tracingEnabled: true,
     });
 
+    appConfiguratorStateMachine.role.addToPrincipalPolicy(new cdk.aws_iam.PolicyStatement({
+      actions: [
+        'cognito-idp:UpdateUserPool',
+        'cognito-idp:describeUserPool'
+      ],
+      resources: [props.cognitoUserPool.userPoolArn]
+    }))
+
+
+    const invokeStepFunctionSDKCall: cr.AwsSdkCall = {
+      service: 'StepFunctions',
+      action: 'startExecution',
+      parameters: {
+        stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
+        input: JSON.stringify({ action: 'create' }),
+      },
+      physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
+    }
+
     // Create a Custom Resource that invokes the Step Function on every stack update
     new cr.AwsCustomResource(this, `TriggerStepFunction-${Date.now().toString().slice(-5)}`, {
-      onCreate: {
-        service: 'StepFunctions',
-        action: 'startExecution',
-        parameters: {
-          stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
-          input: JSON.stringify({ action: 'create' }),
-        },
-        physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
-      },
-      onUpdate: {
-        service: 'StepFunctions',
-        action: 'startExecution',
-        parameters: {
-          stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
-          input: JSON.stringify({ action: 'update' }),
-        },
-        physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
-      },
+      onCreate: invokeStepFunctionSDKCall,
+      onUpdate: invokeStepFunctionSDKCall,
       policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
         resources: [appConfiguratorStateMachine.stateMachineArn],
       }),
