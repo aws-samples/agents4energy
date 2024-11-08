@@ -16,6 +16,7 @@ export default function ChatUIMessageList(props: ChatUIMessageListProps) {
         <ChatUIMessage
           key={idx}
           message={message}
+          allMessages={messages}
           showCopyButton={props.showCopyButton}
         />
       ))}

@@ -1,5 +1,6 @@
 "use client"
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { Link } from '@mui/material';
 
 import {
   Button,
@@ -53,7 +54,8 @@ ChartJS.register(
 
 export interface ChatUIMessageProps {
   // message: Schema["ChatMessage"]["type"];
-  message: Message
+  message: Message;
+  allMessages: Message[];
   showCopyButton?: boolean;
 }
 
@@ -96,16 +98,16 @@ function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
   return result;
 }
 
-type InputData = {
+type TransformToDataRowsInputData = {
   [key: string]: (string | number)[]
 };
 
-type OutputData = {
+type TransformToDataRowsOutputData = {
   id: string;
   [key: string]: string;
 };
 
-function transformDataToRows(input: InputData): OutputData[] {
+function transformDataToRows(input: TransformToDataRowsInputData): TransformToDataRowsOutputData[] {
   const keys = Object.keys(input);
   const firstArrayLength = input[keys[0]].length;
 
@@ -119,7 +121,7 @@ function transformDataToRows(input: InputData): OutputData[] {
       obj["id"] = `${i}`
       obj[key] = `${input[key][i]}`;
       return obj;
-    }, {} as OutputData)
+    }, {} as TransformToDataRowsOutputData)
   );
 }
 
@@ -158,6 +160,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           columnNameFromQueryForXAxis: string,
           chartTitle: string | undefined
         }
+
+
 
         const datasets = Object.keys(chartData)
           .filter(key => key !== columnNameFromQueryForXAxis)
@@ -258,21 +262,39 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         const columnNames = Object.keys(queryResponseData)
 
+        const columns: GridColDef<TransformToDataRowsOutputData>[] = columnNames
+          .filter((columnName) => columnName !== 's3Key')
+          .map((name) => ({
+            field: `${name}`,
+            headerName: `${name}`,
+            flex: 1,
+            minWidth: 150,
+            renderCell: (params) => (
+              <div style={{
+                whiteSpace: 'normal',
+                wordWrap: 'break-word',
+                lineHeight: 'normal',
+                width: '100%'
+              }}>
+                {params.value}
+              </div>
+            ),
+          }));
 
-        const columns: GridColDef<OutputData>[] = columnNames.map((name) => ({
-          field: `${name}`,
-          headerName: `${name}`,
-          width: 150,
-          type: 'string'
-        }));
-
-        // const columns = columnNames.map((name) => ({
-        //   field: name,
-        //   headerName: name,
-        //   width: 150,
-        //   type: 'number'
-        // }))
-        columns.push({ field: 'id', headerName: 'ID', width: 90, type: 'number' })
+        if (columnNames.includes('s3Key')) {
+          columns.push({
+            field: 's3Key',
+            headerName: 's3Key',
+            flex: 1,
+            minWidth: 150,
+            renderCell: (params) => (
+              <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
+                {params.value}
+              </Link>
+            ),
+        
+          })
+        }
 
         const rowData = transformDataToRows(queryResponseData)
 
@@ -289,6 +311,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             >
               {stringify(JSON.parse(props.message.content))}
             </pre> */}
+
             <DataGrid
               rows={rowData}
               columns={columns}
@@ -302,6 +325,26 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               pageSizeOptions={[5]}
               checkboxSelection
               disableRowSelectionOnClick
+
+              getRowHeight={() => 'auto'}
+
+              sx={{
+                '& .MuiDataGrid-cell': {
+                  padding: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                },
+                '& .MuiDataGrid-row': {
+                  maxHeight: 'none !important',
+                },
+                '& .MuiDataGrid-renderingZone': {
+                  maxHeight: 'none !important',
+                },
+                '& .MuiDataGrid-virtualScroller': {
+                  // Disable virtual scrolling
+                  overflowY: 'visible !important',
+                },
+              }}
             />
           </>
 

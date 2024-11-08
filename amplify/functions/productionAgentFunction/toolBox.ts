@@ -441,8 +441,8 @@ export const wellTableTool = tool(
 
         const dataRowsPivoted = pivotLists(dataRows)
 
-        const dataObject = tableColumns.reduce((acc, columnDefinition, index) => {
-            acc[columnDefinition.columnName] = dataRowsPivoted[index];
+        const dataObject = columnNames.reduce((acc, columnName, index) => {
+            acc[columnName] = dataRowsPivoted[index];
             return acc;
         }, {} as Record<string, string[]>)
 
