@@ -170,7 +170,7 @@ export const executeSQLQueryTool = tool(
                     messageContentType: 'tool_json',
                     error: `
                     DATE_SUB is not allowed in the SQL query. 
-                    Re-write the query and use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp.
+                    Re-write the query and use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Ex: DATE_ADD('year', -5, CURRENT_DATE)
                     `
                 } as ToolMessageContentType
             }
