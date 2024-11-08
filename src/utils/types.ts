@@ -1,4 +1,4 @@
-import type { Schema } from '@/../amplify/data/resource';
+import type { Schema } from '../../amplify/data/resource';
 export type Message = Schema["ChatMessage"]["type"] | {
 content: string;
 role: "ai"|"human"|"tool";
@@ -8,6 +8,13 @@ tool_name?: string;
 tool_call_id?: string;
 tool_calls?: string;
 chatSessionId?: string;
+};
+
+
+export type messageContentType = 'ai' | 'tool_markdown' | 'tool_json' | 'tool_table' | 'tool_plot'
+
+export type ToolMessageContentType = {
+    messageContentType: messageContentType;
 };
 
 // export type Message = {

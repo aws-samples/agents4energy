@@ -25,13 +25,19 @@ import {
     CardContent,
     CardActions,
     Button,
-    CircularProgress
+    // CircularProgress
 } from '@mui/material';
 
 import DeleteIcon from '@mui/icons-material/Delete';
 
-import { ChatUI } from "@/components/chat-ui/chat-ui";
+import { ChatUIProps } from "@/components/chat-ui/chat-ui";
 import { withAuth } from '@/components/WithAuth';
+
+import dynamic from 'next/dynamic'
+
+const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
+    ssr: false,
+});
 
 const drawerWidth = 240;
 
@@ -175,7 +181,7 @@ const getSuggestedPromptsOutputStructure = {
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["type"]>>([]);
-    const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({role:"ai", content:"", createdAt: new Date().toISOString()});
+    const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
     const [activeChatSession, setActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
@@ -291,12 +297,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     // Subscribe to the token stream for this chat session
     useEffect(() => {
         if (activeChatSession) {
-            const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: activeChatSession.id}).subscribe({
+            const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: activeChatSession.id }).subscribe({
                 next: ({ chunk }) => {
                     // console.log('Message Stream Chunk: ', chunk)
 
                     setCharacterStreamMessage((prevStreamMessage) => ({
-                        content: prevStreamMessage? (prevStreamMessage.content || "") + chunk : chunk,
+                        content: prevStreamMessage ? (prevStreamMessage.content || "") + chunk : chunk,
                         role: "ai",
                         createdAt: new Date().toISOString()
                     }))
@@ -415,7 +421,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     <DropdownMenu buttonText='New Chat Session'>
                         {
                             [
-                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({agentId: agentId, agentName: agentInfo.name})),
+                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
                                 ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
                             ]
                                 .map((agent) => (
@@ -474,45 +480,53 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     }
                 </Box>
             </Drawer>
-            <div style={{ marginLeft: '260px', padding: '20px' }}>
-                <Toolbar />
-                <Box>
-                    <Typography variant="h4" gutterBottom>
-                        Chat with {activeChatSession?.aiBotInfo?.aiBotName}
-                    </Typography>
-                </Box>
-                <Box>
-                    <ChatUI
-                        onSendMessage={addUserChatMessage}
-                        messages={[
-                            ...messages,
-                            ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
-                        ]}
-                        running={isLoading}
-                    />
-                </Box>
-                <Box sx={{ mt: 5 }}>
-                    {
-                        !isLoading && (suggestedPrompts.length || !messages.length) ? (
-                            <Typography variant="body2">
-                                Suggested Follow Ups:
-                            </Typography>
-                        ) : (
-                            <CircularProgress />
-                        )
-                    }
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    {!isLoading && suggestedPrompts.map((prompt) => (
-                        <div key={prompt}>
-                            <Button onClick={() => addUserChatMessage(prompt)} >
-                                {prompt}
-                            </Button>
-                        </div>
-                    ))
-                    }
-                </Box>
-            </div>
+            {params ? //Show the chat UI if there is an active chat session
+                <div style={{ marginLeft: '260px', padding: '20px' }}>
+                    <Toolbar />
+
+                    <Box>
+                        <Typography variant="h4" gutterBottom>
+                            Chat with {activeChatSession?.aiBotInfo?.aiBotName}
+                        </Typography>
+                    </Box>
+                    <Box>
+
+                        <DynamicChatUI
+                            onSendMessage={addUserChatMessage}
+                            messages={[
+                                ...messages,
+                                ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                            ]}
+                            running={isLoading}
+                        />
+
+
+                    </Box>
+                    <Box sx={{ mt: 5 }}>
+                        {
+                            !isLoading && (suggestedPrompts.length || !messages.length) ? (
+                                <Typography variant="body2">
+                                    Suggested Follow Ups:
+                                </Typography>
+                            ) : (
+                                null
+                                // <CircularProgress />
+                            )
+                        }
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {!isLoading && suggestedPrompts.map((prompt) => (
+                            <div key={prompt}>
+                                <Button onClick={() => addUserChatMessage(prompt)} >
+                                    {prompt}
+                                </Button>
+                            </div>
+                        ))
+                        }
+                    </Box>
+
+                </div>
+                : null}
         </div>
 
     );

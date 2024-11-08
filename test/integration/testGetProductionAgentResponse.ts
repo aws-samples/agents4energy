@@ -2,20 +2,14 @@ import { handler } from "@/../amplify/functions/productionAgentFunction/index"
 import { AppSyncResolverEvent, Context, AppSyncIdentity } from 'aws-lambda';
 import { Schema } from '@/../amplify/data/resource';
 import { STSClient } from "@aws-sdk/client-sts";
-import { generateAmplifyClientWrapper } from '@/../amplify/functions/utils/amplifyUtils'
+import { AmplifyClientWrapper } from '@/../amplify/functions/utils/amplifyUtils'
 import { createChatSession } from "@/../amplify/functions/graphql/mutations";
-// '@/../utils/amplifyUtils'
+
+import { getDeployedResourceArn, getLambdaEnvironmentVariables } from "../utils";
 
 import outputs from '@/../amplify_outputs.json';
 
 const stsClient = new STSClient();
-
-process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT = outputs.data.url
-process.env.AWS_DEFAULT_REGION = outputs.auth.aws_region
-process.env.MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
-
-
-
 
 const dummyContext: Context = {
   callbackWaitsForEmptyEventLoop: true,
@@ -35,12 +29,21 @@ const dummyContext: Context = {
 };
 
 export const main = async () => {
+  const rootStackName = outputs.custom.root_stack_name
+  await getLambdaEnvironmentVariables(await getDeployedResourceArn(rootStackName, 'productionagentfunctionlambda'))
+
+  process.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT = outputs.data.url
+  process.env.AWS_DEFAULT_REGION = outputs.auth.aws_region
+  process.env.MODEL_ID = 'anthropic.claude-3-sonnet-20240229-v1:0'
+
   const credentials = await stsClient.config.credentials()
   process.env.AWS_ACCESS_KEY_ID = credentials.accessKeyId
   process.env.AWS_SECRET_ACCESS_KEY = credentials.secretAccessKey
   process.env.AWS_SESSION_TOKEN = credentials.sessionToken
 
-  const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
+  const amplifyClientWrapper = new AmplifyClientWrapper({
+    env: process.env
+  })
 
   //Create a new chat session for testing
   const testChatSession = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
@@ -51,8 +54,19 @@ export const main = async () => {
   })
 
   const testArguments = {
-    "chatSessionId": testChatSession.data.createChatSession.id,
-    "input": "What is 5*67?"
+    chatSessionId: testChatSession.data.createChatSession.id,
+
+    input: `
+    Execute a SQL query and plot the result to get the oil production over the last 12 weeks. 
+    Get the table definition so you know what to include in the query.
+    Plot the result of this query.
+    `
+
+    // input: `
+    // Execute a SQL query and plot the result to get the production over the last 12 weeks. 
+    // Get the table definition so you know what to include in the query.
+    // `
+    // "input": "What is 1+54?"
   }
 
   const event: AppSyncResolverEvent<Schema['invokeProductionAgent']['args']> = {

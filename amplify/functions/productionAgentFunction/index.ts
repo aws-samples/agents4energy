@@ -4,12 +4,34 @@ import { Schema } from '../../data/resource';
 import { ChatBedrockConverse } from "@langchain/aws";
 import { AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { calculatorTool, wellTableTool, convertPdfToJsonTool } from './toolBox';
-import { generateAmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
+// import { Pregel } from "@langchain/langgraph/pregel";
+
+import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
-// Define the tools for the agent to use
-const agentTools = [calculatorTool, wellTableTool, convertPdfToJsonTool];
+import { calculatorTool, wellTableTool, convertPdfToJsonTool, getTableDefinitionsTool, executeSQLQueryTool, plotTableFromToolResponseToolBuilder } from './toolBox';
+
+async function retryOperation<T>(
+    operation: () => Promise<T>,
+    retries: number = 3,
+    delay: number = 1000 // delay in milliseconds
+): Promise<T> {
+    let attempt = 0;
+    while (attempt < retries) {
+        try {
+            return await operation();
+        } catch (error) {
+            attempt++;
+            if (attempt >= retries) {
+                throw error;
+            }
+            console.warn(`Retrying... Attempt ${attempt}/${retries}`);
+            await new Promise(res => setTimeout(res, delay));
+        }
+    }
+    // Fallback, should not be reached
+    throw new Error("Operation failed after maximum retries");
+}
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
 
@@ -18,66 +40,74 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     // console.log('Amplify env: ', env)
     // console.log('process.env: ', process.env)
 
-    const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
+    // const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
+
 
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
     if (!('sub' in event.identity)) throw new Error("Event does not contain user");
 
+    const amplifyClientWrapper = new AmplifyClientWrapper({
+        chatSessionId: event.arguments.chatSessionId,
+        env: process.env
+    })
+
+    const agentTools = [
+        calculatorTool,
+        wellTableTool,
+        convertPdfToJsonTool,
+        getTableDefinitionsTool,
+        executeSQLQueryTool,
+        plotTableFromToolResponseToolBuilder(amplifyClientWrapper)
+    ];
+
     try {
         console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
-        const messages = await amplifyClientWrapper.getChatMessageHistory({
-            chatSessionId: event.arguments.chatSessionId,
+        await amplifyClientWrapper.getChatMessageHistory({
             latestHumanMessageText: event.arguments.input
         })
 
-        console.log("mesages in langchain form: ", messages)
+        // console.log("mesages in langchain form: ", amplifyClientWrapper.chatMessages)
 
         const agentModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
             temperature: 0
         });
 
-        const agent = createReactAgent({
+        // const agent2 = createReactAgent({
+        //     llm: agentModel,
+        //     tools: agentTools,
+        // });
+
+
+        //Add retry to the agent
+        const agent = await retryOperation(async () => createReactAgent({
             llm: agentModel,
             tools: agentTools,
-        });
+        }));
+
+        // agent.nodes['agent'] = langchainNodeWithRetry(agent.nodes['agent'], 3, 1000);
 
         const input = {
-            messages: messages,
+            messages: amplifyClientWrapper.chatMessages,
         }
-
-
-        // await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-        //     query: publishResponseStreamChunk,
-        //     variables: {
-        //         chatSessionId: event.arguments.chatSessionId,
-        //         chunk: "Test data. "
-        //     }
-        // })
-        // await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-        //     query: publishResponseStreamChunk,
-        //     variables: {
-        //         chatSessionId: event.arguments.chatSessionId,
-        //         chunk: "Test data 2. "
-        //     }
-        // })
 
         // https://js.langchain.com/v0.2/docs/how_to/chat_streaming/#stream-events
         // https://js.langchain.com/v0.2/docs/how_to/streaming/#using-stream-events
-        const stream = await agent.streamEvents(input, { version: "v2" });
+        const stream = agent.streamEvents(input, { version: "v2" });
 
+        console.log('Listening for stream events')
         for await (const streamEvent of stream) {
             // console.log(`${JSON.stringify(streamEvent, null, 2)}\n---`);
 
-            if (streamEvent.event === "on_chat_model_stream"){
+            if (streamEvent.event === "on_chat_model_stream") {
                 // console.log('Message Chunk: ', streamEvent.data.chunk)
 
                 const streamChunk = streamEvent.data.chunk as AIMessageChunk
-                
+
                 // const chunkContent = streamEvent.data.chunk.kwargs.content
                 const chunkContent = getLangChainMessageTextContent(streamChunk)
-                console.log("chunkContent: ", chunkContent)
+                // console.log("chunkContent: ", chunkContent)
                 if (chunkContent) {
                     await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
                         query: publishResponseStreamChunk,
@@ -86,11 +116,11 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                             chunk: chunkContent
                         }
                     })
-                }                
-                
+                }
+
             } else if (streamEvent.event === 'on_tool_end') {
                 const streamChunk = streamEvent.data.output as ToolMessage
-                console.log('Tool Output: ', streamChunk)
+                // console.log('Tool Output: ', streamChunk)
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
                     owner: event.identity.sub,
@@ -100,16 +130,15 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             } else if (streamEvent.event === "on_chat_model_end") { //When there is a full response from the chat model
                 // console.log('Message Output Chunk: ', streamEvent.data.output)
                 const streamChunk = streamEvent.data.output as AIMessageChunk
-                console.log('Message Output Chunk as AIMessageChunk: ', streamChunk)
+                // console.log('Message Output Chunk as AIMessageChunk: ', streamChunk)
 
                 if (!streamChunk) throw new Error("No output chunk found")
-                const streamChunkAIMessage = new AIMessage({ 
-                    content: streamChunk.content, 
+                const streamChunkAIMessage = new AIMessage({
+                    content: streamChunk.content,
                     tool_calls: streamChunk.tool_calls
                 })
 
                 // console.log('Publishing AI Message: ', streamChunkAIMessage, '. Content: ', streamChunkAIMessage.content)
-
 
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
@@ -121,34 +150,6 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
         }
 
-        
-        // agent.streamEvents
-
-        // for await (
-        //     const chunk of await agent.stream(input, {
-        //         streamMode: "values",
-        //     })
-        // ) {
-        //     const newMessage: BaseMessage = chunk.messages[chunk.messages.length - 1];
-
-        //     if (!(newMessage instanceof HumanMessage)) {
-        //         console.log('new message: ', newMessage)
-                
-
-        //         console.log('publishMessageStreamChunkResponse: ', publishMessageStreamChunkResponse)
-
-                // await amplifyClientWrapper.publishMessage({
-                //     chatSessionId: event.arguments.chatSessionId,
-                //     owner: event.identity.sub,
-                //     message: newMessage
-                // })
-
-
-
-
-        //     }
-
-        // }
         return "Invocation Successful!";
 
     } catch (error) {

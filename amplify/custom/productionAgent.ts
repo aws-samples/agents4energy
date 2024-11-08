@@ -1,27 +1,45 @@
 
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib'
-import * as iam from 'aws-cdk-lib/aws-iam';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
+import {
+    aws_bedrock as bedrock,
+    aws_iam as iam,
+    aws_lambda as lambda,
+    aws_stepfunctions as sfn,
+    aws_stepfunctions_tasks as sfnTasks,
+    aws_logs as logs,
+    aws_athena as athena,
+    aws_rds as rds,
+    aws_ec2 as ec2,
+    aws_s3 as s3,
+    custom_resources as cr
+} from 'aws-cdk-lib';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
-import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
-import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-import * as logs from 'aws-cdk-lib/aws-logs';
+
+
+import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
+
+import { bedrock as cdkLabsBedrock } from "@cdklabs/generative-ai-cdk-constructs";
 
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CfnApplication } from 'aws-cdk-lib/aws-sam';
 
+const defaultProdDatabaseName = 'proddb'
+
 interface ProductionAgentProps {
-    s3BucketName: string,
+    vpc: ec2.Vpc,
+    s3Bucket: s3.IBucket,
+
 }
 
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    // const rootDir = path.resolve(__dirname, '..');
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
-
     if (!rootStack) throw new Error('Root stack not found')
-    
+
 
     // Lambda function to apply a promp to a pdf file
     const queryReportsLambdaRole = new iam.Role(scope, 'LambdaExecutionRole', {
@@ -42,13 +60,13 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                     new iam.PolicyStatement({
                         actions: ["s3:GetObject"],
                         resources: [
-                            `arn:aws:s3:::${props.s3BucketName}/*`
+                            `arn:aws:s3:::${props.s3Bucket.bucketName}/*`
                         ],
                     }),
                     new iam.PolicyStatement({
                         actions: ["s3:ListBucket"],
                         resources: [
-                            `arn:aws:s3:::${props.s3BucketName}`
+                            `arn:aws:s3:::${props.s3Bucket.bucketName}`
                         ],
                     }),
                 ]
@@ -79,7 +97,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const ghostScriptLayer = lambda.LayerVersion.fromLayerVersionArn(scope, 'GhostScriptLayerVersion', ghostScriptLayerArn)
 
     // How AWS Amplify creates lambda functions: https://github.com/aws-amplify/amplify-backend/blob/d8692b0c96584fb699e892183ae68fe302740680/packages/backend-function/src/factory.ts#L368
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const queryReportImageLambda = new NodejsFunction(scope, 'QueryReportImagesTs', {
         runtime: lambda.Runtime.NODEJS_20_X,
         entry: path.join(__dirname, '..', 'functions', 'getInfoFromPdf', 'index.ts'),
@@ -96,7 +113,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         memorySize: 3000,
         role: queryReportsLambdaRole,
         environment: {
-            'DATA_BUCKET_NAME': props.s3BucketName,
+            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
             // 'MODEL_ID': 'anthropic.claude-3-sonnet-20240229-v1:0',
             'MODEL_ID': 'anthropic.claude-3-haiku-20240307-v1:0',
         },
@@ -119,7 +136,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         memorySize: 3000,
         role: queryReportsLambdaRole,
         environment: {
-            'DATA_BUCKET_NAME': props.s3BucketName,
+            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
         },
         layers: [imageMagickLayer, ghostScriptLayer]
     });
@@ -142,14 +159,14 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 service: 's3',
                 action: 'listObjectsV2',
                 parameters: {
-                    Bucket: props.s3BucketName,
+                    Bucket: props.s3Bucket.bucketName,
                     Prefix: sfn.JsonPath.stringAt('$.s3Prefix'),
 
                 },
                 iamAction: 's3:ListBucket',
                 iamResources: [
-                    `arn:aws:s3:::${props.s3BucketName}`,
-                    `arn:aws:s3:::${props.s3BucketName}/*`
+                    `arn:aws:s3:::${props.s3Bucket.bucketName}`,
+                    `arn:aws:s3:::${props.s3Bucket.bucketName}/*`
                 ],
                 resultPath: '$.s3Result',
 
@@ -188,11 +205,281 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ),
     });
 
+    //https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
+    const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
+        engine: rds.DatabaseClusterEngine.auroraPostgres({
+            version: rds.AuroraPostgresEngineVersion.VER_16_4,
+        }),
+        defaultDatabaseName: defaultProdDatabaseName,
+        enableDataApi: true,
+        writer: rds.ClusterInstance.serverlessV2('writer'),
+        serverlessV2MinCapacity: 0.5,
+        serverlessV2MaxCapacity: 2,
+        vpcSubnets: {
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
+        vpc: props.vpc,
+        port: 5432,
+        removalPolicy: cdk.RemovalPolicy.DESTROY
+    });
+    const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
+
+    // //Make the subnets automatically delete.
+    // hydrocarbonProductionDb.vpcSubnets!.subnets!.forEach(subnet => {
+    //     subnet.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
+    // });
+
+
+    // //This serverless aurora cluster will store hydrocarbon production pressures and volume
+    // // const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'A4E-HydrocarbonProdDb-1', {
+    // const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
+    //     engine: rds.DatabaseClusterEngine.auroraPostgres({
+    //         version: rds.AuroraPostgresEngineVersion.VER_16_4,
+    //     }),
+
+    //     // scaling: {
+    //     //     autoPause: cdk.Duration.minutes(300), // default is to pause after 5 minutes
+    //     //     minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
+    //     //     maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
+    //     // },
+    //     enableDataApi: true,
+    //     defaultDatabaseName: defaultProdDatabaseName, // optional: create a database named "mydb"
+    //     // credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
+    //     //     secretName: `a4e-proddb-credentials`
+    //     // }),
+    //     vpc: props.vpc,
+    //     vpcSubnets: {
+    //         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+    //     },
+    //     removalPolicy: cdk.RemovalPolicy.DESTROY,
+    // });
+
+    // //Create an inbound rule for the db's security group which allows inbound traffic from the vpc
+    // hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
+    //     ec2.Peer.ipv4(props.vpc.vpcCidrBlock),
+    //     ec2.Port.tcp(5432),
+    //     'Allow inbound traffic from VPC'
+    // );
+
+    //Allow inbound traffic from the default SG in the VPC
+    hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
+        ec2.Peer.securityGroupId(props.vpc.vpcDefaultSecurityGroup),
+        ec2.Port.tcp(5432),
+        'Allow inbound traffic from default SG'
+    );
+
+    const athenaWorkgroup = new athena.CfnWorkGroup(scope, 'FedQueryWorkgroup', {
+        name: `${rootStack.stackName}-fed_query_workgroup`.slice(-64),
+        description: 'Workgroup for querying federated data sources',
+        recursiveDeleteOption: true,
+        workGroupConfiguration: {
+            resultConfiguration: {
+                outputLocation: `s3://${props.s3Bucket.bucketName}/athena_query_results/`,
+            },
+        },
+    });
+
+    // Create the Postgres JDBC connector for Amazon Athena Federated Queries
+    const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
+    
+    const postgressConnectorLambdaFunctionName = `query-postgres-${rootStack.stackName.slice(0,40)}`
+    const prodDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
+        location: {
+            applicationId: `arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaPostgreSQLConnector`,
+            semanticVersion: `2024.39.1`
+        },
+        parameters: {
+            DefaultConnectionString: jdbcConnectionString,
+            LambdaFunctionName: postgressConnectorLambdaFunctionName,
+            SecretNamePrefix: `A4E`,
+            SpillBucket: props.s3Bucket.bucketName,
+            SpillPrefix: `athena-spill/${rootStack.stackName}`,
+            SecurityGroupIds: props.vpc.vpcDefaultSecurityGroup,
+            SubnetIds: props.vpc.privateSubnets.map(subnet => subnet.subnetId).join(',')
+        }
+    });
+
+    //Create an athena datasource for postgres databases
+    const athenaPostgresCatalog = new athena.CfnDataCatalog(scope, 'PostgresAthenaDataSource', {
+        name: `postgres_sample_${rootStack.stackName.slice(-3)}`,
+        type: 'LAMBDA',
+        description: 'Athena data source for postgres',
+        parameters: {
+            'function': `arn:aws:lambda:${rootStack.region}:${rootStack.account}:function:${postgressConnectorLambdaFunctionName}`
+        },
+    });
+
+    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefBedrockKnoledgeBase", {
+        vpc: props.vpc,
+        bucket: props.s3Bucket
+    })
+
+    const productionAgentTableDefDataSource = new bedrock.CfnDataSource(scope, 'sqlTableDefinitions', {
+        name: "sqlTableDefinitions",
+        dataSourceConfiguration: {
+            type: 'S3',
+            s3Configuration: {
+                bucketArn: props.s3Bucket.bucketArn,
+                inclusionPrefixes: ['production-agent/table-definitions/']
+            }
+        },
+        knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
+    })
+
+    //////////////////////////////
+    //// Configuration Assets ////
+    //////////////////////////////
+
+    //TODO - Maker sure this correctly loads the table deffs in s3
+    const configureProdDbFunction = new NodejsFunction(scope, 'configureProdDbFunction', {
+        runtime: lambda.Runtime.NODEJS_LATEST,
+        entry: path.join(__dirname, '..', 'functions', 'configureProdDb', 'index.ts'),
+        timeout: cdk.Duration.seconds(300),
+        environment: {
+            CLUSTER_ARN: hydrocarbonProductionDb.clusterArn,
+            SECRET_ARN: hydrocarbonProductionDb.secret!.secretArn,
+            DATABASE_NAME: defaultProdDatabaseName,
+            ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
+            ATHENA_CATALOG_NAME: athenaPostgresCatalog.name,
+            S3_BUCKET_NAME: props.s3Bucket.bucketName,
+            ATHENA_SAMPLE_DATA_SOURCE_NAME: athenaPostgresCatalog.name
+        },
+    });
+
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            'rds-data:ExecuteStatement',
+        ],
+        resources: [`arn:aws:rds:${rootStack.region}:${rootStack.account}:*`],
+        conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+            'StringEquals': {
+                'aws:ResourceTag/rootStackName': rootStack.stackName
+            }
+        }
+    }))
+
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            'secretsmanager:GetSecretValue',
+        ],
+        resources: [`arn:aws:secretsmanager:${rootStack.region}:${rootStack.account}:secret:*`],
+        conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+            'StringEquals': {
+                'aws:ResourceTag/rootStackName': rootStack.stackName
+            }
+        }
+    }))
+
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            'athena:StartQueryExecution',
+            'athena:GetQueryExecution',
+            'athena:GetQueryResults',
+            'athena:GetDataCatalog'
+        ],
+        resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:*`],
+        conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+            'StringEquals': {
+                'aws:ResourceTag/rootStackName': rootStack.stackName
+            }
+        }
+    }))
+
+    //Allow the function to invoke the lambda used to connect Athena to the postgres db
+    configureProdDbFunction.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ["lambda:InvokeFunction"],
+          resources: [
+            // convertPdfToJsonFunction.functionArn,
+            `arn:aws:lambda:${rootStack.region}:${rootStack.account}:*`
+          ],
+          conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+            'StringEquals': {
+              'aws:ResourceTag/rootStackName': rootStack.stackName
+            }
+          }
+        }),
+      )
+
+    //Executing athena queries requires the caller have these permissions
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            "s3:GetBucketLocation",
+            "s3:GetObject",
+            "s3:ListBucket",
+            "s3:ListBucketMultipartUploads",
+            "s3:ListMultipartUploadParts",
+            "s3:AbortMultipartUpload",
+            "s3:PutObject",
+        ],
+        resources: [
+            props.s3Bucket.bucketArn,
+            props.s3Bucket.arnForObjects("*")
+        ],
+    }))
+
+
+
+    // Create a Custom Resource that invokes only if the dependencies change
+    const invokeConfigureProdDbFunctionServiceCall: cr.AwsSdkCall = {
+        service: 'Lambda',
+        action: 'invoke',
+        parameters: {
+            FunctionName: configureProdDbFunction.functionName,
+            Payload: JSON.stringify({}), // No need to pass an event
+            InvocationType: 'Event', // Call the lambda funciton asynchronously
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
+    }
+
+    const prodDbConfigurator = new cr.AwsCustomResource(scope, `configureProdDbAndExportTableDefs`, {
+        onCreate: invokeConfigureProdDbFunctionServiceCall,
+        onUpdate: invokeConfigureProdDbFunctionServiceCall,
+        policy: cr.AwsCustomResourcePolicy.fromStatements([
+            new iam.PolicyStatement({
+                actions: ['lambda:InvokeFunction'],
+                resources: [configureProdDbFunction.functionArn],
+            }),
+        ]),
+    });
+    prodDbConfigurator.node.addDependency(writerNode)
+
+    // Start the knowledge base ingestion job
+    //// https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/BedrockAgent.html#startIngestionJob-property
+    const startIngestionJobResourceCall: cr.AwsSdkCall = {
+        service: '@aws-sdk/client-bedrock-agent',
+        action: 'startIngestionJob',
+        parameters: {
+            dataSourceId: productionAgentTableDefDataSource.attrDataSourceId,
+            knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('startKbIngestion'),
+    }
+
+    const prodTableKbIngestionJobTrigger = new cr.AwsCustomResource(scope, `startKbIngestion1`, {
+        onCreate: startIngestionJobResourceCall,
+        // onUpdate: startIngestionJobResourceCall,
+        policy: cr.AwsCustomResourcePolicy.fromStatements([
+            new iam.PolicyStatement({
+                actions: ['bedrock:startIngestionJob'],
+                resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn],
+            }),
+        ]),
+    });
+    // prodTableKbIngestionJobTrigger.node.addDependency(productionAgentTableDefDataSource)
+    prodTableKbIngestionJobTrigger.node.addDependency(prodDbConfigurator)
+
+
     return {
         queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,
         imageMagickLayer: imageMagickLayer,
         ghostScriptLayer: ghostScriptLayer,
         getInfoFromPdfFunction: queryReportImageLambda,
-        convertPdfToJsonFunction: convertPdfToJsonFunction
+        convertPdfToJsonFunction: convertPdfToJsonFunction,
+        defaultProdDatabaseName: defaultProdDatabaseName,
+        hydrocarbonProductionDb: hydrocarbonProductionDb,
+        sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
+        athenaWorkgroup: athenaWorkgroup,
+        athenaPostgresCatalog: athenaPostgresCatalog
     };
 }
