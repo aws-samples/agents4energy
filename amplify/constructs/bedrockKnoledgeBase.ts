@@ -425,7 +425,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
             }),
             new iam.PolicyStatement({
               actions: [
-                's3:*', //TODO scope this down
+                // 's3:*', //TODO scope this down
                 's3:ListBucket',
                 's3:GetObject'
               ],

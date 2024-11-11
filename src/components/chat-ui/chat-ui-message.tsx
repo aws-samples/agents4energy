@@ -155,13 +155,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   useEffect(() => {
     switch (messageContentCategory) {
       case 'tool_plot':
+        //TODO - Make oil green, gas red, water blue, ...
         const { chartData, columnNameFromQueryForXAxis, chartTitle } = JSON.parse(props.message.content) as {
           chartData: { [key: string]: (string | number)[] },
           columnNameFromQueryForXAxis: string,
           chartTitle: string | undefined
         }
-
-
 
         const datasets = Object.keys(chartData)
           .filter(key => key !== columnNameFromQueryForXAxis)

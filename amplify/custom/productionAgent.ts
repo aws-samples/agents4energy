@@ -12,6 +12,8 @@ import {
     aws_rds as rds,
     aws_ec2 as ec2,
     aws_s3 as s3,
+    aws_events as events,
+    aws_events_targets as eventsTargets,
     custom_resources as cr
 } from 'aws-cdk-lib';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -19,7 +21,7 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 
 import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
 
-import { bedrock as cdkLabsBedrock } from "@cdklabs/generative-ai-cdk-constructs";
+// import { bedrock as cdkLabsBedrock } from "@cdklabs/generative-ai-cdk-constructs";
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -30,7 +32,7 @@ const defaultProdDatabaseName = 'proddb'
 interface ProductionAgentProps {
     vpc: ec2.Vpc,
     s3Bucket: s3.IBucket,
-
+    // lambdaLlmAgentRole: iam.IRole
 }
 
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
@@ -42,7 +44,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
 
     // Lambda function to apply a promp to a pdf file
-    const queryReportsLambdaRole = new iam.Role(scope, 'LambdaExecutionRole', {
+    const lambdaLlmAgentRole = new iam.Role(scope, 'LambdaExecutionRole', {
         assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
         managedPolicies: [
             iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
@@ -51,10 +53,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             'BedrockInvocationPolicy': new iam.PolicyDocument({
                 statements: [
                     new iam.PolicyStatement({
-                        actions: ["bedrock:InvokeModel"],
+                        actions: ["bedrock:InvokeModel*"],
                         resources: [
-                            `arn:aws:bedrock:${rootStack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
-                            `arn:aws:bedrock:${rootStack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`
+                            `arn:aws:bedrock:${rootStack.region}:${rootStack.account}:inference-profile/*`,
+                            `arn:aws:bedrock:us-*::foundation-model/*`,
                         ],
                     }),
                     new iam.PolicyStatement({
@@ -96,6 +98,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const ghostScriptLayerArn = ghostScriptLayerStack.getAtt('Outputs.LayerVersion').toString()
     const ghostScriptLayer = lambda.LayerVersion.fromLayerVersionArn(scope, 'GhostScriptLayerVersion', ghostScriptLayerArn)
 
+
+
     // How AWS Amplify creates lambda functions: https://github.com/aws-amplify/amplify-backend/blob/d8692b0c96584fb699e892183ae68fe302740680/packages/backend-function/src/factory.ts#L368
     const queryReportImageLambda = new NodejsFunction(scope, 'QueryReportImagesTs', {
         runtime: lambda.Runtime.NODEJS_20_X,
@@ -111,35 +115,15 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
         timeout: cdk.Duration.minutes(15),
         memorySize: 3000,
-        role: queryReportsLambdaRole,
+        role: lambdaLlmAgentRole,
         environment: {
             'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
-            // 'MODEL_ID': 'anthropic.claude-3-sonnet-20240229-v1:0',
-            'MODEL_ID': 'anthropic.claude-3-haiku-20240307-v1:0',
+            // 'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
+            'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
         },
         layers: [imageMagickLayer, ghostScriptLayer]
     });
 
-    const convertPdfToJsonFunction = new NodejsFunction(scope, 'ConvertPdfToJsonFunction', {
-        runtime: lambda.Runtime.NODEJS_20_X,
-        entry: path.join(__dirname, '..', 'functions', 'convertPdfToJson', 'index.ts'),
-        bundling: {
-            format: OutputFormat.CJS,
-            loader: {
-                '.node': 'file',
-            },
-            bundleAwsSDK: true,
-            minify: true,
-            sourceMap: true,
-        },
-        timeout: cdk.Duration.minutes(15),
-        memorySize: 3000,
-        role: queryReportsLambdaRole,
-        environment: {
-            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
-        },
-        layers: [imageMagickLayer, ghostScriptLayer]
-    });
 
     // Create a Step Functions state machine
     const queryImagesStateMachine = new sfn.StateMachine(scope, 'QueryReportImagesStateMachine', {
@@ -204,6 +188,54 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 .next(new sfn.Succeed(scope, 'Succeed'))
         ),
     });
+
+    // // Now we'll create assets which convert all uploaded pdf files into a JSON file with the same information.
+    // const athenaDataSourceRule = new events.Rule(scope, 'AthenaDataSourceRule', {
+    //     eventPattern: {
+    //       source: ['aws.athena'],
+    //       detailType: ['AWS API Call via CloudTrail'],
+    //       detail: {
+    //         eventSource: ['athena.amazonaws.com'],
+    //         eventName: [
+    //           'CreateDataCatalog',
+    //           'UpdateDataCatalog'
+    //         ],
+    //         // You can add additional filters in the detail section if needed
+    //         requestParameters: {
+    //           tags: {
+    //             'AgentsForEnergy': ['true']
+    //           }
+    //         }
+    //       }
+    //     }
+    //   });
+
+
+    const convertPdfToJsonFunction = new NodejsFunction(scope, 'ConvertPdfToJsonFunction', {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        entry: path.join(__dirname, '..', 'functions', 'convertPdfToJson', 'index.ts'),
+        bundling: {
+            format: OutputFormat.CJS,
+            loader: {
+                '.node': 'file',
+            },
+            bundleAwsSDK: true,
+            minify: true,
+            sourceMap: true,
+        },
+        timeout: cdk.Duration.minutes(15),
+        memorySize: 3000,
+        role: lambdaLlmAgentRole,
+        environment: {
+            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
+            // 'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
+            'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
+        },
+        layers: [imageMagickLayer, ghostScriptLayer]
+    });
+
+
+    //This event bridge rule triggers when 
 
     //https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
     const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
@@ -281,8 +313,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
     const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
-    
-    const postgressConnectorLambdaFunctionName = `query-postgres-${rootStack.stackName.slice(0,40)}`
+
+    const postgressConnectorLambdaFunctionName = `query-postgres-${rootStack.stackName.slice(0, 40)}`
     const prodDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
         location: {
             applicationId: `arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaPostgreSQLConnector`,
@@ -330,7 +362,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //// Configuration Assets ////
     //////////////////////////////
 
-    //TODO - Maker sure this correctly loads the table deffs in s3
     const configureProdDbFunction = new NodejsFunction(scope, 'configureProdDbFunction', {
         runtime: lambda.Runtime.NODEJS_LATEST,
         entry: path.join(__dirname, '..', 'functions', 'configureProdDb', 'index.ts'),
@@ -340,9 +371,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             SECRET_ARN: hydrocarbonProductionDb.secret!.secretArn,
             DATABASE_NAME: defaultProdDatabaseName,
             ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
-            ATHENA_CATALOG_NAME: athenaPostgresCatalog.name,
             S3_BUCKET_NAME: props.s3Bucket.bucketName,
-            ATHENA_SAMPLE_DATA_SOURCE_NAME: athenaPostgresCatalog.name
+            ATHENA_SAMPLE_DATA_SOURCE_NAME: athenaPostgresCatalog.name,
+            TABLE_DEF_KB_ID: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            TABLE_DEF_KB_DS_ID: productionAgentTableDefDataSource.attrDataSourceId,
         },
     });
 
@@ -370,36 +402,43 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }
     }))
 
-    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-        actions: [
-            'athena:StartQueryExecution',
-            'athena:GetQueryExecution',
-            'athena:GetQueryResults',
-            'athena:GetDataCatalog'
-        ],
-        resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:*`],
-        conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-            'StringEquals': {
-                'aws:ResourceTag/rootStackName': rootStack.stackName
+    configureProdDbFunction.addToRolePolicy(
+        new cdk.aws_iam.PolicyStatement({
+            actions: [
+                'athena:StartQueryExecution',
+                'athena:GetQueryExecution',
+                'athena:GetQueryResults',
+            ],
+            resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
+        })
+    )
+
+    configureProdDbFunction.addToRolePolicy(
+        new cdk.aws_iam.PolicyStatement({
+            actions: [
+                'athena:GetDataCatalog'
+            ],
+            resources: [`arn:aws:athena:*:*:datacatalog/*`], // This function must be able to invoke data catalogs in other accoutns.
+            conditions: { // The data catalog must be tagged with `AgentsForEnergy: true` in order to be invoked.
+                'StringEquals': {
+                    'aws:ResourceTag/AgentsForEnergy': 'true'
+                }
             }
-        }
-    }))
+        })
+    )
 
     //Allow the function to invoke the lambda used to connect Athena to the postgres db
     configureProdDbFunction.addToRolePolicy(
         new iam.PolicyStatement({
-          actions: ["lambda:InvokeFunction"],
-          resources: [
-            // convertPdfToJsonFunction.functionArn,
-            `arn:aws:lambda:${rootStack.region}:${rootStack.account}:*`
-          ],
-          conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-            'StringEquals': {
-              'aws:ResourceTag/rootStackName': rootStack.stackName
+            actions: ["lambda:InvokeFunction"],
+            resources: [`arn:aws:lambda:*:*:*`], //This function must be able to invoke lambda functions in other accounts so to query Athena federated data sources in other accounts.
+            conditions: { //The lambda must be tagged with `AgentsForEnergy: true` in order to be invoked.
+                'StringEquals': {
+                    'aws:ResourceTag/AgentsForEnergy': 'true'
+                }
             }
-          }
         }),
-      )
+    )
 
     //Executing athena queries requires the caller have these permissions
     configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
@@ -418,7 +457,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ],
     }))
 
-
+    configureProdDbFunction.addToRolePolicy(
+        new iam.PolicyStatement({
+            actions: ['bedrock:startIngestionJob'],
+            resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn],
+        })
+    )
 
     // Create a Custom Resource that invokes only if the dependencies change
     const invokeConfigureProdDbFunctionServiceCall: cr.AwsSdkCall = {
@@ -468,6 +512,59 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
     // prodTableKbIngestionJobTrigger.node.addDependency(productionAgentTableDefDataSource)
     prodTableKbIngestionJobTrigger.node.addDependency(prodDbConfigurator)
+
+
+    //This function will get table definitions from any athena data source with the AgentsForEnergy tag, upload them to s3, and start a knoledge base ingestion job to present them to an agent 
+    const recordTableDefAndStarkKBIngestionJob = new NodejsFunction(scope, 'RecordTableDefAndStartKbIngestionJob', {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        entry: path.join(__dirname, '..', 'functions', 'recordTableDefAndStartKBIngestion', 'index.ts'),
+        bundling: {
+            format: OutputFormat.CJS,
+            loader: {
+                '.node': 'file',
+            },
+            bundleAwsSDK: true,
+            minify: true,
+            sourceMap: true,
+        },
+        timeout: cdk.Duration.minutes(15),
+        // memorySize: 3000,
+        role: lambdaLlmAgentRole,
+        environment: {
+            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
+            // 'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
+            'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
+        }
+    });
+
+    // Now we'll create assets which update the table definition knoledge base when an athena data source is updated
+    const athenaDataSourceRule = new events.Rule(scope, 'AthenaDataSourceRule', {
+        eventPattern: {
+            source: ['aws.athena'],
+            detailType: ['AWS API Call via CloudTrail'],
+            detail: {
+                eventSource: ['athena.amazonaws.com'],
+                eventName: [
+                    'CreateDataCatalog',
+                    'UpdateDataCatalog'
+                ],
+                // You can add additional filters in the detail section if needed
+                requestParameters: {
+                    tags: {
+                        'AgentsForEnergy': ['true']
+                    }
+                }
+            }
+        }
+    });
+
+    recordTableDefAndStarkKBIngestionJob.addPermission('EventBridgeInvoke', {
+        principal: new iam.ServicePrincipal('events.amazonaws.com'),
+        action: 'lambda:InvokeFunction',
+        sourceArn: athenaDataSourceRule.ruleArn,
+      });
+
+    athenaDataSourceRule.addTarget(new eventsTargets.LambdaFunction(recordTableDefAndStarkKBIngestionJob));
 
 
     return {

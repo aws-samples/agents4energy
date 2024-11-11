@@ -24,6 +24,7 @@ import { AppConfigurator } from './custom/appConfigurator'
 const resourceTags = {
   Project: 'agents-for-energy',
   Environment: 'dev',
+  AgentsForEnergy: 'true'
 }
 
 const backend = defineBackend({
@@ -206,7 +207,8 @@ const {
 
 } = productionAgentBuilder(customStack, {
   vpc: vpc,
-  s3Bucket: uploadToS3Deployment.deployedBucket // This causes the assets here to not deploy until the s3 upload is complete.
+  s3Bucket: uploadToS3Deployment.deployedBucket, // This causes the assets here to not deploy until the s3 upload is complete.
+  // lambdaLlmAgentRole: backend.productionAgentFunction.resources.lambda.role!
 })
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
@@ -219,12 +221,14 @@ backend.productionAgentFunction.addEnvironment('ATHENA_CATALOG_NAME', athenaPost
 
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
-    actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+    actions: ["bedrock:InvokeModel*"],
     resources: [
-      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
-      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
-      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0`,
-      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.*`,
+      `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:inference-profile/*`,
+      `arn:aws:bedrock:us-*::foundation-model/*`,
+      // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
+      // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
+      // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0`,
+      // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.*`,
     ],
   })
 )
@@ -269,39 +273,40 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
 backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["lambda:InvokeFunction"],
-    resources: [
-      // convertPdfToJsonFunction.functionArn,
-      `arn:aws:lambda:${rootStack.region}:${rootStack.account}:*`
-    ],
-    conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
+    resources: [`arn:aws:lambda:*:*:*`], //This function must be able to invoke lambda functions in other accounts so to query Athena federated data sources in other accounts.
+    conditions: { //The lambda must be tagged with `AgentsForEnergy: true` in order to be invoked.
       'StringEquals': {
-        'aws:ResourceTag/rootStackName': rootStack.stackName
+        'aws:ResourceTag/AgentsForEnergy': 'true'
       }
     }
   }),
 )
 
-backend.productionAgentFunction.resources.lambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-  actions: [
-    'athena:StartQueryExecution',
-    'athena:GetQueryExecution',
-    'athena:GetQueryResults',
-  ],
-  resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
-}))
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new cdk.aws_iam.PolicyStatement({
+    actions: [
+      'athena:StartQueryExecution',
+      'athena:GetQueryExecution',
+      'athena:GetQueryResults',
+    ],
+    resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
+  })
+)
 
 
-backend.productionAgentFunction.resources.lambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-  actions: [
-    'athena:GetDataCatalog'
-  ],
-  resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:datacatalog/*`],
-  conditions: { //This only allows the configurator function to modify resources which are part of the app being deployed.
-    'StringEquals': {
-      'aws:ResourceTag/rootStackName': rootStack.stackName
+backend.productionAgentFunction.resources.lambda.addToRolePolicy(
+  new cdk.aws_iam.PolicyStatement({
+    actions: [
+      'athena:GetDataCatalog'
+    ],
+    resources: [`arn:aws:athena:*:*:datacatalog/*`], // This function must be able to invoke data catalogs in other accoutns.
+    conditions: { // The data catalog must be tagged with `AgentsForEnergy: true` in order to be invoked.
+      'StringEquals': {
+        'aws:ResourceTag/AgentsForEnergy': 'true'
+      }
     }
-  }
-}))
+  })
+)
 
 //Create data sources and resolvers for the lambdas created in the production agent stack
 const convertPdfToImageDS = backend.data.addLambdaDataSource(

@@ -46,6 +46,7 @@
     "@aws-appsync/utils": "^1.9.0",
     "@aws-sdk/client-appsync": "^3.670.0",
     "@aws-sdk/client-athena": "^3.679.0",
+    "@aws-sdk/client-bedrock-agent": "^3.687.0",
     "@aws-sdk/client-bedrock-agent-runtime": "^3.670.0",
     "@aws-sdk/client-rds-data": "^3.679.0",
     "@aws-sdk/client-sfn": "^3.670.0",
