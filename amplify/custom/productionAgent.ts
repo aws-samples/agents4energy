@@ -531,9 +531,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         // memorySize: 3000,
         role: lambdaLlmAgentRole,
         environment: {
-            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
-            // 'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
-            'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
+            ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
+            S3_BUCKET_NAME: props.s3Bucket.bucketName,
+            TABLE_DEF_KB_ID: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            TABLE_DEF_KB_DS_ID: productionAgentTableDefDataSource.attrDataSourceId,
         }
     });
 
@@ -546,7 +547,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 eventSource: ['athena.amazonaws.com'],
                 eventName: [
                     'CreateDataCatalog',
-                    'UpdateDataCatalog'
+                    'UpdateDataCatalog',
+                    'TagResource',
+                    'UntagResource',
                 ],
                 // You can add additional filters in the detail section if needed
                 requestParameters: {
