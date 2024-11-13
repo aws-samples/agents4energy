@@ -67,6 +67,7 @@ export function transformColumnOfAthenaQueryToList(props: {queryResult: GetQuery
 
 
 export async function uploadStringToS3(props: {
+    bucket?: string,
     key: string,
     content: string,
     contentType?: string
@@ -76,7 +77,7 @@ export async function uploadStringToS3(props: {
 
     try {
         const command = new PutObjectCommand({
-            Bucket: process.env.S3_BUCKET_NAME,
+            Bucket: props.bucket || process.env.S3_BUCKET_NAME,
             Key: props.key,
             Body: props.content,
             ContentType: props.contentType || "text/plain",

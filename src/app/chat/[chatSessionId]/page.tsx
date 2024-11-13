@@ -147,7 +147,6 @@ const getAgentAliasId = async (agentId: string) => {
 }
 
 const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr2: Array<Schema["ChatMessage"]["type"]>) => {
-    // const combinedMessages = [...new Set([...arr1, ...arr2])] //TODO find out why this does not remove duplicate messages
     const combinedMessages = [...arr1, ...arr2]
     const uniqueMessages = combinedMessages.filter((message, index, self) =>
         index === self.findIndex((p) => p.id === message.id)

@@ -176,7 +176,6 @@ export class AppConfigurator extends Construct {
     }
 
     // Create a Custom Resource that invokes the Step Function on every stack update
-    // TODO- make this trigger with an event bridge stack complete event instead of this custom reasource.
     // new cr.AwsCustomResource(this, `TriggerStepFunction-${Date.now().toString().slice(-5)}`, {
       new cr.AwsCustomResource(this, `TriggerStepFunction`, {
       onCreate: invokeStepFunctionSDKCall,

@@ -66,8 +66,8 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     // this.embeddingModelArn = `arn:aws:bedrock:${rootStack.region}::foundation-model/cohere.embed-multilingual-v3` //512 token window
     this.embeddingModelArn = `arn:aws:bedrock:${rootStack.region}::foundation-model/amazon.titan-embed-text-v2:0` //8k token window
 
-    // const vectorStorePostgresCluster = new rds.DatabaseCluster(scope, `VectorStoreAuroraCluster-${id}`, {
-    const vectorStorePostgresCluster = new rds.DatabaseCluster(scope, 'VectorStoreAuroraCluster-1', {
+    const vectorStorePostgresCluster = new rds.DatabaseCluster(scope, `VectorStoreAuroraCluster-${id}`, {
+    // const vectorStorePostgresCluster = new rds.DatabaseCluster(scope, 'VectorStoreAuroraCluster-1', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
         version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
@@ -148,7 +148,6 @@ export class AuroraBedrockKnoledgeBase extends Construct {
             }),
             new iam.PolicyStatement({
               actions: [
-                // 's3:*', //TODO scope this down
                 's3:ListBucket',
                 's3:GetObject'
               ],

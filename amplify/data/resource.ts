@@ -58,8 +58,6 @@ const schema = a.schema({
       })
     })
     .authorization((allow) => [allow.owner(), allow.authenticated().to(['read'])]), //The allow.authenticated() allows other users to view chat sessions.
-  // TODO: let authenticated only read
-
   ChatMessage: a
     .model({
       chatSessionId: a.id(),
@@ -143,12 +141,12 @@ const schema = a.schema({
     })
     .returns(a.json()),
 
-  convertPdfToJson: a
-    .query()
-    .arguments({
-      s3Key: a.string().required()
-    })
-    .returns(a.json()),
+  // convertPdfToJson: a
+  //   .query()
+  //   .arguments({
+  //     s3Key: a.string().required()
+  //   })
+  //   .returns(a.json()),
 
   //These assets enable token level streaming from the model
   ResponseStreamChunk: a

@@ -12,6 +12,7 @@ import {
     aws_rds as rds,
     aws_ec2 as ec2,
     aws_s3 as s3,
+    aws_s3_notifications as s3n,
     aws_glue as glue,
     aws_events as events,
     aws_events_targets as eventsTargets,
@@ -212,9 +213,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //   });
 
 
-    const convertPdfToJsonFunction = new NodejsFunction(scope, 'ConvertPdfToJsonFunction', {
+    const convertPdfToYamlFunction = new NodejsFunction(scope, 'ConvertPdfToYamlFunction', {
         runtime: lambda.Runtime.NODEJS_20_X,
-        entry: path.join(__dirname, '..', 'functions', 'convertPdfToJson', 'index.ts'),
+        entry: path.join(__dirname, '..', 'functions', 'convertPdfToYaml', 'index.ts'),
         bundling: {
             format: OutputFormat.CJS,
             loader: {
@@ -229,11 +230,23 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         role: lambdaLlmAgentRole,
         environment: {
             'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
-            // 'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
-            'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
+            'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
+            // 'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
         },
         layers: [imageMagickLayer, ghostScriptLayer]
     });
+
+    // This causes a circular dependency error
+    // //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
+    // // Add S3 event notification
+    // props.s3Bucket.addEventNotification(
+    //     s3.EventType.OBJECT_CREATED, // Triggers on file upload
+    //     new s3n.LambdaDestination(convertPdfToYamlFunction),
+    //     {
+    //         prefix: 'production-agent/well-files/', // Only trigger for files in this prefix
+    //         suffix: '.pdf' // Only trigger for files with this extension
+    //     }
+    // );
 
 
     //This event bridge rule triggers when 
@@ -256,43 +269,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         removalPolicy: cdk.RemovalPolicy.DESTROY
     });
     const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
-
-    // //Make the subnets automatically delete.
-    // hydrocarbonProductionDb.vpcSubnets!.subnets!.forEach(subnet => {
-    //     subnet.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
-    // });
-
-
-    // //This serverless aurora cluster will store hydrocarbon production pressures and volume
-    // // const hydrocarbonProductionDb = new rds.ServerlessCluster(scope, 'A4E-HydrocarbonProdDb-1', {
-    // const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
-    //     engine: rds.DatabaseClusterEngine.auroraPostgres({
-    //         version: rds.AuroraPostgresEngineVersion.VER_16_4,
-    //     }),
-
-    //     // scaling: {
-    //     //     autoPause: cdk.Duration.minutes(300), // default is to pause after 5 minutes
-    //     //     minCapacity: rds.AuroraCapacityUnit.ACU_2, // minimum of 2 Aurora capacity units
-    //     //     maxCapacity: rds.AuroraCapacityUnit.ACU_16, // maximum of 16 Aurora capacity units
-    //     // },
-    //     enableDataApi: true,
-    //     defaultDatabaseName: defaultProdDatabaseName, // optional: create a database named "mydb"
-    //     // credentials: rds.Credentials.fromGeneratedSecret('clusteradmin', { // TODO: make a prefix for all a4e secrets
-    //     //     secretName: `a4e-proddb-credentials`
-    //     // }),
-    //     vpc: props.vpc,
-    //     vpcSubnets: {
-    //         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-    //     },
-    //     removalPolicy: cdk.RemovalPolicy.DESTROY,
-    // });
-
-    // //Create an inbound rule for the db's security group which allows inbound traffic from the vpc
-    // hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
-    //     ec2.Peer.ipv4(props.vpc.vpcCidrBlock),
-    //     ec2.Port.tcp(5432),
-    //     'Allow inbound traffic from VPC'
-    // );
 
     //Allow inbound traffic from the default SG in the VPC
     hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
@@ -428,61 +404,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         s3Bucket: props.s3Bucket
     })
 
-    // configureProdDbFunction.addToRolePolicy(
-    //     new cdk.aws_iam.PolicyStatement({
-    //         actions: [
-    //             'athena:StartQueryExecution',
-    //             'athena:GetQueryExecution',
-    //             'athena:GetQueryResults',
-    //         ],
-    //         resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
-    //     })
-    // )
-
-    // configureProdDbFunction.addToRolePolicy(
-    //     new cdk.aws_iam.PolicyStatement({
-    //         actions: [
-    //             'athena:GetDataCatalog'
-    //         ],
-    //         resources: [`arn:aws:athena:*:*:datacatalog/*`], // This function must be able to invoke data catalogs in other accoutns.
-    //         conditions: { // The data catalog must be tagged with `AgentsForEnergy: true` in order to be invoked.
-    //             'StringEquals': {
-    //                 'aws:ResourceTag/AgentsForEnergy': 'true'
-    //             }
-    //         }
-    //     })
-    // )
-
-    // //Allow the function to invoke the lambda used to connect Athena to the postgres db
-    // configureProdDbFunction.addToRolePolicy(
-    //     new iam.PolicyStatement({
-    //         actions: ["lambda:InvokeFunction"],
-    //         resources: [`arn:aws:lambda:*:*:*`], //This function must be able to invoke lambda functions in other accounts so to query Athena federated data sources in other accounts.
-    //         conditions: { //The lambda must be tagged with `AgentsForEnergy: true` in order to be invoked.
-    //             'StringEquals': {
-    //                 'aws:ResourceTag/AgentsForEnergy': 'true'
-    //             }
-    //         }
-    //     }),
-    // )
-
-    // //Executing athena queries requires the caller have these permissions
-    // configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-    //     actions: [
-    //         "s3:GetBucketLocation",
-    //         "s3:GetObject",
-    //         "s3:ListBucket",
-    //         "s3:ListBucketMultipartUploads",
-    //         "s3:ListMultipartUploadParts",
-    //         "s3:AbortMultipartUpload",
-    //         "s3:PutObject",
-    //     ],
-    //     resources: [
-    //         props.s3Bucket.bucketArn,
-    //         props.s3Bucket.arnForObjects("*")
-    //     ],
-    // }))
-
     configureProdDbFunction.addToRolePolicy(
         new iam.PolicyStatement({
             actions: ['bedrock:startIngestionJob'],
@@ -539,9 +460,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // prodTableKbIngestionJobTrigger.node.addDependency(productionAgentTableDefDataSource)
     prodTableKbIngestionJobTrigger.node.addDependency(prodDbConfigurator)
 
-
     // Create a Glue Database
-    const productionGlueDatabase = new glue.CfnDatabase(scope, 'ProdGlueDb1', { //TODO remove the 1
+    const productionGlueDatabase = new glue.CfnDatabase(scope, 'ProdGlueDb', {
         catalogId: rootStack.account,
         databaseName: `prod_db_${rootStack.stackName.slice(-3)}`,
         databaseInput: {
@@ -693,7 +613,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         imageMagickLayer: imageMagickLayer,
         ghostScriptLayer: ghostScriptLayer,
         getInfoFromPdfFunction: queryReportImageLambda,
-        convertPdfToJsonFunction: convertPdfToJsonFunction,
+        // convertPdfToJsonFunction: convertPdfToJsonFunction,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
         sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,

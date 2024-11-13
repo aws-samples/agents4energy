@@ -200,7 +200,7 @@ const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'tes
 const {
   queryImagesStateMachineArn,
   getInfoFromPdfFunction,
-  convertPdfToJsonFunction,
+  // convertPdfToJsonFunction,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
   sqlTableDefBedrockKnoledgeBase,
@@ -215,7 +215,7 @@ const {
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
-backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_JSON_LAMBDA_ARN', convertPdfToJsonFunction.functionArn)
+// backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_JSON_LAMBDA_ARN', convertPdfToJsonFunction.functionArn)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
 backend.productionAgentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', athenaWorkgroup.name)
 backend.productionAgentFunction.addEnvironment('DATABASE_NAME', defaultProdDatabaseName)
@@ -333,18 +333,18 @@ convertPdfToImageDS.createResolver(
   }
 )
 
-const convertPdfToJsonFunctionDS = backend.data.addLambdaDataSource(
-  'convertPdfToImagesFunctionDS',
-  convertPdfToJsonFunction
-)
+// const convertPdfToJsonFunctionDS = backend.data.addLambdaDataSource(
+//   'convertPdfToImagesFunctionDS',
+//   convertPdfToJsonFunction
+// )
 
-convertPdfToJsonFunctionDS.createResolver(
-  'convertPdfToJsonFunctionResolver',
-  {
-    typeName: 'Query',
-    fieldName: 'convertPdfToJson',
-  }
-)
+// convertPdfToJsonFunctionDS.createResolver(
+//   'convertPdfToJsonFunctionResolver',
+//   {
+//     typeName: 'Query',
+//     fieldName: 'convertPdfToJson',
+//   }
+// )
 
 // Create a stack with the resources to configure the app
 const configuratorStack = backend.createStack('configuratorStack')

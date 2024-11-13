@@ -233,9 +233,6 @@ const plotTableFromToolResponseSchema = z.object({
 export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
     async ({ columnNameFromQueryForXAxis, chartTitle }) => {
 
-        // // // Get the most recent set of chat messages, including tool messages created since the last user message
-        // await amplifyClientWrapper.getChatMessageHistory({}) //TODO - Push the messages directly to amplifyClientWrapper.chatMessages, instead of going through the api here. Better Performance.
-        
         console.log('Messages:\n', amplifyClientWrapper.chatMessages)
 
         const toolResponseMessages = amplifyClientWrapper.chatMessages.filter(
@@ -279,42 +276,42 @@ export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: Ampli
 );
 
 
-//////////////////////////////////////////
-/////////// PDF to JSON Tool /////////////
-//////////////////////////////////////////
+// //////////////////////////////////////////
+// /////////// PDF to JSON Tool /////////////
+// //////////////////////////////////////////
 
-const convertPdfToJsonSchema = z.object({
-    s3Key: z.string().describe("The S3 key of the PDF file to convert."),
-});
+// const convertPdfToJsonSchema = z.object({
+//     s3Key: z.string().describe("The S3 key of the PDF file to convert."),
+// });
 
-export const convertPdfToJsonTool = tool(
-    async ({ s3Key }) => {
-        const lambdaClient = new LambdaClient();
-        const params: InvokeCommandInput = {
-            FunctionName: env.CONVERT_PDF_TO_JSON_LAMBDA_ARN,
-            Payload: JSON.stringify({ arguments: { s3Key: s3Key } }),
-        };
-        const response = await lambdaClient.send(new InvokeCommand(params));
-        if (!response.Payload) throw new Error("No payload returned from Lambda")
+// export const convertPdfToJsonTool = tool(
+//     async ({ s3Key }) => {
+//         const lambdaClient = new LambdaClient();
+//         const params: InvokeCommandInput = {
+//             FunctionName: env.CONVERT_PDF_TO_JSON_LAMBDA_ARN,
+//             Payload: JSON.stringify({ arguments: { s3Key: s3Key } }),
+//         };
+//         const response = await lambdaClient.send(new InvokeCommand(params));
+//         if (!response.Payload) throw new Error("No payload returned from Lambda")
 
-        const jsonContent = JSON.parse(Buffer.from(response.Payload).toString())
-        console.log('Json Content: ', jsonContent)
+//         const jsonContent = JSON.parse(Buffer.from(response.Payload).toString())
+//         console.log('Json Content: ', jsonContent)
 
-        // console.log(`Converting s3 key ${s3Key} into content blocks`)
+//         // console.log(`Converting s3 key ${s3Key} into content blocks`)
 
-        // const pdfImageBuffers = await convertPdfToB64Strings({s3BucketName: env.DATA_BUCKET_NAME, s3Key: s3Key})
+//         // const pdfImageBuffers = await convertPdfToB64Strings({s3BucketName: env.DATA_BUCKET_NAME, s3Key: s3Key})
 
-        return {
-            messageContentType: 'tool_json',
-            content: jsonContent,
-        } as ToolMessageContentType
-    },
-    {
-        name: "convertPdfToJson",
-        description: "Can convert a pdf stored in s3 into a JSON object. Use it to get details about a specific file.",
-        schema: convertPdfToJsonSchema,
-    }
-);
+//         return {
+//             messageContentType: 'tool_json',
+//             content: jsonContent,
+//         } as ToolMessageContentType
+//     },
+//     {
+//         name: "convertPdfToJson",
+//         description: "Can convert a pdf stored in s3 into a JSON object. Use it to get details about a specific file.",
+//         schema: convertPdfToJsonSchema,
+//     }
+// );
 
 //////////////////////////////////////////
 //////// PDF Reports to Table Tool ///////
