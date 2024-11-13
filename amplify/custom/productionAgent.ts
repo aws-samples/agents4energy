@@ -12,20 +12,19 @@ import {
     aws_rds as rds,
     aws_ec2 as ec2,
     aws_s3 as s3,
+    aws_glue as glue,
     aws_events as events,
     aws_events_targets as eventsTargets,
     custom_resources as cr
 } from 'aws-cdk-lib';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
-
-
-import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
-
-// import { bedrock as cdkLabsBedrock } from "@cdklabs/generative-ai-cdk-constructs";
+import { CfnApplication } from 'aws-cdk-lib/aws-sam';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { CfnApplication } from 'aws-cdk-lib/aws-sam';
+
+import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
+import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
 
 const defaultProdDatabaseName = 'proddb'
 
@@ -347,12 +346,17 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     })
 
     const productionAgentTableDefDataSource = new bedrock.CfnDataSource(scope, 'sqlTableDefinitions', {
-        name: "sqlTableDefinitions",
+        name: "sqlTableDefinitions-1",
         dataSourceConfiguration: {
             type: 'S3',
             s3Configuration: {
                 bucketArn: props.s3Bucket.bucketArn,
                 inclusionPrefixes: ['production-agent/table-definitions/']
+            },
+        },
+        vectorIngestionConfiguration: {
+            chunkingConfiguration: {
+                chunkingStrategy: 'NONE' // This sets the whole file as a single chunk
             }
         },
         knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
@@ -402,60 +406,67 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }
     }))
 
-    configureProdDbFunction.addToRolePolicy(
-        new cdk.aws_iam.PolicyStatement({
-            actions: [
-                'athena:StartQueryExecution',
-                'athena:GetQueryExecution',
-                'athena:GetQueryResults',
-            ],
-            resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
-        })
-    )
+    addLlmAgentPolicies({
+        role: configureProdDbFunction.role!,
+        rootStack: rootStack,
+        athenaWorkgroup: athenaWorkgroup,
+        s3Bucket: props.s3Bucket
+    })
 
-    configureProdDbFunction.addToRolePolicy(
-        new cdk.aws_iam.PolicyStatement({
-            actions: [
-                'athena:GetDataCatalog'
-            ],
-            resources: [`arn:aws:athena:*:*:datacatalog/*`], // This function must be able to invoke data catalogs in other accoutns.
-            conditions: { // The data catalog must be tagged with `AgentsForEnergy: true` in order to be invoked.
-                'StringEquals': {
-                    'aws:ResourceTag/AgentsForEnergy': 'true'
-                }
-            }
-        })
-    )
+    // configureProdDbFunction.addToRolePolicy(
+    //     new cdk.aws_iam.PolicyStatement({
+    //         actions: [
+    //             'athena:StartQueryExecution',
+    //             'athena:GetQueryExecution',
+    //             'athena:GetQueryResults',
+    //         ],
+    //         resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
+    //     })
+    // )
 
-    //Allow the function to invoke the lambda used to connect Athena to the postgres db
-    configureProdDbFunction.addToRolePolicy(
-        new iam.PolicyStatement({
-            actions: ["lambda:InvokeFunction"],
-            resources: [`arn:aws:lambda:*:*:*`], //This function must be able to invoke lambda functions in other accounts so to query Athena federated data sources in other accounts.
-            conditions: { //The lambda must be tagged with `AgentsForEnergy: true` in order to be invoked.
-                'StringEquals': {
-                    'aws:ResourceTag/AgentsForEnergy': 'true'
-                }
-            }
-        }),
-    )
+    // configureProdDbFunction.addToRolePolicy(
+    //     new cdk.aws_iam.PolicyStatement({
+    //         actions: [
+    //             'athena:GetDataCatalog'
+    //         ],
+    //         resources: [`arn:aws:athena:*:*:datacatalog/*`], // This function must be able to invoke data catalogs in other accoutns.
+    //         conditions: { // The data catalog must be tagged with `AgentsForEnergy: true` in order to be invoked.
+    //             'StringEquals': {
+    //                 'aws:ResourceTag/AgentsForEnergy': 'true'
+    //             }
+    //         }
+    //     })
+    // )
 
-    //Executing athena queries requires the caller have these permissions
-    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
-        actions: [
-            "s3:GetBucketLocation",
-            "s3:GetObject",
-            "s3:ListBucket",
-            "s3:ListBucketMultipartUploads",
-            "s3:ListMultipartUploadParts",
-            "s3:AbortMultipartUpload",
-            "s3:PutObject",
-        ],
-        resources: [
-            props.s3Bucket.bucketArn,
-            props.s3Bucket.arnForObjects("*")
-        ],
-    }))
+    // //Allow the function to invoke the lambda used to connect Athena to the postgres db
+    // configureProdDbFunction.addToRolePolicy(
+    //     new iam.PolicyStatement({
+    //         actions: ["lambda:InvokeFunction"],
+    //         resources: [`arn:aws:lambda:*:*:*`], //This function must be able to invoke lambda functions in other accounts so to query Athena federated data sources in other accounts.
+    //         conditions: { //The lambda must be tagged with `AgentsForEnergy: true` in order to be invoked.
+    //             'StringEquals': {
+    //                 'aws:ResourceTag/AgentsForEnergy': 'true'
+    //             }
+    //         }
+    //     }),
+    // )
+
+    // //Executing athena queries requires the caller have these permissions
+    // configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+    //     actions: [
+    //         "s3:GetBucketLocation",
+    //         "s3:GetObject",
+    //         "s3:ListBucket",
+    //         "s3:ListBucketMultipartUploads",
+    //         "s3:ListMultipartUploadParts",
+    //         "s3:AbortMultipartUpload",
+    //         "s3:PutObject",
+    //     ],
+    //     resources: [
+    //         props.s3Bucket.bucketArn,
+    //         props.s3Bucket.arnForObjects("*")
+    //     ],
+    // }))
 
     configureProdDbFunction.addToRolePolicy(
         new iam.PolicyStatement({
@@ -514,6 +525,16 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     prodTableKbIngestionJobTrigger.node.addDependency(prodDbConfigurator)
 
 
+    // Create a Glue Database
+    const productionGlueDatabase = new glue.CfnDatabase(scope, 'ProdGlueDb1', { //TODO remove the 1
+        catalogId: rootStack.account,
+        databaseName: `prod_db_${rootStack.stackName.slice(-3)}`,
+        databaseInput: {
+            name: `prod_db_${rootStack.stackName.slice(-3)}`,
+            description: 'Database for storing additional information for the production agent'
+        }
+    });
+
     //This function will get table definitions from any athena data source with the AgentsForEnergy tag, upload them to s3, and start a knoledge base ingestion job to present them to an agent 
     const recordTableDefAndStarkKBIngestionJob = new NodejsFunction(scope, 'RecordTableDefAndStartKbIngestionJob', {
         runtime: lambda.Runtime.NODEJS_20_X,
@@ -535,7 +556,88 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             S3_BUCKET_NAME: props.s3Bucket.bucketName,
             TABLE_DEF_KB_ID: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
             TABLE_DEF_KB_DS_ID: productionAgentTableDefDataSource.attrDataSourceId,
+            PROD_GLUE_DB_NAME: productionGlueDatabase.ref
         }
+    });
+
+    // recordTableDefAndStarkKBIngestionJob.addTest
+
+
+
+    // // Trigger the recordTableDefAndStarkKBIngestionJob on the sample data source
+    // new cr.AwsCustomResource(scope, `RecordAndIngestSampleData`, {
+    //   onCreate: {
+    //     service: 'Lambda',
+    //     action: 'invoke',
+    //     parameters: {
+    //       FunctionName: recordTableDefAndStarkKBIngestionJob.functionName,
+    //       Payload: JSON.stringify({}), // No need to pass SQL here
+    //     },
+    //     physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
+    //   },
+    //   policy: cr.AwsCustomResourcePolicy.fromStatements([
+    //     new iam.PolicyStatement({
+    //       actions: ['lambda:InvokeFunction'],
+    //       resources: [recordTableDefAndStarkKBIngestionJob.functionArn],
+    //     }),
+    //   ]),
+    // });
+
+    
+
+    // Create IAM role for the Glue crawler
+    const crawlerRole = new iam.Role(scope, 'GlueCrawlerRole', {
+        assumedBy: new iam.ServicePrincipal('glue.amazonaws.com'),
+        managedPolicies: [
+            iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSGlueServiceRole'),
+        ],
+        inlinePolicies: {
+            'GetListS3': new iam.PolicyDocument({
+                statements: [
+                    new iam.PolicyStatement({
+                        actions: ['s3:GetObject', 's3:ListBucket'],
+                        resources: [
+                            props.s3Bucket.bucketArn,
+                            props.s3Bucket.arnForObjects("*")
+                        ],
+                    })
+                ]
+            })
+        }
+    });
+
+
+    // Create a Glue crawler
+    const crawler = new glue.CfnCrawler(scope, 'GlueCrawler', {
+        // name: 'my-data-crawler',
+        role: crawlerRole.roleArn,
+        // databaseName: 'default',
+        databaseName: productionGlueDatabase.ref,
+        targets: {
+            s3Targets: [
+                {
+                    path: `s3://${props.s3Bucket.bucketName}/production-agent/additional-data/`,
+                },
+            ],
+        },
+        tablePrefix: 'crawler_',
+    });
+    // // Add dependency to ensure database is created before crawler
+    // crawler.addDependency(productionGlueDatabase);
+
+    // Create the EventBridge rule
+    const newGlueTableRule = new events.Rule(scope, 'GlueTableCreationRule', {
+        eventPattern: {
+            source: ['aws.glue'],
+            detailType: ['AWS API Call via CloudTrail'],
+            detail: {
+                eventSource: ['glue.amazonaws.com'],
+                eventName: ['CreateTable'],
+                requestParameters: {
+                    databaseName: [productionGlueDatabase.ref], // Replace with your Glue database name
+                },
+            },
+        },
     });
 
     // Now we'll create assets which update the table definition knoledge base when an athena data source is updated
@@ -565,10 +667,11 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         principal: new iam.ServicePrincipal('events.amazonaws.com'),
         action: 'lambda:InvokeFunction',
         sourceArn: athenaDataSourceRule.ruleArn,
-      });
+    });
 
+    // Add targets for both the new athena data source rule, and the new glue table rule
     athenaDataSourceRule.addTarget(new eventsTargets.LambdaFunction(recordTableDefAndStarkKBIngestionJob));
-
+    newGlueTableRule.addTarget(new eventsTargets.LambdaFunction(recordTableDefAndStarkKBIngestionJob));
 
     return {
         queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,

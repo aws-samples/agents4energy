@@ -11,17 +11,13 @@ export const addLlmAgentPolicies = (props: {
 
     props.role.addToPrincipalPolicy(
         new iam.PolicyStatement({
-          actions: ["bedrock:InvokeModel*"],
-          resources: [
-            `arn:aws:bedrock:${props.rootStack.region}:${props.rootStack.account}:inference-profile/*`,
-            `arn:aws:bedrock:us-*::foundation-model/*`,
-            // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
-            // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
-            // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0`,
-            // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.*`,
-          ],
+            actions: ["bedrock:InvokeModel*"],
+            resources: [
+                `arn:aws:bedrock:${props.rootStack.region}:${props.rootStack.account}:inference-profile/*`,
+                `arn:aws:bedrock:us-*::foundation-model/*`,
+            ],
         })
-      )
+    )
 
     props.role.addToPrincipalPolicy(
         new cdk.aws_iam.PolicyStatement({
@@ -45,6 +41,33 @@ export const addLlmAgentPolicies = (props: {
                     'aws:ResourceTag/AgentsForEnergy': 'true'
                 }
             }
+        })
+    )
+
+    props.role.addToPrincipalPolicy(
+        new cdk.aws_iam.PolicyStatement({
+            actions: [
+                'athena:GetDataCatalog'
+            ],
+            resources: [`arn:aws:athena:${props.rootStack.region}:${props.rootStack.account}:datacatalog/AwsDataCatalog`],
+        })
+    )
+
+    props.role.addToPrincipalPolicy(
+        new cdk.aws_iam.PolicyStatement({
+            actions: [
+                "glue:GetDatabase",
+                "glue:GetDatabases",
+                "glue:GetTable",
+                "glue:GetTables",
+                "glue:GetPartitions",
+                "glue:BatchGetPartition",
+            ],
+            resources: [
+                `arn:aws:glue:${props.rootStack.region}:${props.rootStack.account}:catalog`,
+                `arn:aws:glue:${props.rootStack.region}:${props.rootStack.account}:database/*`,//TODO look at scoping this down
+                `arn:aws:glue:${props.rootStack.region}:${props.rootStack.account}:table/*`
+            ],
         })
     )
 
