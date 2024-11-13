@@ -11,14 +11,10 @@ import {
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 const athenaClient = new AthenaClient();
 
-export async function startQueryExecution(props:{query: string, workgroup: string, database?: string, athenaCatalogaName?: string}): Promise<string> {
+export async function startQueryExecution(props: { query: string, workgroup: string }): Promise<string> {
     const params: StartQueryExecutionInput = {
         QueryString: props.query,
         WorkGroup: props.workgroup,
-        // QueryExecutionContext: {
-        //     Catalog: props.athenaCatalogaName,
-        //     Database: props.database
-        // },
     };
 
     const result = await athenaClient.send(new StartQueryExecutionCommand(params))
@@ -44,6 +40,29 @@ export async function getQueryResults(queryExecutionId: string): Promise<GetQuer
     return athenaClient.send(new GetQueryResultsCommand({
         QueryExecutionId: queryExecutionId,
     }));
+}
+
+export async function executeAthenaQueryGetResult(props: { query: string, workgroup: string }): Promise<GetQueryResultsOutput> {
+    console.log('Executing Athena Query:\n', props.query);
+    const queryExecutionId = await startQueryExecution({
+        query: props.query,
+        workgroup: props.workgroup,
+    });
+    await waitForQueryToComplete(queryExecutionId, props.workgroup);
+    return getQueryResults(queryExecutionId);
+}
+
+export function transformColumnOfAthenaQueryToList(props: {queryResult: GetQueryResultsOutput, columnIndex?: number | undefined}): (string | undefined)[] {
+
+    const columnIndex = props.columnIndex || 0
+
+    const result = props.queryResult.ResultSet?.Rows?.slice(1).map((row) => {
+        if (row.Data && row.Data[columnIndex] && row.Data[columnIndex].VarCharValue !== undefined) return row.Data[columnIndex].VarCharValue
+    })
+
+    if (!result) throw new Error(`Column ${columnIndex} not found in query result: ${props.queryResult}`)
+
+    return result
 }
 
 
@@ -77,7 +96,7 @@ export function transformResultSet(resultSet: ResultSet) {
     }
 
     // Get column names from metadata
-    const columnNames = resultSet.ResultSetMetadata.ColumnInfo.map(col => 
+    const columnNames = resultSet.ResultSetMetadata.ColumnInfo.map(col =>
         col.Name || ''
     );
 
@@ -89,10 +108,10 @@ export function transformResultSet(resultSet: ResultSet) {
 
     // Skip the header row (first row) and process data rows
     const dataRows = resultSet.Rows.slice(1);
-    
+
     dataRows.forEach(row => {
         if (!row.Data) return;
-        
+
         row.Data.forEach((cell, columnIndex) => {
             const columnName = columnNames[columnIndex];
             if (columnName) {

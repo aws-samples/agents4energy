@@ -102,7 +102,7 @@ export const getTableDefinitionsTool = tool(
         )
 
         if (!relevantTables) throw new Error("No relevant tables found")
-        console.log("Text2Sql KB response:\n", relevantTables)
+        console.log("Text2Sql KB response:\n", JSON.stringify(relevantTables, null, 2))
 
 
         const tableDefinitions = relevantTables.map((result) =>
@@ -134,6 +134,7 @@ const executeSQLQuerySchema = z.object({
         The Trino SQL query to be executed. 
         Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
         Include the dataSource, database, and tableName in the FROM element (ex: FROM postgres_sample_992.production.daily)
+        Use "" arond all column names.
         `),
 });
 

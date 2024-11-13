@@ -1,10 +1,11 @@
 import { RDSDataClient, ExecuteStatementCommand, ExecuteStatementCommandInput } from "@aws-sdk/client-rds-data";
-
+import { BedrockAgentClient, StartIngestionJobCommand } from "@aws-sdk/client-bedrock-agent";
 import { startQueryExecution, waitForQueryToComplete, getQueryResults, uploadStringToS3 } from '../utils/sdkUtils'
 
 import sqlStatements from './sqlStatements'
 
 const rdsDataClient = new RDSDataClient();
+const bedrockAgentClient = new BedrockAgentClient();
 // const athenaClient = new AthenaClient();
 
 export const handler = async (event: any, context: any, callback: any): Promise<{ statusCode: number; body: string }> => {
@@ -12,8 +13,11 @@ export const handler = async (event: any, context: any, callback: any): Promise<
   if (!process.env.CLUSTER_ARN) throw new Error('CLUSTER_ARN is not defined')
   if (!process.env.ATHENA_WORKGROUP_NAME) throw new Error('ATHENA_WORKGROUP_NAME is not defined')
   if (!process.env.DATABASE_NAME) throw new Error('DATABASE_NAME is not defined')
-  if (!process.env.ATHENA_CATALOG_NAME) throw new Error('ATHENA_CATALOG_NAME is not defined')
   if (!process.env.S3_BUCKET_NAME) throw new Error('S3_BUCKET_NAME is not defined')
+  if (!process.env.ATHENA_SAMPLE_DATA_SOURCE_NAME) throw new Error('ATHENA_SAMPLE_DATA_SOURCE_NAME is not defined')
+  if (!process.env.TABLE_DEF_KB_ID) throw new Error('TABLE_DEF_KB_ID is not defined')
+  if (!process.env.TABLE_DEF_KB_DS_ID) throw new Error('TABLE_DEF_KB_DS_ID is not defined')
+    
 
   // if (!process.env.TABLE_DEF_KB_ID) throw new Error('TABLE_DEF_KB_ID is not defined')
 
@@ -107,6 +111,12 @@ export const handler = async (event: any, context: any, callback: any): Promise<
       return describeTableResult; // Return the results if you need them
     })
   );
+
+  //Now start the knowledge base sync
+  await bedrockAgentClient.send(new StartIngestionJobCommand({
+    dataSourceId: process.env.TABLE_DEF_KB_DS_ID,
+    knowledgeBaseId: process.env.TABLE_DEF_KB_ID,
+  }))
 
   return { statusCode: 200, body: 'All SQL statements executed and table definitions exported successfully.' };
 };
