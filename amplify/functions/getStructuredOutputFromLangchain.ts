@@ -75,6 +75,12 @@ async function getSortedMessages(chatSessionId: string, latestHumanMessageText: 
 
     const sortedMessages = chatSessionMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items.reverse()
 
+    if (sortedMessages.length === 0) return [ //Here there are no messages in the chat session
+        new HumanMessage({
+            content: latestHumanMessageText,
+        })
+    ]
+
     // Remove all of the messages before the first message with the role of human
     const firstHumanMessageIndex = sortedMessages.findIndex((message) => message.role === 'human');
     const sortedMessagesStartingWithHumanMessage = sortedMessages.slice(firstHumanMessageIndex)
@@ -107,27 +113,27 @@ async function getSortedMessages(chatSessionId: string, latestHumanMessageText: 
         messages &&
         messages[messages.length - 1] &&
         !(messages[messages.length - 1] instanceof HumanMessage)
+
     ) {
         messages.push(
             new HumanMessage({
                 content: latestHumanMessageText,
             })
         )
-    } else {
-        console.log('Last message in query is a human message')
-    }
+    } 
 
     console.log("mesages in langchain form: ", messages)
 
     return messages
 }
 
-async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => any; }, response: { raw: BaseMessage; parsed: Record<string, any>;}, targetJsonSchema: JsonSchema, messages: BaseMessage[]) {
+async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => any; }, response: { raw: BaseMessage; parsed: Record<string, any>; }, targetJsonSchema: JsonSchema, messages: BaseMessage[]) {
     for (let attempt = 0; attempt < 3; attempt++) {
         const validationReslut = validate(response.parsed, targetJsonSchema);
-        console.log(`Data validation result (${attempt}): `, validationReslut.valid);
+        
         if (validationReslut.valid) break
-
+        console.log(`Data validation result (${attempt}): `, validationReslut.valid);
+        
         console.log("Data validation error:", validationReslut.errors.join('\n'));
         console.log('Model response which caused error: \n', response);
         messages.push(
@@ -145,10 +151,11 @@ async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => a
 export const handler: Schema["invokeBedrockWithStructuredOutput"]["functionHandler"] = async (event) => {
 
     const outputStructure = JSON.parse(event.arguments.outputStructure)
-    console.log('target output structure:\n', JSON.stringify(outputStructure, null, 2))
+    // console.log('target output structure:\n', JSON.stringify(outputStructure, null, 2))
 
     const sortedLangchainMessages = await getSortedMessages(event.arguments.chatSessionId, event.arguments.lastMessageText)
-    
+    // console.log('sorted messages:\n', sortedLangchainMessages)
+
     const chatModelWithStructuredOutput = new ChatBedrockConverse({
         model: process.env.MODEL_ID,
         // temperature: 0
@@ -159,11 +166,11 @@ export const handler: Schema["invokeBedrockWithStructuredOutput"]["functionHandl
     )
 
     let structuredOutputResponse = await chatModelWithStructuredOutput.invoke(sortedLangchainMessages)
-    
+
     structuredOutputResponse = await correctStructuredOutputResponse(
-        chatModelWithStructuredOutput, 
-        structuredOutputResponse, 
-        outputStructure, 
+        chatModelWithStructuredOutput,
+        structuredOutputResponse,
+        outputStructure,
         sortedLangchainMessages
     )
 

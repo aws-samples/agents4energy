@@ -177,7 +177,7 @@ export class AppConfigurator extends Construct {
 
     // Create a Custom Resource that invokes the Step Function on every stack update
     // new cr.AwsCustomResource(this, `TriggerStepFunction-${Date.now().toString().slice(-5)}`, {
-      new cr.AwsCustomResource(this, `TriggerStepFunction`, {
+    new cr.AwsCustomResource(this, `TriggerStepFunction-1`, {
       onCreate: invokeStepFunctionSDKCall,
       onUpdate: invokeStepFunctionSDKCall,
       policy: cr.AwsCustomResourcePolicy.fromSdkCalls({

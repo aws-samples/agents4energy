@@ -1,6 +1,6 @@
 "use client"
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { Link } from '@mui/material';
+import { Link, Box } from '@mui/material';
 
 import {
   Button,
@@ -98,32 +98,34 @@ function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
   return result;
 }
 
-type TransformToDataRowsInputData = {
-  [key: string]: (string | number)[]
-};
+type RowDataInput = {
+  [key: string]: (string | number)
+}[];
 
 type TransformToDataRowsOutputData = {
   id: string;
   [key: string]: string;
 };
 
-function transformDataToRows(input: TransformToDataRowsInputData): TransformToDataRowsOutputData[] {
-  const keys = Object.keys(input);
-  const firstArrayLength = input[keys[0]].length;
+// function transformDataToRows(input: RowDataInput): TransformToDataRowsOutputData[] {
+//   // const keys = Object.keys(input[0]);
 
-  // Check if all arrays have the same length
-  if (!keys.every(key => input[key].length === firstArrayLength)) {
-    throw new Error("All arrays must have the same length");
-  }
+//   // const numberOfRows = input.length;
 
-  return Array.from({ length: firstArrayLength }, (_, i) =>
-    keys.reduce((obj, key) => {
-      obj["id"] = `${i}`
-      obj[key] = `${input[key][i]}`;
-      return obj;
-    }, {} as TransformToDataRowsOutputData)
-  );
-}
+
+//   // // Check if all arrays have the same length 
+//   // if (!keys.every(key => input[key].length === firstArrayLength)) {
+//   //   throw new Error("All arrays must have the same length");
+//   // }
+
+//   return Array.from({ length: firstArrayLength }, (_, i) =>
+//     keys.reduce((obj, key) => {
+//       obj["id"] = `${i}`
+//       obj[key] = `${input[key][i]}`;
+//       return obj;
+//     }, {} as TransformToDataRowsOutputData)
+//   );
+// }
 
 function generateColor(index: number): string {
   const hue = (index * 137.508) % 360; // Use golden angle approximation
@@ -250,7 +252,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         ))
       case 'tool_table':
         // https://mui.com/x/react-data-grid/
-        const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
+        // const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
+        const queryResponseData: RowDataInput = JSON.parse(props.message.content as string).queryResponseData
 
         if (!queryResponseData) {
           console.log('no query response data')
@@ -259,10 +262,13 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         console.log('Query Response Data: ', queryResponseData)
 
-        const columnNames = Object.keys(queryResponseData)
+        const columnNames = Object.keys(queryResponseData[0])
+        console.log('Column Names: ', columnNames)
+
+        const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation']
 
         const columns: GridColDef<TransformToDataRowsOutputData>[] = columnNames
-          .filter((columnName) => columnName !== 's3Key')
+          .filter((columnName) => !nonDefaultColumns.includes(columnName))
           .map((name) => ({
             field: `${name}`,
             headerName: `${name}`,
@@ -283,25 +289,33 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         if (columnNames.includes('s3Key')) {
           columns.push({
             field: 's3Key',
-            headerName: 's3Key',
+            headerName: 'Document Links',
             flex: 1,
             minWidth: 150,
             renderCell: (params) => (
-              <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
-                {params.value}
-              </Link>
+              <Box display='flex' flexDirection='column'>
+                <Link href={`/files/${params.value.slice(0, -5)}`} target="_blank" rel="noopener">
+                  pdf link
+                </Link>
+                <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
+                  yaml link
+                </Link>
+              </Box>
             ),
 
           })
         }
 
-        const rowData = transformDataToRows(queryResponseData)
+        const rowData: TransformToDataRowsOutputData[] = queryResponseData.map((item, index) => ({
+          id: `${index}`,
+          ...item
+        }))
 
         console.log('Row Data: ', rowData)
 
         setMessageTable(() => (
           <>
-            {/* <pre
+            <pre
               style={{ //Wrap long lines
                 whiteSpace: 'pre-wrap',
                 wordWrap: 'break-word',
@@ -309,7 +323,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               }}
             >
               {stringify(JSON.parse(props.message.content))}
-            </pre> */}
+            </pre>
 
             <DataGrid
               rows={rowData}
@@ -348,17 +362,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           </>
 
         ))
-
-
-      // const rows: {id: string}[] = data.date.map((date, index) => ({
-      //   id: index,
-      //   date: date,
-      //   value: data.value[index],
-      // }));
-
-      // const columns: GridColDef<(typeof rows)[number]>[] = []
-
-
 
     }
   }, [props.message, messageContentCategory])

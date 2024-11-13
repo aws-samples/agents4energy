@@ -76,7 +76,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }
     });
 
-    
+
 
     // Import the ImageMagick Lambda Layer from the AWS SAM Application
     const imageMagickLayerStack = new CfnApplication(scope, 'ImageMagickLayer', {
@@ -236,23 +236,25 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         layers: [imageMagickLayer, ghostScriptLayer]
     });
 
-    // This causes a circular dependency error
-    // //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
-    // // Add S3 event notification
-    // props.s3Bucket.addEventNotification(
-    //     s3.EventType.OBJECT_CREATED, // Triggers on file upload
-    //     new s3n.LambdaDestination(convertPdfToYamlFunction),
-    //     {
-    //         prefix: 'production-agent/well-files/', // Only trigger for files in this prefix
-    //         suffix: '.pdf' // Only trigger for files with this extension
-    //     }
-    // );
+    // This is a way to prevent a circular dependency error when interacting with the well fiel drive bucket
+    const wellFileDriveBucket = s3.Bucket.fromBucketName( scope, 'ExistingBucket', props.s3Bucket.bucketName );
+    //This causes a circular dependency error
+    //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
+    // Add S3 event notification
+    wellFileDriveBucket.addEventNotification(
+        s3.EventType.OBJECT_CREATED, // Triggers on file upload
+        new s3n.LambdaDestination(convertPdfToYamlFunction),
+        {
+            prefix: 'production-agent/well-files/', // Only trigger for files in this prefix
+            suffix: '.pdf' // Only trigger for files with this extension
+        }
+    );
 
 
     //This event bridge rule triggers when 
 
     //https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
-    const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', {
+    const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', { //TODO remove the 1
         engine: rds.DatabaseClusterEngine.auroraPostgres({
             version: rds.AuroraPostgresEngineVersion.VER_16_4,
         }),
@@ -518,7 +520,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //   ]),
     // });
 
-    
+
 
     // Create IAM role for the Glue crawler
     const crawlerRole = new iam.Role(scope, 'GlueCrawlerRole', {
@@ -613,7 +615,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         imageMagickLayer: imageMagickLayer,
         ghostScriptLayer: ghostScriptLayer,
         getInfoFromPdfFunction: queryReportImageLambda,
-        // convertPdfToJsonFunction: convertPdfToJsonFunction,
+        convertPdfToYamlFunction: convertPdfToYamlFunction,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
         sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,

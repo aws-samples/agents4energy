@@ -58,7 +58,7 @@ export function getLangChainMessageTextContent(message: HumanMessage | AIMessage
 
 }
 
-interface FieldDefinition {
+export interface FieldDefinition {
     type: string;
     description: string;
     format?: string;

@@ -133,11 +133,10 @@ backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
 backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     resources: [
-      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
-      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/*`,
+      `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:inference-profile/*`,
+      `arn:aws:bedrock:us-*::foundation-model/*`,
     ],
     actions: ["bedrock:InvokeModel"],
-
   })
 )
 
@@ -191,7 +190,7 @@ applyTagsToRootStack()
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'test-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sample-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
@@ -200,7 +199,7 @@ const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'tes
 const {
   queryImagesStateMachineArn,
   getInfoFromPdfFunction,
-  // convertPdfToJsonFunction,
+  convertPdfToYamlFunction,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
   sqlTableDefBedrockKnoledgeBase,
@@ -212,6 +211,8 @@ const {
   // s3Bucket: uploadToS3Deployment.deployedBucket, // This causes the assets here to not deploy until the s3 upload is complete.
   s3Bucket: backend.storage.resources.bucket
 })
+
+uploadToS3Deployment.node.addDependency(convertPdfToYamlFunction) //Don't deploy files until the convertPdfToYamlFunction function is done deploying
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
