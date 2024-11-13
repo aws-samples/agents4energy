@@ -291,7 +291,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 {params.value}
               </Link>
             ),
-        
+
           })
         }
 
@@ -560,7 +560,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                     overflowWrap: 'break-word',
                   }}
                 >
-                  {stringify(JSON.parse(props.message.content))}
+                  {
+                    isValidJSON(props.message.content) ?
+                      stringify(JSON.parse(props.message.content)) :
+                      props.message.content
+                  }
                 </pre>/* Render as YAML */;
               // case 'tool_table':
               //   return <ReactMarkdown

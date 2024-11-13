@@ -62,24 +62,34 @@ export const handler = async (
   if (!process.env.PROD_GLUE_DB_NAME) throw new Error('PROD_GLUE_DB_NAME is not defined')
 
 
-  const { detail } = event;
+  console.log('event:\n', event)
+
+  // const { detail: {eventName, requestParameters} } = event ;
+
+  //If no event is provided (like if a test event is used) run the function on the AwsDataCatalog
+  const { detail: { eventName, requestParameters } } = ('detail' in event) ?
+    event
+    :
+    { detail: { eventName: 'DummyEvent', requestParameters: { name: 'AwsDataCatalog' } } };
+
+  // const { detail } = event;
 
 
-  const {
-    eventName,
-    requestParameters,
-    // responseElements
-  } = detail;
+  // const {
+  //   eventName,
+  //   requestParameters,
+  //   // responseElements
+  // } = detail;
 
 
   // Extract relevant information
   const dataCatalogName = requestParameters.name;
-  const dataCatalogType = requestParameters.type;
-  const tags = requestParameters.tags;
+  // const dataCatalogType = requestParameters.type;
+  // const tags = requestParameters.tags;
 
   console.log(`Processing ${eventName} event for data catalog: ${dataCatalogName}`);
-  console.log('Data Catalog Type:', dataCatalogType);
-  console.log('Tags:', tags);
+  // console.log('Data Catalog Type:', dataCatalogType);
+  // console.log('Tags:', tags);
 
 
   const dataCatalogPrefix = dataCatalogName.split("_").slice(0)[0]

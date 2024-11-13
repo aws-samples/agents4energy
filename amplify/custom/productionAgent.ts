@@ -75,6 +75,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }
     });
 
+    
+
     // Import the ImageMagick Lambda Layer from the AWS SAM Application
     const imageMagickLayerStack = new CfnApplication(scope, 'ImageMagickLayer', {
         location: {
@@ -310,6 +312,14 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
     });
 
+    //Add policies to call the work gorup in the lambdaLlmAgentRole
+    addLlmAgentPolicies({
+        role: lambdaLlmAgentRole,
+        rootStack: rootStack,
+        athenaWorkgroup: athenaWorkgroup,
+        s3Bucket: props.s3Bucket
+    })
+
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
     const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
 
@@ -361,6 +371,11 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
         knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
     })
+
+    lambdaLlmAgentRole.addToPrincipalPolicy(new iam.PolicyStatement({
+        actions: ["bedrock:StartIngestionJob"],
+        resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn]
+    }))
 
     //////////////////////////////
     //// Configuration Assets ////
