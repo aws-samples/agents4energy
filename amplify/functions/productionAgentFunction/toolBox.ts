@@ -244,7 +244,7 @@ export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: Ampli
         console.log('data object: ', queryResponseData)
 
         // Functions must return strings
-        if (!(columnNameFromQueryForXAxis in queryResponseData)) {
+        if (!(columnNameFromQueryForXAxis in queryResponseData[0])) {
             return {
                 messageContentType: 'tool_json',
                 error: `
@@ -258,7 +258,7 @@ export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: Ampli
             messageContentType: 'tool_plot',
             columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
             chartTitle: chartTitle,
-            chartData: queryResponseData
+            // chartData: queryResponseData
         } as ToolMessageContentType
 
     },

@@ -55,6 +55,7 @@ ChartJS.register(
 export interface ChatUIMessageProps {
   // message: Schema["ChatMessage"]["type"];
   message: Message;
+  messages: Message[];
   allMessages: Message[];
   showCopyButton?: boolean;
 }
@@ -98,6 +99,16 @@ function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
   return result;
 }
 
+function transformListToObject<T extends Record<string, any>>(
+  list: T[]
+): { [K in keyof T]: T[K][] } {
+  return Object.keys(list[0]).reduce((acc, key) => {
+    return {
+      ...acc,
+      [key]: list.map(item => item[key as keyof T])
+    };
+  }, {}) as { [K in keyof T]: T[K][] };
+}
 type RowDataInput = {
   [key: string]: (string | number)
 }[];
@@ -106,26 +117,6 @@ type TransformToDataRowsOutputData = {
   id: string;
   [key: string]: string;
 };
-
-// function transformDataToRows(input: RowDataInput): TransformToDataRowsOutputData[] {
-//   // const keys = Object.keys(input[0]);
-
-//   // const numberOfRows = input.length;
-
-
-//   // // Check if all arrays have the same length 
-//   // if (!keys.every(key => input[key].length === firstArrayLength)) {
-//   //   throw new Error("All arrays must have the same length");
-//   // }
-
-//   return Array.from({ length: firstArrayLength }, (_, i) =>
-//     keys.reduce((obj, key) => {
-//       obj["id"] = `${i}`
-//       obj[key] = `${input[key][i]}`;
-//       return obj;
-//     }, {} as TransformToDataRowsOutputData)
-//   );
-// }
 
 function generateColor(index: number): string {
   const hue = (index * 137.508) % 360; // Use golden angle approximation
@@ -158,16 +149,33 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     switch (messageContentCategory) {
       case 'tool_plot':
         //TODO - Make oil green, gas red, water blue, ...
-        const { chartData, columnNameFromQueryForXAxis, chartTitle } = JSON.parse(props.message.content) as {
-          chartData: { [key: string]: (string | number)[] },
+        const toolResponseMessages = props.messages.filter(
+            (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
+        )
+
+        console.log('Tool Response Messages:\n', toolResponseMessages)
+
+        const selectedToolMessage = toolResponseMessages.slice(-1)[0]
+
+        console.log("Selected message: ", selectedToolMessage)
+
+        const chartContent = JSON.parse(selectedToolMessage.content) as {
+          queryResponseData: RowDataInput,
+        }
+
+        console.log('chartData: ', chartContent.queryResponseData)
+
+        const { columnNameFromQueryForXAxis, chartTitle } = JSON.parse(props.message.content) as {
           columnNameFromQueryForXAxis: string,
           chartTitle: string | undefined
         }
 
-        const datasets = Object.keys(chartData)
+        const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+        const datasets = Object.keys(chartDataObject)
           .filter(key => key !== columnNameFromQueryForXAxis)
           .map((columnName, index) => ({
-            data: zipLists(chartData[columnNameFromQueryForXAxis], chartData[columnName]),
+            data: zipLists(chartDataObject[columnNameFromQueryForXAxis], chartDataObject[columnName]),
             mode: 'lines+markers',
             backgroundColor: generateColor(index),
             label: columnName,
@@ -315,7 +323,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         setMessageTable(() => (
           <>
-            <pre
+            {/* <pre
               style={{ //Wrap long lines
                 whiteSpace: 'pre-wrap',
                 wordWrap: 'break-word',
@@ -323,7 +331,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               }}
             >
               {stringify(JSON.parse(props.message.content))}
-            </pre>
+            </pre> */}
 
             <DataGrid
               rows={rowData}

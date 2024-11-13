@@ -18,6 +18,7 @@ export default function ChatUIMessageList(props: ChatUIMessageListProps) {
           message={message}
           allMessages={messages}
           showCopyButton={props.showCopyButton}
+          messages={messages}
         />
       ))}
     </SpaceBetween>
