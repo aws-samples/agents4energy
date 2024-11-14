@@ -32,6 +32,7 @@ export interface AppConfiguratorProps {
   s3Bucket: cdk.aws_s3.IBucket
   preSignUpFunction: lambda.IFunction
   cognitoUserPool: cdk.aws_cognito.IUserPool
+  appSyncApi: cdk.aws_appsync.IGraphqlApi
   // sqlTableDefBedrockKnoledgeBase: bedrock.KnowledgeBase
 }
 
@@ -46,15 +47,7 @@ export class AppConfigurator extends Construct {
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
 
-    // // Grant the user pool the authorization to invoke the pre sign up lambda function
-    // props.cognitoUserPool.grant(props.preSignUpFunction, 'lambda:InvokeFunction')
-
     props.preSignUpFunction.grantInvoke(new cdk.aws_iam.ServicePrincipal('cognito-idp.amazonaws.com'))
-
-    // preSignUpFunction.addPermission('AllowCognitoInvoke', {
-    //   principal: new iam.ServicePrincipal('cognito-idp.amazonaws.com'),
-    //   sourceArn: userPool.userPoolArn,
-    // });
 
     // This function and custom resource will update the GraphQL schema to allow for @aws_iam access to all resources 
     const addIamDirectiveFunction = new NodejsFunction(scope, 'addIamDirective', {
@@ -62,19 +55,23 @@ export class AppConfigurator extends Construct {
       entry: path.join(rootDir, 'functions', 'addIamDirectiveToAllAssets.ts'),
       timeout: cdk.Duration.seconds(60),
       environment: {
-        ROOT_STACK_NAME: rootStack.stackName
+        ROOT_STACK_NAME: rootStack.stackName,
+        APPSYNC_API_ID: props.appSyncApi.apiId,
       },
     });
 
     addIamDirectiveFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
       actions: [
-        'appsync:ListGraphqlApis',
-        'appsync:ListTagsForResource',
+        // 'appsync:ListGraphqlApis',
+        // 'appsync:ListTagsForResource',
         'appsync:GetIntrospectionSchema',
         'appsync:StartSchemaCreation',
         'appsync:GetSchemaCreationStatus',
       ],
-      resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
+      resources: [
+        // `arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`,
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:apis/${props.appSyncApi.apiId}`
+      ],
     }))
 
 
@@ -119,6 +116,7 @@ export class AppConfigurator extends Construct {
     });
 
     // This step will add the iam directive to the graphql schema
+    // The step function has a wait loop to let the stack complete deployment to ensure that the schema is updated after all changes to the schema are complete.
     const invokeAddIamDirectiveFunction = new sfn_tasks.LambdaInvoke(this, 'InvokeLambda', {
       lambdaFunction: addIamDirectiveFunction,
     })
@@ -170,47 +168,24 @@ export class AppConfigurator extends Construct {
       action: 'startExecution',
       parameters: {
         stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
-        input: JSON.stringify({ action: 'create' }),
+        input: JSON.stringify({ 
+          action: 'create',
+          startTime: Date.now(),
+        }),
       },
       physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
     }
 
     // Create a Custom Resource that invokes the Step Function on every stack update
     // new cr.AwsCustomResource(this, `TriggerStepFunction-${Date.now().toString().slice(-5)}`, {
-    new cr.AwsCustomResource(this, `TriggerStepFunction-1`, {
+    new cr.AwsCustomResource(this, `TriggerStepFunction`, {
       onCreate: invokeStepFunctionSDKCall,
       onUpdate: invokeStepFunctionSDKCall,
       policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
         resources: [appConfiguratorStateMachine.stateMachineArn],
       }),
+      
     });
 
-    // // Create a Custom Resource that invokes only if the dependencies change
-    // new cr.AwsCustomResource(this, `TriggerOnDepChange`, {
-    //   onCreate: {
-    //     service: 'Lambda',
-    //     action: 'invoke',
-    //     parameters: {
-    //       FunctionName: configureProdDbFunction.functionName,
-    //       Payload: JSON.stringify({}), // No need to pass SQL here
-    //     },
-    //     physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
-    //   },
-    //   onUpdate: {
-    //     service: 'Lambda',
-    //     action: 'invoke',
-    //     parameters: {
-    //       FunctionName: configureProdDbFunction.functionName,
-    //       Payload: JSON.stringify({}), // No need to pass SQL here
-    //     },
-    //     physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
-    //   },
-    //   policy: cr.AwsCustomResourcePolicy.fromStatements([
-    //     new iam.PolicyStatement({
-    //       actions: ['lambda:InvokeFunction'],
-    //       resources: [configureProdDbFunction.functionArn],
-    //     }),
-    //   ]),
-    // });
   }
 }

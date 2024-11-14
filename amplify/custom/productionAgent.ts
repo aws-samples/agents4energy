@@ -18,6 +18,7 @@ import {
     aws_events_targets as eventsTargets,
     custom_resources as cr
 } from 'aws-cdk-lib';
+
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { CfnApplication } from 'aws-cdk-lib/aws-sam';
 
@@ -237,7 +238,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
 
     // This is a way to prevent a circular dependency error when interacting with the well fiel drive bucket
-    const wellFileDriveBucket = s3.Bucket.fromBucketName( scope, 'ExistingBucket', props.s3Bucket.bucketName );
+    const wellFileDriveBucket = s3.Bucket.fromBucketName(scope, 'ExistingBucket', props.s3Bucket.bucketName);
     //This causes a circular dependency error
     //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
     // Add S3 event notification
@@ -355,9 +356,59 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn]
     }))
 
-    //////////////////////////////
-    //// Configuration Assets ////
-    //////////////////////////////
+
+    // Create a Glue Database
+    const productionGlueDatabase = new glue.CfnDatabase(scope, 'ProdGlueDb', {
+        catalogId: rootStack.account,
+        databaseName: `production_db_${rootStack.stackName.slice(-3)}`,
+        databaseInput: {
+            name: `production_db_${rootStack.stackName.slice(-3)}`,
+            description: 'Database for storing additional information for the production agent'
+        }
+    });
+
+    // Create IAM role for the Glue crawler
+    const crawlerRole = new iam.Role(scope, 'GlueCrawlerRole', {
+        assumedBy: new iam.ServicePrincipal('glue.amazonaws.com'),
+        managedPolicies: [
+            iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSGlueServiceRole'),
+        ],
+        inlinePolicies: {
+            'GetListS3': new iam.PolicyDocument({
+                statements: [
+                    new iam.PolicyStatement({
+                        actions: ['s3:GetObject', 's3:ListBucket'],
+                        resources: [
+                            props.s3Bucket.bucketArn,
+                            props.s3Bucket.arnForObjects("*")
+                        ],
+                    })
+                ]
+            })
+        }
+    });
+
+    // Create a Glue crawler
+    const crawler = new glue.CfnCrawler(scope, 'GlueCrawler', {
+        // name: 'my-data-crawler',
+        role: crawlerRole.roleArn,
+        // databaseName: 'default',
+        databaseName: productionGlueDatabase.ref,
+        targets: {
+            s3Targets: [
+                {
+                    path: `s3://${props.s3Bucket.bucketName}/production-agent/additional-data/`,
+                },
+            ],
+        },
+        tablePrefix: 'crawler_',
+    });
+
+
+
+    ////////////////////////////////////////////////////////////
+    /////////////////// Configuration Assets ///////////////////
+    ////////////////////////////////////////////////////////////
 
     const configureProdDbFunction = new NodejsFunction(scope, 'configureProdDbFunction', {
         runtime: lambda.Runtime.NODEJS_LATEST,
@@ -462,15 +513,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // prodTableKbIngestionJobTrigger.node.addDependency(productionAgentTableDefDataSource)
     prodTableKbIngestionJobTrigger.node.addDependency(prodDbConfigurator)
 
-    // Create a Glue Database
-    const productionGlueDatabase = new glue.CfnDatabase(scope, 'ProdGlueDb', {
-        catalogId: rootStack.account,
-        databaseName: `prod_db_${rootStack.stackName.slice(-3)}`,
-        databaseInput: {
-            name: `prod_db_${rootStack.stackName.slice(-3)}`,
-            description: 'Database for storing additional information for the production agent'
-        }
-    });
+
 
     //This function will get table definitions from any athena data source with the AgentsForEnergy tag, upload them to s3, and start a knoledge base ingestion job to present them to an agent 
     const recordTableDefAndStarkKBIngestionJob = new NodejsFunction(scope, 'RecordTableDefAndStartKbIngestionJob', {
@@ -522,43 +565,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
 
 
-    // Create IAM role for the Glue crawler
-    const crawlerRole = new iam.Role(scope, 'GlueCrawlerRole', {
-        assumedBy: new iam.ServicePrincipal('glue.amazonaws.com'),
-        managedPolicies: [
-            iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSGlueServiceRole'),
-        ],
-        inlinePolicies: {
-            'GetListS3': new iam.PolicyDocument({
-                statements: [
-                    new iam.PolicyStatement({
-                        actions: ['s3:GetObject', 's3:ListBucket'],
-                        resources: [
-                            props.s3Bucket.bucketArn,
-                            props.s3Bucket.arnForObjects("*")
-                        ],
-                    })
-                ]
-            })
-        }
-    });
 
 
-    // Create a Glue crawler
-    const crawler = new glue.CfnCrawler(scope, 'GlueCrawler', {
-        // name: 'my-data-crawler',
-        role: crawlerRole.roleArn,
-        // databaseName: 'default',
-        databaseName: productionGlueDatabase.ref,
-        targets: {
-            s3Targets: [
-                {
-                    path: `s3://${props.s3Bucket.bucketName}/production-agent/additional-data/`,
-                },
-            ],
-        },
-        tablePrefix: 'crawler_',
-    });
+
+
     // // Add dependency to ensure database is created before crawler
     // crawler.addDependency(productionGlueDatabase);
 
@@ -609,6 +619,69 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // Add targets for both the new athena data source rule, and the new glue table rule
     athenaDataSourceRule.addTarget(new eventsTargets.LambdaFunction(recordTableDefAndStarkKBIngestionJob));
     newGlueTableRule.addTarget(new eventsTargets.LambdaFunction(recordTableDefAndStarkKBIngestionJob));
+
+    // This step function will invoke the glue crawler, wait until in completes, and then call the recordTableDefAndStarkKBIngestionJob function to load the table defs into the kb
+    // Create Step Function tasks
+    const startCrawler = new sfnTasks.GlueStartCrawlerRun(scope, 'Start Crawler', {
+        crawlerName: crawler.ref,
+        integrationPattern: sfn.IntegrationPattern.REQUEST_RESPONSE
+    });
+
+    const checkCrawlerStatus = new sfnTasks.CallAwsService(scope, 'Get Crawler Status', {
+        service: 'glue',
+        action: 'getCrawler',
+        parameters: {
+            Name: crawler.ref
+        },
+        iamResources: [`arn:aws:glue:${rootStack.region}:${rootStack.account}:crawler/${crawler.ref}`]
+    });
+
+    const waitX = new sfn.Wait(scope, 'Wait 10 Seconds', {
+        time: sfn.WaitTime.duration(cdk.Duration.seconds(10)),
+    });
+
+    const invokeLambda = new sfnTasks.LambdaInvoke(scope, 'Invoke Lambda', {
+        lambdaFunction: recordTableDefAndStarkKBIngestionJob,
+        outputPath: '$.Payload',
+    });
+
+    // Create a Choice state to check crawler status
+    const isCrawlerComplete = new sfn.Choice(scope, 'Is Crawler Complete?')
+        .when(sfn.Condition.stringEquals('$.Crawler.State', 'READY'), invokeLambda)
+        .otherwise(waitX);
+
+    // Create the state machine
+    const definition = startCrawler
+        .next(checkCrawlerStatus)
+        .next(isCrawlerComplete);
+
+    waitX.next(checkCrawlerStatus);
+
+    const runCrawlerRecordTableDefintionStateMachine = new sfn.StateMachine(scope, 'CrawlerStateMachine', {
+        definition,
+        timeout: cdk.Duration.minutes(30),
+    });
+
+    recordTableDefAndStarkKBIngestionJob.grantInvoke(runCrawlerRecordTableDefintionStateMachine);
+
+    const invokeStepFunctionSDKCall: cr.AwsSdkCall = {
+        service: 'StepFunctions',
+        action: 'startExecution',
+        parameters: {
+            stateMachineArn: runCrawlerRecordTableDefintionStateMachine.stateMachineArn,
+            input: JSON.stringify({ action: 'create' }),
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
+    }
+
+    // Create a Custom Resource that invokes the Step Function
+    new cr.AwsCustomResource(scope, `TriggerCrawlerStepFunction`, {
+        onCreate: invokeStepFunctionSDKCall,
+        policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+            resources: [runCrawlerRecordTableDefintionStateMachine.stateMachineArn],
+        }),
+    });
+
 
     return {
         queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,

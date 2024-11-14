@@ -23,6 +23,7 @@
     "aws-amplify": "^6.6.4",
     "chart.js": "^4.4.6",
     "chartjs-adapter-date-fns": "^3.0.0",
+    "chartjs-plugin-annotation": "^3.1.0",
     "chartjs-plugin-zoom": "^2.0.1",
     "date-fns": "^4.1.0",
     "gm": "^1.25.0",

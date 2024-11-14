@@ -111,7 +111,6 @@ export const handler = async (
         SELECT table_name
         FROM ${dataCatalogName}.information_schema.tables
         WHERE table_schema = '${database}'
-        ORDER BY table_name;
         `),
       describeTable: (database: string, table: string) => ( /* sql */`
         DESCRIBE ${dataCatalogName}.${database}.${table}

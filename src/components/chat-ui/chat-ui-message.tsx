@@ -24,6 +24,7 @@ import { Message, messageContentType, ToolMessageContentType } from "../../utils
 
 // import PlotComponent from '../PlotComponent'
 import { Scatter } from 'react-chartjs-2';
+import annotationPlugin from 'chartjs-plugin-annotation';
 import {
   Chart as ChartJS,
   LinearScale,
@@ -32,9 +33,8 @@ import {
   LineElement,
   Tooltip,
   Legend,
+  ChartData,
   TimeScale,
-  // ChartData,
-  // Point,
   ChartOptions
 } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
@@ -49,7 +49,8 @@ ChartJS.register(
   Tooltip,
   Legend,
   TimeScale,
-  zoomPlugin
+  zoomPlugin,
+  annotationPlugin
 );
 
 export interface ChatUIMessageProps {
@@ -88,18 +89,18 @@ function isValidJSON(str: string): boolean {
   }
 }
 
-function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
-  const minLength = Math.min(list1.length, list2.length);
-  const result: { x: T, y: U }[] = [];
+// function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
+//   const minLength = Math.min(list1.length, list2.length);
+//   const result: { x: T, y: U }[] = [];
 
-  for (let i = 0; i < minLength; i++) {
-    result.push({ x: list1[i], y: list2[i] });
-  }
+//   for (let i = 0; i < minLength; i++) {
+//     result.push({ x: list1[i], y: list2[i] });
+//   }
 
-  return result;
-}
+//   return result;
+// }
 
-function transformListToObject<T extends Record<string, any>>(
+function transformListToObject<T extends Record<string, string | number>>(
   list: T[]
 ): { [K in keyof T]: T[K][] } {
   return Object.keys(list[0]).reduce((acc, key) => {
@@ -122,6 +123,23 @@ function generateColor(index: number): string {
   const hue = (index * 137.508) % 360; // Use golden angle approximation
   return `hsl(${hue}, 70%, 60%)`;
 }
+
+// function wrapText(text: string, maxWidth: number) {
+//   const words = text.split(' ');
+//   const lines = [];
+//   let currentLine = words[0];
+
+//   for (let i = 1; i < words.length; i++) {
+//     if (currentLine.length + words[i].length < maxWidth) {
+//       currentLine += ' ' + words[i];
+//     } else {
+//       lines.push(currentLine);
+//       currentLine = words[i];
+//     }
+//   }
+//   lines.push(currentLine);
+//   return lines;
+// }
 
 function getMessageCatigory(message: Message): messageContentType {
   if (!message.tool_name) {
@@ -146,41 +164,114 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   const messageContentCategory = getMessageCatigory(props.message);
 
   useEffect(() => {
+    const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation']
     switch (messageContentCategory) {
       case 'tool_plot':
-        //TODO - Make oil green, gas red, water blue, ...
+        const { chartTitle, numberOfPreviousTablesToInclude } = JSON.parse(props.message.content) as {
+          // columnNameFromQueryForXAxis: string,
+          chartTitle: string | undefined,
+          numberOfPreviousTablesToInclude: number
+        }
+
         const toolResponseMessages = props.messages.filter(
-            (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
+          (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
         )
 
         console.log('Tool Response Messages:\n', toolResponseMessages)
 
-        const selectedToolMessage = toolResponseMessages.slice(-1)[0]
+        const selectedToolMessages = toolResponseMessages.slice(-1 * numberOfPreviousTablesToInclude)
 
-        console.log("Selected message: ", selectedToolMessage)
+        console.log("Selected messages: ", selectedToolMessages)
 
-        const chartContent = JSON.parse(selectedToolMessage.content) as {
-          queryResponseData: RowDataInput,
+        if (selectedToolMessages.length === 0) return
+
+        interface ScatterDataPoint {
+          x: Date;
+          y: number;
         }
 
-        console.log('chartData: ', chartContent.queryResponseData)
+        const data: ChartData<'scatter', ScatterDataPoint[]> = { datasets: [] }
+        let annotations = {}
 
-        const { columnNameFromQueryForXAxis, chartTitle } = JSON.parse(props.message.content) as {
-          columnNameFromQueryForXAxis: string,
-          chartTitle: string | undefined
-        }
+        selectedToolMessages.map((selectedToolMessage, selectedToolMessageIndex) => {
 
-        const chartDataObject = transformListToObject(chartContent.queryResponseData)
-
-        const datasets = Object.keys(chartDataObject)
-          .filter(key => key !== columnNameFromQueryForXAxis)
-          .map((columnName, index) => ({
-            data: zipLists(chartDataObject[columnNameFromQueryForXAxis], chartDataObject[columnName]),
-            mode: 'lines+markers',
-            backgroundColor: generateColor(index),
-            label: columnName,
+          const chartContent = JSON.parse(selectedToolMessage.content) as {
+            queryResponseData: RowDataInput,
           }
-          ))
+
+          if (chartContent.queryResponseData.length === 0) return
+
+          const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+          // console.log('chart data: ', chartDataObject)
+
+          const chartTrendNames = Object.keys(chartDataObject)
+
+          const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+
+          console.log('table type: ', tableType)
+
+          switch (tableType) {
+            case 'events':
+              const annotationValues = chartContent.queryResponseData
+                .map((event) => ({
+                  type: 'label',
+                  xValue: event[chartTrendNames[0]], //The first column will be the x axis value
+                  // yValue: 100,
+
+                  backgroundColor: 'rgba(255, 255, 255, 1)',
+                  // content: wrapText(event[chartTrendNames[1]] as string, 60), //The second column will be the label text
+                  content: `Event`,
+                  font: {
+                    size: 12
+                  },
+                  click: () => {
+                    const s3Key = (event['s3Key'] as string).slice(0, -5)
+                    window.open(`/files/${s3Key}`, '_blank')
+                  },
+                  // click: () => (void), // Add click handler
+                  // Make the annotation interactive
+                  display: true,
+                  rotation: 90
+                }))
+              const newAnnotations = Object.fromEntries(annotationValues.map((value, index) => [`text${selectedToolMessageIndex}_${index}`, value]))
+              annotations = { ...annotations, ...newAnnotations }
+              break
+            case 'trend':
+              const newData: ChartData<'scatter', ScatterDataPoint[]> = {
+                datasets: chartTrendNames
+                  .slice(1) // The first column will be used for the x axis
+                  .filter((columnName) => (!isNaN(Number(chartDataObject[columnName][0]))))
+                  .map((columnName, index) => ({
+                    // data: zipLists(chartDataObject[chartTrendNames[0]], chartDataObject[columnName]),
+                    data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
+                      x: new Date(xValue), // Convert to Date object
+                      // x: xValue, // Convert to Date object
+                      y: Number(chartDataObject[columnName][i])
+                    })),
+                    mode: 'lines+markers',
+                    backgroundColor:
+                      (columnName.toLocaleLowerCase().includes('oil')) ?
+                        `hsl(120, 70%, 30%)` : // bright green
+                        (columnName.toLocaleLowerCase().includes('gas')) ?
+                          `hsl(0, 70%, 60%)` : // bright red
+                          (columnName.toLocaleLowerCase().includes('water')) ?
+                            `hsl(240, 70%, 60%)` : //bright blue
+                            generateColor(index),
+                    label: columnName,
+                  })
+                  )
+              }
+
+              data.datasets.push(...newData.datasets)
+              break
+          }
+        })
+
+
+
+        console.log('chart data:\n', data)
+
 
         const options: ChartOptions<'scatter'> = {
           scales: {
@@ -190,12 +281,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 unit: 'day' as const,
                 tooltipFormat: 'PP',
                 displayFormats: {
-                  day: 'MMM d',
+                  day: 'yyyy MMM d',
                 },
               },
               title: {
                 display: true,
-                text: columnNameFromQueryForXAxis,
+                text: 'date',
               },
               adapters: {
                 date: {
@@ -216,10 +307,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               text: chartTitle,
               display: true
             },
-            // title: {
-            //   display: true,
-            //   text: 'Custom Chart Title'
-            // },
             zoom: {
               pan: {
                 enabled: true,
@@ -234,7 +321,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   modifierKey: "shift"
                 },
               }
+            },
+            annotation: {
+              annotations: annotations
             }
+
           }
         };
 
@@ -247,12 +338,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 overflowWrap: 'break-word',
               }}
             >
-              {stringify(JSON.parse(props.message.content))}
+              {stringify(chartDataObject)}
             </pre> */}
             <Scatter
-              data={{
-                datasets: datasets,
-              }}
+              data={data}
               options={options}
             />
           </>
@@ -263,7 +352,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         // const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
         const queryResponseData: RowDataInput = JSON.parse(props.message.content as string).queryResponseData
 
-        if (!queryResponseData) {
+        if (!queryResponseData || queryResponseData.length === 0) {
           console.log('no query response data')
           return
         }
@@ -273,7 +362,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         const columnNames = Object.keys(queryResponseData[0])
         console.log('Column Names: ', columnNames)
 
-        const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation']
+
 
         const columns: GridColDef<TransformToDataRowsOutputData>[] = columnNames
           .filter((columnName) => !nonDefaultColumns.includes(columnName))
@@ -372,7 +461,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         ))
 
     }
-  }, [props.message, messageContentCategory])
+  }, [props.message, props.messages, messageContentCategory])
 
   // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
   async function getGlossary(message: Message) {

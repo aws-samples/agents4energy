@@ -127,12 +127,9 @@ export const main = async () => {
   await amplifyClientWrapper.getChatMessageHistory({})
 
   const toolResponse = await plotTableFromToolResponseTool.invoke({
-    // toolCallId: "tooluse_hny127d-R--qBs-gbj1vHA",
-    columnNameFromQueryForXAxis: "date",
-    chartTitle: "Hello World"
+    chartTitle: "Hello World",
+    numberOfPreviousTablesToInclude: 2
   })
-
-
 
   console.log('Tool response: ', toolResponse)
 }

@@ -1,7 +1,8 @@
 import { STSClient } from "@aws-sdk/client-sts";
+import { z } from 'zod';
 
 import { getDeployedResourceArn, getLambdaEnvironmentVariables } from "../utils";
-import { wellTableToolBuilder } from '../../amplify/functions/productionAgentFunction/toolBox';
+import { wellTableToolBuilder, wellTableSchema } from '../../amplify/functions/productionAgentFunction/toolBox';
 import { AmplifyClientWrapper } from '@/../amplify/functions/utils/amplifyUtils'
 import outputs from '@/../amplify_outputs.json';
 
@@ -12,11 +13,23 @@ const testArguments = {
     "tableColumns": [
       {
         "columnDescription": "The type of operation performed on the well",
-        "columnName": "Operation Type"
+        "columnName": "Operation Type",
+        "columnDefinition": {
+            "type": "enum",
+            "values": [
+                "drill",
+                "completion",
+                "transportation",
+                "cathodic protection"
+            ]
+        }
       },
       {
         "columnDescription": "Text describing the details of the operation",
-        "columnName": "Operation Details"
+        "columnName": "Operation Details",
+        "columnDefinition": {
+            "type": "string",
+        }
       }
     ],
     "dataToExclude": "transportation corporation, cathotic protection"
@@ -26,7 +39,7 @@ const testArguments = {
     // "s3Key": "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00112.pdf" //Drill Report
     // s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00117.pdf" // Drill Report
     "s3Key": "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf" // Drill Report
-  }
+  } as z.infer<typeof wellTableSchema>
 
 async function main() {
     const rootStackName = outputs.custom.root_stack_name

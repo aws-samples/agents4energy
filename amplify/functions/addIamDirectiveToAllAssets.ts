@@ -52,54 +52,6 @@ async function getAppSyncApiIdByTag(): Promise<string | null> {
     }
 }
 
-// async function getGraphQLApiId(stackName: string):  Promise<string | void> {
-//   // Initialize CloudFormation client
-//   const cfnClient = new CloudFormationClient();
-
-//   // Initialize AppSync client
-//   const appSyncClient = new AppSyncClient();
-
-//   try {
-//     // Get the GraphQLAPI resource from CloudFormation
-//     const describeStackResourceCommand = new DescribeStackResourceCommand({
-//       StackName: stackName,
-//       LogicalResourceId: "GraphQLAPI"
-//     });
-
-//     const stackResourceResponse = await cfnClient.send(describeStackResourceCommand);
-//     const apiId = stackResourceResponse.StackResourceDetail?.PhysicalResourceId;
-
-//     if (!apiId) throw new Error('Did not find GraphQL API ID')
-
-//     return apiId
-
-//     // // Get the GraphQL API details from AppSync
-//     // const getGraphqlApiCommand = new GetGraphqlApiCommand({ apiId });
-//     // const graphqlApiResponse = await appSyncClient.send(getGraphqlApiCommand);
-
-//     // // Log the GraphQL API details
-//     // console.log("GraphQL API Details:");
-//     // console.log("API ID:", graphqlApiResponse.graphqlApi?.apiId);
-//     // console.log("Name:", graphqlApiResponse.graphqlApi?.name);
-//     // console.log("URI:", graphqlApiResponse.graphqlApi?.uris?.GRAPHQL);
-//     // console.log("ARN:", graphqlApiResponse.graphqlApi?.arn);
-
-//   } catch (error) {
-//     console.error("Error fetching GraphQL API info:", error);
-//   }
-// }
-
-// function getApiIdFromEndpoint(endpoint: string): string | null {
-//     const regex = /^https:\/\/([a-zA-Z0-9]+)\.appsync-api\.[a-zA-Z0-9-]+\.amazonaws\.com\/graphql$/;
-//     const match = endpoint.match(regex);
-
-//     if (match && match[1]) {
-//         return match[1]; // API ID is the first capture group
-//     }
-
-//     return null; // Return null if the API ID cannot be parsed
-// }
-
 function addDirectivesToSchema(props: { schema: string, directivesToAdd: string[] }): string {
     const ast = parse(props.schema);
 
@@ -197,7 +149,8 @@ export const handler = async (event: any, context: Context, callback: any): Prom
     // const apiId = getApiIdFromEndpoint(env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
     // const apiId = event.ResourceProperties.apiId;
 
-    const apiId = await getAppSyncApiIdByTag()
+    // const apiId = await getAppSyncApiIdByTag()
+    const apiId = process.env.APPSYNC_API_ID
 
     if (!apiId) throw new Error("API ID not found");
 

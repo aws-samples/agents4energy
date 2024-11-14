@@ -114,7 +114,7 @@ export const getTableDefinitionsTool = tool(
     },
     {
         name: "getTableDefinitionsTool",
-        description: "Can retrieve database table definitons which can help answer a user's question.",
+        description: "Always call this tool before executing a SQL query. Can retrieve database table definitons available for SQL queries.",
         schema: getTableDefinitionsSchema,
     }
 );
@@ -125,10 +125,12 @@ export const getTableDefinitionsTool = tool(
 
 const executeSQLQuerySchema = z.object({
     query: z.string().describe(`
-        The Trino SQL query to be executed. 
-        Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
-        Include the dataSource, database, and tableName in the FROM element (ex: FROM postgres_sample_992.production.daily)
+        The Trino SQL query to be executed.
+        To use date functions on a column with varchar type, cast the column to a date first.
+        The DATE_SUB function is not available. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
+        Include the dataSource, database, and tableName in the FROM element (ex: FROM <dataSourceName>.production.daily)
         Use "" arond all column names.
+        The first column in the returned result will be used as the x axis column. If the query contains a date, set it as the first column.
         `),
 });
 
@@ -208,7 +210,7 @@ export const executeSQLQueryTool = tool(
     },
     {
         name: "executeSQLQuery",
-        description: "Can execute a Trino SQL query and returns the results as a table.",
+        description: "Always call the getTableDefinitionsTool before calling this tool. This tool can execute a Trino SQL query and returns the results as a table.",
         schema: executeSQLQuerySchema,
     }
 );
@@ -219,45 +221,49 @@ export const executeSQLQueryTool = tool(
 
 const plotTableFromToolResponseSchema = z.object({
     // toolCallId: z.string().describe("The tool call ID which produced the table to plot. Ex: tooluse_xxxxxxx"),
-    columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
+    // columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
     chartTitle: z.string().describe("The title of the plot."),
+    numberOfPreviousTablesToInclude: z.number().int().optional().describe("The number of previous tables to include in the plot. Default is 1."),
 });
 
 
 export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
-    async ({ columnNameFromQueryForXAxis, chartTitle }) => {
+    async ({ chartTitle, numberOfPreviousTablesToInclude = 1 }) => {
 
-        console.log('Messages:\n', amplifyClientWrapper.chatMessages)
+        // console.log('Messages:\n', amplifyClientWrapper.chatMessages)
 
-        const toolResponseMessages = amplifyClientWrapper.chatMessages.filter(
-            (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
-        )
+        // const toolResponseMessages = amplifyClientWrapper.chatMessages.filter(
+        //     (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
+        // )
 
-        console.log('Tool Response Messages:\n', toolResponseMessages)
+        // console.log('Tool Response Messages:\n', toolResponseMessages)
 
-        const selectedToolMessage = toolResponseMessages.slice(-1)[0]
+        // const selectedToolMessages = toolResponseMessages.slice(-1*numberOfPreviousTablesToInclude)
 
-        console.log("Selected message: ", selectedToolMessage)
+        // console.log("Selected messages: ", selectedToolMessages)
 
-        const queryResponseData = JSON.parse(selectedToolMessage.content as string).queryResponseData
+        // for (const selectedToolMessage of selectedToolMessages) {
+        //     const queryResponseData = JSON.parse(selectedToolMessage.content as string).queryResponseData
 
-        console.log('data object: ', queryResponseData)
+        //     console.log('data object: ', queryResponseData)
 
-        // Functions must return strings
-        if (!(columnNameFromQueryForXAxis in queryResponseData[0])) {
-            return {
-                messageContentType: 'tool_json',
-                error: `
-                    Column name "${columnNameFromQueryForXAxis}" is not present in the result of the SQL query column names: ${queryResponseData.keys}
-                    Be sure to select a column from the sql query for the x axis.
-                    `
-            } as ToolMessageContentType
-        }
+        //     // Functions must return strings
+        //     if (!(columnNameFromQueryForXAxis in queryResponseData[0])) {
+        //         return {
+        //             messageContentType: 'tool_json',
+        //             error: `
+        //                 Column name "${columnNameFromQueryForXAxis}" is not present in the result of the SQL query column names: ${queryResponseData.keys}
+        //                 Be sure to select a column from the sql query for the x axis.
+        //                 `
+        //         } as ToolMessageContentType
+        //     }
+        // }
 
         return {
             messageContentType: 'tool_plot',
-            columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
+            // columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
             chartTitle: chartTitle,
+            numberOfPreviousTablesToInclude: numberOfPreviousTablesToInclude
             // chartData: queryResponseData
         } as ToolMessageContentType
 
@@ -274,20 +280,21 @@ export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: Ampli
 //////// PDF Reports to Table Tool ///////
 //////////////////////////////////////////
 
-const wellTableSchema = z.object({
+export const wellTableSchema = z.object({
     dataToExclude: z.string().optional().describe("List of criteria to exclude data from the table"),
     dataToInclude: z.string().optional().describe("List of criteria to include data in the table"),
     tableColumns: z.array(z.object({
         columnName: z.string().describe('The name of a column'),
         columnDescription: z.string().describe('A description of the information which this column contains.'),
         columnDefinition: z.object({
-            type: z.enum(['string', 'integer', 'date', 'number', 'boolean']).describe('The data type of the column.'),
+            type: z.enum(['string', 'integer', 'date', 'number', 'boolean', 'enum']).describe('The data type of the column.'),
             format: z.string().describe('The format of the column.').optional(),
             pattern: z.string().describe('The regex pattern for the column.').optional(),
             minimum: z.number().optional(),
-            maximum: z.number().optional()
-        }).optional()
-    })).describe("The column name and description for each column of the table."),
+            maximum: z.number().optional(),
+            values: z.array(z.string()).optional()
+        })//.optional()
+    })).describe("The column name and description for each column of the table. Choose the column best suited for a chart label as the first element."),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
 });
 
@@ -357,7 +364,6 @@ function removeSpaceAndLowerCase(str: string): string {
 
 export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
     async ({ dataToInclude, tableColumns, wellApiNumber, dataToExclude }) => {
-
         if (!process.env.DATA_BUCKET_NAME) throw new Error("DATA_BUCKET_NAME environment variable is not set")
         // const sfnClient = new SFNClient({
         //     region: process.env.AWS_REGION,
@@ -447,7 +453,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
 
         const dataRows = await processWithConcurrency({
             items: wellFiles,
-            concurrency: 2,
+            concurrency: 10,
             fn: async (s3Key) => {
                 try {
 
@@ -459,11 +465,12 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
                     const objectContent = await getObjectResponse.Body?.transformToString()
                     if (!objectContent) throw new Error(`No object content for s3 key: ${s3Key}`)
                     
-                    const messageText = `
+                    const messageText = `ß
                     The user is asking you to extract information from a YAML object.
                     The YAML object contains information about a well.
-                    The YAML object is:
+                    <YamlObject>
                     ${objectContent}
+                    </YamlObject>
                     `
 
                     const fileDataResponse = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
@@ -476,8 +483,6 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
                     })
 
                     const fileData = JSON.parse(fileDataResponse.data.invokeBedrockWithStructuredOutput || "")
-
-                    // console.log('fileData: ', fileData)
 
                     //Replace the keys in file Data with those from correctedColumnNameMap
                     Object.keys(fileData).forEach(key => {
