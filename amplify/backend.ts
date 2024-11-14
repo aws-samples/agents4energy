@@ -185,15 +185,13 @@ applyTagsToRootStack()
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sample-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
 });
 
 const {
-  // queryImagesStateMachineArn,
-  // getInfoFromPdfFunction,
   convertPdfToYamlFunction,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
@@ -203,7 +201,7 @@ const {
 
 } = productionAgentBuilder(customStack, {
   vpc: vpc,
-  // s3Bucket: uploadToS3Deployment.deployedBucket, // This causes the assets here to not deploy until the s3 upload is complete.
+  deployedS3Bucket: uploadToS3Deployment.deployedBucket, // This causes the assets here to not deploy until the s3 upload is complete.
   s3Bucket: backend.storage.resources.bucket
 })
 

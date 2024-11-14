@@ -33,6 +33,7 @@ const defaultProdDatabaseName = 'proddb'
 interface ProductionAgentProps {
     vpc: ec2.Vpc,
     s3Bucket: s3.IBucket,
+    deployedS3Bucket: s3.IBucket
     // lambdaLlmAgentRole: iam.IRole
 }
 
@@ -487,6 +488,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ]),
     });
     prodDbConfigurator.node.addDependency(writerNode)
+    prodDbConfigurator.node.addDependency(props.deployedS3Bucket) //Make sure the bucket deployment is finished before writing to the bucket
 
     // Start the knowledge base ingestion job
     //// https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/BedrockAgent.html#startIngestionJob-property
@@ -675,12 +677,15 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     }
 
     // Create a Custom Resource that invokes the Step Function
-    new cr.AwsCustomResource(scope, `TriggerCrawlerStepFunction`, {
+    const crawlerTriggerCustomResource = new cr.AwsCustomResource(scope, `TriggerCrawlerStepFunction`, {
         onCreate: invokeStepFunctionSDKCall,
         policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
             resources: [runCrawlerRecordTableDefintionStateMachine.stateMachineArn],
         }),
     });
+
+    //Make sure the bucket deployment finishs before 
+    crawlerTriggerCustomResource.node.addDependency(props.deployedS3Bucket)
 
 
     return {

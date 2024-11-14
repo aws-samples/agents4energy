@@ -70,8 +70,9 @@ export class AppConfigurator extends Construct {
       ],
       resources: [
         // `arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`,
-        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:apis/${props.appSyncApi.apiId}`,
-        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:apis/${props.appSyncApi.apiId}/*`
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:/v1/apis/${props.appSyncApi.apiId}/*`,
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:/apis/${props.appSyncApi.apiId}`,
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:/apis/${props.appSyncApi.apiId}/*`
       ],
     }))
 
@@ -178,7 +179,6 @@ export class AppConfigurator extends Construct {
     }
 
     // Create a Custom Resource that invokes the Step Function on every stack update
-    // new cr.AwsCustomResource(this, `TriggerStepFunction-${Date.now().toString().slice(-5)}`, {
     new cr.AwsCustomResource(this, `TriggerStepFunction`, {
       onCreate: invokeStepFunctionSDKCall,
       onUpdate: invokeStepFunctionSDKCall,
