@@ -70,7 +70,8 @@ export class AppConfigurator extends Construct {
       ],
       resources: [
         // `arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`,
-        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:apis/${props.appSyncApi.apiId}`
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:apis/${props.appSyncApi.apiId}`,
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:apis/${props.appSyncApi.apiId}/*`
       ],
     }))
 
