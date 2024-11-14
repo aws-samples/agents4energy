@@ -68,20 +68,15 @@ const bedrockAgentDataSource = backend.data.resources.graphqlApi.addHttpDataSour
   }
 );
 
-const bedrockAgentRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
-  "bedrockAgentRuntimeDS",
-  `https://bedrock-agent-runtime.${backend.auth.stack.region}.amazonaws.com`,
-  {
-    authorizationConfig: {
-      signingRegion: backend.auth.stack.region,
-      signingServiceName: "bedrock",
-    },
-  }
-);
-
-
-// const noneDS = backend.data.resources.graphqlApi.addNoneDataSource(
-//   "noneDS"
+// const bedrockAgentRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
+//   "bedrockAgentRuntimeDS",
+//   `https://bedrock-agent-runtime.${backend.auth.stack.region}.amazonaws.com`,
+//   {
+//     authorizationConfig: {
+//       signingRegion: backend.auth.stack.region,
+//       signingServiceName: "bedrock",
+//     },
+//   }
 // );
 
 bedrockRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
@@ -106,17 +101,17 @@ bedrockAgentDataSource.grantPrincipal.addToPrincipalPolicy(
   })
 );
 
-bedrockAgentRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
-  new iam.PolicyStatement({
-    resources: [
-      `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:agent-alias/*`,
-    ],
-    actions: [
-      "bedrock:InvokeAgent",
-    ],
+// bedrockAgentRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
+//   new iam.PolicyStatement({
+//     resources: [
+//       `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:agent-alias/*`,
+//     ],
+//     actions: [
+//       "bedrock:InvokeAgent",
+//     ],
 
-  })
-);
+//   })
+// );
 
 backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
@@ -190,15 +185,15 @@ applyTagsToRootStack()
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sample-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
 });
 
 const {
-  queryImagesStateMachineArn,
-  getInfoFromPdfFunction,
+  // queryImagesStateMachineArn,
+  // getInfoFromPdfFunction,
   convertPdfToYamlFunction,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
@@ -215,8 +210,7 @@ const {
 uploadToS3Deployment.node.addDependency(convertPdfToYamlFunction) //Don't deploy files until the convertPdfToYamlFunction function is done deploying
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
-backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
-// backend.productionAgentFunction.addEnvironment('CONVERT_PDF_TO_JSON_LAMBDA_ARN', convertPdfToJsonFunction.functionArn)
+// backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
 backend.productionAgentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', athenaWorkgroup.name)
 backend.productionAgentFunction.addEnvironment('DATABASE_NAME', defaultProdDatabaseName)
@@ -239,111 +233,24 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
 )
 
 
-backend.productionAgentFunction.resources.lambda.addToRolePolicy(
-  new iam.PolicyStatement({
-    actions: ["states:StartSyncExecution"],
-    resources: [queryImagesStateMachineArn],
-  })
-)
-
 // backend.productionAgentFunction.resources.lambda.addToRolePolicy(
 //   new iam.PolicyStatement({
-//     actions: ["bedrock:InvokeModel*"],
-//     resources: [
-//       `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:inference-profile/*`,
-//       `arn:aws:bedrock:us-*::foundation-model/*`,
-//       // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
-//       // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`,
-//       // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0`,
-//       // `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/anthropic.*`,
-//     ],
+//     actions: ["states:StartSyncExecution"],
+//     resources: [queryImagesStateMachineArn],
 //   })
 // )
 
-
-
-// //https://repost.aws/knowledge-center/athena-output-bucket-error
-// backend.productionAgentFunction.resources.lambda.addToRolePolicy(
-//   new iam.PolicyStatement({
-//     actions: [
-//       "s3:GetBucketLocation",
-//       "s3:GetObject",
-//       "s3:ListBucket",
-//       "s3:ListBucketMultipartUploads",
-//       "s3:ListMultipartUploadParts",
-//       "s3:AbortMultipartUpload",
-//       "s3:PutObject"
-//     ],
-//     resources: [
-//       backend.storage.resources.bucket.bucketArn,
-//       backend.storage.resources.bucket.arnForObjects("*")
-//     ],
-//   }),
+// //Create data sources and resolvers for the lambdas created in the production agent stack
+// const convertPdfToImageDS = backend.data.addLambdaDataSource(
+//   'convertPdfToImageDS',
+//   getInfoFromPdfFunction
 // )
 
-// // The function must be able to invoke the lambda function used as a datasource for the federated Athena Query.
-// backend.productionAgentFunction.resources.lambda.addToRolePolicy(
-//   new iam.PolicyStatement({
-//     actions: ["lambda:InvokeFunction"],
-//     resources: [`arn:aws:lambda:*:*:*`], //This function must be able to invoke lambda functions in other accounts so to query Athena federated data sources in other accounts.
-//     conditions: { //The lambda must be tagged with `AgentsForEnergy: true` in order to be invoked.
-//       'StringEquals': {
-//         'aws:ResourceTag/AgentsForEnergy': 'true'
-//       }
-//     }
-//   }),
-// )
-
-// backend.productionAgentFunction.resources.lambda.addToRolePolicy(
-//   new cdk.aws_iam.PolicyStatement({
-//     actions: [
-//       'athena:StartQueryExecution',
-//       'athena:GetQueryExecution',
-//       'athena:GetQueryResults',
-//     ],
-//     resources: [`arn:aws:athena:${rootStack.region}:${rootStack.account}:workgroup/${athenaWorkgroup.name}`],
-//   })
-// )
-
-
-// backend.productionAgentFunction.resources.lambda.addToRolePolicy(
-//   new cdk.aws_iam.PolicyStatement({
-//     actions: [
-//       'athena:GetDataCatalog'
-//     ],
-//     resources: [`arn:aws:athena:*:*:datacatalog/*`], // This function must be able to invoke data catalogs in other accoutns.
-//     conditions: { // The data catalog must be tagged with `AgentsForEnergy: true` in order to be invoked.
-//       'StringEquals': {
-//         'aws:ResourceTag/AgentsForEnergy': 'true'
-//       }
-//     }
-//   })
-// )
-
-//Create data sources and resolvers for the lambdas created in the production agent stack
-const convertPdfToImageDS = backend.data.addLambdaDataSource(
-  'convertPdfToImageDS',
-  getInfoFromPdfFunction
-)
-
-convertPdfToImageDS.createResolver(
-  'getInfoFromPdfResolver',
-  {
-    typeName: 'Query',
-    fieldName: 'getInfoFromPdf'
-  }
-)
-
-// const convertPdfToJsonFunctionDS = backend.data.addLambdaDataSource(
-//   'convertPdfToImagesFunctionDS',
-//   convertPdfToJsonFunction
-// )
-
-// convertPdfToJsonFunctionDS.createResolver(
-//   'convertPdfToJsonFunctionResolver',
+// convertPdfToImageDS.createResolver(
+//   'getInfoFromPdfResolver',
 //   {
 //     typeName: 'Query',
-//     fieldName: 'convertPdfToJson',
+//     fieldName: 'getInfoFromPdf'
 //   }
 // )
 

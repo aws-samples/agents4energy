@@ -64,6 +64,7 @@ const schema = a.schema({
       })
     })
     .authorization((allow) => [allow.owner(), allow.authenticated().to(['read'])]), //The allow.authenticated() allows other users to view chat sessions.
+
   ChatMessage: a
     .model({
       chatSessionId: a.id(),
@@ -137,15 +138,15 @@ const schema = a.schema({
     .handler(a.handler.function(productionAgentFunction))
     .authorization((allow) => [allow.authenticated()]),
 
-  getInfoFromPdf: a
-    .query()
-    .arguments({
-      s3Key: a.string().required(),
-      tableColumns: a.json().required(),
-      dataToExclude: a.json(),
-      dataToInclude: a.json()
-    })
-    .returns(a.json()),
+  // getInfoFromPdf: a
+  //   .query()
+  //   .arguments({
+  //     s3Key: a.string().required(),
+  //     tableColumns: a.json().required(),
+  //     dataToExclude: a.json(),
+  //     dataToInclude: a.json()
+  //   })
+  //   .returns(a.json()),
 
   // convertPdfToJson: a
   //   .query()
