@@ -162,7 +162,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     })
 
     this.knowledgeBase = new bedrock.CfnKnowledgeBase(this, "KnowledgeBase", {
-      name: `${id}-${rootStack.stackName.slice(-5)}-1`,
+      name: `${id}-${rootStack.stackName.slice(-3)}`,
       roleArn: knoledgeBaseRole.roleArn,
       description: 'This knowledge base stores sql table definitions',
       knowledgeBaseConfiguration: {
