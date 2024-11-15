@@ -330,7 +330,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
     });
 
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefBedrockKnoledgeBase", {
+    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefinitionBedrockKnoledgeBase", {
         vpc: props.vpc,
         bucket: props.s3Bucket
     })

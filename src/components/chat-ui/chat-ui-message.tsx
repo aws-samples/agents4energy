@@ -61,6 +61,14 @@ export interface ChatUIMessageProps {
   showCopyButton?: boolean;
 }
 
+// // Define types for annotations
+// interface AnnotationData {
+//   additionalInfo: string;
+//   title?: string;
+//   description?: string;
+//   // Add any other custom data fields you need
+// }
+
 //https://json-schema.org/understanding-json-schema/reference/array
 const getDataQualityCheckSchema = {
   title: "DataQualityCheck",
@@ -140,6 +148,15 @@ function generateColor(index: number): string {
 //   lines.push(currentLine);
 //   return lines;
 // }
+
+// // Helper function to format tooltip content
+// const formatTooltip = (data: AnnotationData): string[] => {
+//   const lines: string[] = [];
+//   if (data.title) lines.push(data.title);
+//   if (data.description) lines.push(data.description);
+//   if (data.additionalInfo) lines.push(data.additionalInfo);
+//   return lines;
+// };
 
 function getMessageCatigory(message: Message): messageContentType {
   if (!message.tool_name) {
@@ -225,6 +242,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   font: {
                     size: 12
                   },
+                  borderWidth: 2,
                   click: () => {
                     const s3Key = (event['s3Key'] as string).slice(0, -5)
                     window.open(`/files/${s3Key}`, '_blank')
@@ -232,7 +250,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   // click: () => (void), // Add click handler
                   // Make the annotation interactive
                   display: true,
-                  rotation: 90
+                  rotation: 90,
+                  data: {
+                    additionalInfo: 'More details here'
+                  }
                 }))
               const newAnnotations = Object.fromEntries(annotationValues.map((value, index) => [`text${selectedToolMessageIndex}_${index}`, value]))
               annotations = { ...annotations, ...newAnnotations }
@@ -324,6 +345,27 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             },
             annotation: {
               annotations: annotations
+            },
+            tooltip: {
+              callbacks: {
+                label: () => "dummy label"
+                // (context: any) => {
+                //   const chart = context.chart;
+                //   const annotations = chart.options.plugins.annotation.annotations;
+
+                //   for (const key in annotations) {
+                //     const annotation = annotations[key];
+                //     // For point/label annotations
+                //     if (annotation.xValue !== undefined && annotation.yValue !== undefined) {
+                //       if (context.raw.x === annotation.xValue && 
+                //           context.raw.y === annotation.yValue) {
+                //         return formatTooltip(annotation.data);
+                //       }
+                //     }
+
+                //   }
+                // }
+              }
             }
 
           }
