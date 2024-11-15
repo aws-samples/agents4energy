@@ -24,7 +24,9 @@ import { Message, messageContentType, ToolMessageContentType } from "../../utils
 
 // import PlotComponent from '../PlotComponent'
 import { Scatter } from 'react-chartjs-2';
-import annotationPlugin from 'chartjs-plugin-annotation';
+// import annotationPlugin from 'chartjs-plugin-annotation';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+
 import {
   Chart as ChartJS,
   LinearScale,
@@ -50,7 +52,8 @@ ChartJS.register(
   Legend,
   TimeScale,
   zoomPlugin,
-  annotationPlugin
+  ChartDataLabels,
+  // annotationPlugin
 );
 
 export interface ChatUIMessageProps {
@@ -204,11 +207,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         interface ScatterDataPoint {
           x: Date;
-          y: number;
+          y?: number;
+          url?: string
         }
 
         const data: ChartData<'scatter', ScatterDataPoint[]> = { datasets: [] }
-        let annotations = {}
+        // let annotations = {}
 
         selectedToolMessages.map((selectedToolMessage, selectedToolMessageIndex) => {
 
@@ -230,33 +234,83 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
           switch (tableType) {
             case 'events':
-              const annotationValues = chartContent.queryResponseData
-                .map((event) => ({
-                  type: 'label',
-                  xValue: event[chartTrendNames[0]], //The first column will be the x axis value
-                  // yValue: 100,
-
-                  backgroundColor: 'rgba(255, 255, 255, 1)',
-                  // content: wrapText(event[chartTrendNames[1]] as string, 60), //The second column will be the label text
-                  content: `Event`,
-                  font: {
-                    size: 12
-                  },
-                  borderWidth: 2,
-                  click: () => {
-                    const s3Key = (event['s3Key'] as string).slice(0, -5)
-                    window.open(`/files/${s3Key}`, '_blank')
-                  },
-                  // click: () => (void), // Add click handler
-                  // Make the annotation interactive
-                  display: true,
-                  rotation: 90,
-                  data: {
-                    additionalInfo: 'More details here'
+              const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
+                labels: ['event'.repeat(chartDataObject[chartTrendNames[0]].length)],
+                datasets: [
+                  {
+                    data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
+                      x: new Date(xValue), // Convert to Date object
+                      // x: xValue, // Convert to Date object
+                      y: 10,
+                      url: `/files/${chartDataObject['s3Key'][i]}`.slice(0, -5)//Remove the .yaml
+                    })),
+                    datalabels: {
+                      display: "auto"
+                    },
+                    // datalabels: {
+                    //   color: '#FFCE56'
+                    // },
+                    label: "Events",
+                    // tension: 0.1,
+                    
+                    // borderColor: 'rgb(75, 192, 192)',
+                    // pointBackgroundColor: 'rgb(75, 192, 192)',
                   }
-                }))
-              const newAnnotations = Object.fromEntries(annotationValues.map((value, index) => [`text${selectedToolMessageIndex}_${index}`, value]))
-              annotations = { ...annotations, ...newAnnotations }
+                ]
+              }
+
+              // const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
+              //   datasets: [{
+              //       // data: zipLists(chartDataObject[chartTrendNames[0]], chartDataObject[columnName]),
+              // data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
+              //   x: new Date(xValue), // Convert to Date object
+              //   // x: xValue, // Convert to Date object
+              //   // y: Number(chartDataObject[columnName][i])
+              // })),
+              //       // mode: 'lines+markers',
+              //       // backgroundColor:
+              //       //   (columnName.toLocaleLowerCase().includes('oil')) ?
+              //       //     `hsl(120, 70%, 30%)` : // bright green
+              //       //     (columnName.toLocaleLowerCase().includes('gas')) ?
+              //       //       `hsl(0, 70%, 60%)` : // bright red
+              //       //       (columnName.toLocaleLowerCase().includes('water')) ?
+              //       //         `hsl(240, 70%, 60%)` : //bright blue
+              //       //         generateColor(index),
+              //       // label: columnName,
+              //     }
+              //   ]
+              //     )
+              // }
+
+              data.datasets.push(...newEventData.datasets)
+              break
+              // const annotationValues = chartContent.queryResponseData
+              //   .map((event) => ({
+              //     type: 'label',
+              //     xValue: event[chartTrendNames[0]], //The first column will be the x axis value
+              //     // yValue: 100,
+
+              //     backgroundColor: 'rgba(255, 255, 255, 1)',
+              //     // content: wrapText(event[chartTrendNames[1]] as string, 60), //The second column will be the label text
+              //     content: `Event`,
+              //     font: {
+              //       size: 12
+              //     },
+              //     borderWidth: 2,
+              //     click: () => {
+              //       const s3Key = (event['s3Key'] as string).slice(0, -5)
+              //       window.open(`/files/${s3Key}`, '_blank')
+              //     },
+              //     // click: () => (void), // Add click handler
+              //     // Make the annotation interactive
+              //     display: true,
+              //     rotation: 90,
+              //     data: {
+              //       additionalInfo: 'More details here'
+              //     }
+              //   }))
+              // const newAnnotations = Object.fromEntries(annotationValues.map((value, index) => [`text${selectedToolMessageIndex}_${index}`, value]))
+              // annotations = { ...annotations, ...newAnnotations }
               break
             case 'trend':
               const newData: ChartData<'scatter', ScatterDataPoint[]> = {
@@ -271,6 +325,9 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                       y: Number(chartDataObject[columnName][i])
                     })),
                     mode: 'lines+markers',
+                    datalabels: {
+                      display: false
+                    },
                     backgroundColor:
                       (columnName.toLocaleLowerCase().includes('oil')) ?
                         `hsl(120, 70%, 30%)` : // bright green
@@ -295,6 +352,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
 
         const options: ChartOptions<'scatter'> = {
+          // responsive: true,
           scales: {
             x: {
               type: 'time' as const,
@@ -323,6 +381,16 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               },
             },
           },
+          onClick: (_event, elements) => {
+            if (elements.length > 0) {
+              const datasetIndex = elements[0].datasetIndex;
+              const index = elements[0].index;
+              const url = data.datasets[datasetIndex].data[index].url
+              if (data.datasets[datasetIndex].label === 'Events' && url) window.open(url, '_blank');
+              // const url = data.datasets[datasetIndex].urls[index];
+              // window.open(url, '_blank');
+            }
+          },
           plugins: {
             title: {
               text: chartTitle,
@@ -343,30 +411,61 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 },
               }
             },
-            annotation: {
-              annotations: annotations
-            },
-            tooltip: {
-              callbacks: {
-                label: () => "dummy label"
-                // (context: any) => {
-                //   const chart = context.chart;
-                //   const annotations = chart.options.plugins.annotation.annotations;
-
-                //   for (const key in annotations) {
-                //     const annotation = annotations[key];
-                //     // For point/label annotations
-                //     if (annotation.xValue !== undefined && annotation.yValue !== undefined) {
-                //       if (context.raw.x === annotation.xValue && 
-                //           context.raw.y === annotation.yValue) {
-                //         return formatTooltip(annotation.data);
-                //       }
-                //     }
-
-                //   }
+            // annotation: {
+            //   annotations: annotations
+            // },
+            datalabels: {
+              display: 'auto', //Hide overlapped data
+              color: 'black',
+              backgroundColor: 'white',
+              borderRadius: 4,
+              // padding: 6,
+              font: function(context) {
+                var w = context.chart.width;
+                return {
+                  size: w < 512 ? 12 : 14,
+                  weight: 'bold',
+                };
+              },
+              formatter: function(value, context) {
+                // const datasetIndex = elements[0].datasetIndex;
+                return 'event'//JSON.stringify(context.dataIndex)
+                // return 'testValue'
+                // if (context.chart.data.labels) {
+                //   return context!.chart!.data!.labels[context.dataIndex]
                 // }
+                
               }
-            }
+            },
+            // tooltip: {
+            //   // enabled: true,
+            //   // callbacks: {
+            //   //   label: (context: any) => {
+            //   //     return 'Bananna'
+            //   //   }
+            //   // }
+
+
+            //   // callbacks: {
+            //   //   label: () => "dummy label"
+            //   //   // (context: any) => {
+            //   //   //   const chart = context.chart;
+            //   //   //   const annotations = chart.options.plugins.annotation.annotations;
+
+            //   //   //   for (const key in annotations) {
+            //   //   //     const annotation = annotations[key];
+            //   //   //     // For point/label annotations
+            //   //   //     if (annotation.xValue !== undefined && annotation.yValue !== undefined) {
+            //   //   //       if (context.raw.x === annotation.xValue && 
+            //   //   //           context.raw.y === annotation.yValue) {
+            //   //   //         return formatTooltip(annotation.data);
+            //   //   //       }
+            //   //   //     }
+
+            //   //   //   }
+            //   //   // }
+            //   // }
+            // }
 
           }
         };
@@ -400,8 +499,13 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         }
 
         console.log('Query Response Data: ', queryResponseData)
+        if (!queryResponseData[0]) {
+          console.warn('No query response data')
+          return
+        }
 
         const columnNames = Object.keys(queryResponseData[0])
+
         console.log('Column Names: ', columnNames)
 
 

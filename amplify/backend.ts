@@ -185,7 +185,7 @@ applyTagsToRootStack()
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'well-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
@@ -201,8 +201,9 @@ const {
 
 } = productionAgentBuilder(customStack, {
   vpc: vpc,
-  deployedS3Bucket: uploadToS3Deployment.deployedBucket, // This causes the assets here to not deploy until the s3 upload is complete.
-  s3Bucket: backend.storage.resources.bucket
+  s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
+  s3Bucket: backend.storage.resources.bucket,
+  // appSyncApi: backend.data.resources.graphqlApi
 })
 
 uploadToS3Deployment.node.addDependency(convertPdfToYamlFunction) //Don't deploy files until the convertPdfToYamlFunction function is done deploying

@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -8,21 +9,49 @@ import {
   custom_resources as cr,
   aws_logs as logs,
 } from 'aws-cdk-lib'
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 
-// import { Construct } from "@aws-cdk/core";
 import * as cdk from 'aws-cdk-lib';
-// import * as stepfunctions from 'aws-cdk-lib/aws-stepfunctions';
-// import * as stepfunctions_tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-// import * as lambda from 'aws-cdk-lib/aws-lambda';
-// import * as cloudformation from 'aws-cdk-lib/aws-cloudformation';
 import { Construct } from 'constructs';
-// import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
-// import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-// import * as cr from 'aws-cdk-lib/custom-resources';
-// import * as logs from 'aws-cdk-lib/aws-logs';
-// import * as iam from 'aws-cdk-lib/aws-iam';
-import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
-// import { bedrock } from '@cdklabs/generative-ai-cdk-constructs'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, '..');
+
+//These reasurces allow a custom resource to trigger when the AppSync Schema changes.
+import * as crypto from 'crypto';
+const schemaFileContent = fs.readFileSync(path.join(__dirname, '../data/resource.ts'), 'utf8');
+const schemaFileContentHash = crypto.createHash('md5').update(schemaFileContent).digest('hex')
+
+function createDummy<T>(): T {
+  function createDummyValue(type: any): any {
+    // Handle primitive types
+    if (type === String || type === 'String') return '';
+    if (type === Number || type === 'Number') return 0;
+    if (type === Boolean || type === 'Boolean') return false;
+    if (type === Date || type === 'Date') return new Date();
+    if (type === Array || Array.isArray(type)) return [];
+    if (type === null) return null;
+    if (type === undefined) return undefined;
+
+    // Handle objects
+    const obj: any = {};
+    
+    // If type has properties, recursively create dummy values
+    if (type && typeof type === 'object') {
+      Object.keys(type).forEach(key => {
+        obj[key] = createDummyValue(type[key]);
+      });
+    }
+
+    return obj;
+  }
+
+  return createDummyValue({} as T) as T;
+}
+import { Schema } from '../data/resource'
+const dummySchemaString = JSON.stringify(createDummy<Schema>(), null, 2)
+console.log('Dummy Schema Object:\n', dummySchemaString)
+const dummySchemaHash = crypto.createHash('md5').update(dummySchemaString).digest('hex')
 
 export interface AppConfiguratorProps {
   hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
@@ -41,8 +70,7 @@ export class AppConfigurator extends Construct {
   constructor(scope: Construct, id: string, props: AppConfiguratorProps) {
     super(scope, id);
 
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const rootDir = path.resolve(__dirname, '..');
+
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
@@ -170,23 +198,25 @@ export class AppConfigurator extends Construct {
       action: 'startExecution',
       parameters: {
         stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
-        input: JSON.stringify({ 
+        input: JSON.stringify({
           action: 'create',
-          startTime: Date.now(),
+          schemaFileContentHash: dummySchemaHash //This causes the custom resource to trigger when the scheama is updated.
+          // startTime: Date.now(),
         }),
       },
       physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
     }
 
     // Create a Custom Resource that invokes the Step Function on every stack update
-    new cr.AwsCustomResource(this, `TriggerStepFunction`, {
+    const triggerStepFunctionCustomResource = new cr.AwsCustomResource(this, `TriggerStepFunction`, {
       onCreate: invokeStepFunctionSDKCall,
       onUpdate: invokeStepFunctionSDKCall,
       policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
         resources: [appConfiguratorStateMachine.stateMachineArn],
       }),
-      
     });
+
+    triggerStepFunctionCustomResource.node.addDependency(props.appSyncApi) //Trigger the custom resource whenever the app sync api is updated.
 
   }
 }

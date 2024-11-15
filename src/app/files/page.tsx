@@ -9,62 +9,63 @@ import FormField from "@cloudscape-design/components/form-field";
 import styles from './page.module.css'
 // import './page.module.css'
 
-import { list, remove, ListPaginateWithPathInput } from 'aws-amplify/storage';
+import {remove } from 'aws-amplify/storage';
 // import { it } from "node:test";
 // import { useAuthenticator } from '@aws-amplify/ui-react';
 // import { redirect } from 'next/navigation';
 
 import { withAuth } from '@/components/WithAuth';
+import {S3Asset, onFetchObjects } from "@/utils/amplify-utils";
 
 //https://aws-amplify.github.io/amplify-js/api/
 //https://docs.amplify.aws/nextjs/build-a-backend/storage/list-files/
 
-interface S3Asset {
-  Key: string;
-  Size: number | undefined;
-  IsFolder: boolean;
-}
+// interface S3Asset {
+//   Key: string;
+//   Size: number | undefined;
+//   IsFolder: boolean;
+// }
 
-const onFetchObjects = async (pathPrefix: string): Promise<readonly S3Asset[]> => {
-  console.log('pathPrefix', pathPrefix)
-  try {
+// export const onFetchObjects = async (pathPrefix: string): Promise<readonly S3Asset[]> => {
+//   console.log('pathPrefix', pathPrefix)
+//   try {
 
-    const result = await list({
-      path: pathPrefix || "well-files/",
-      pageSize: 10,
-      options: {
-        subpathStrategy: { strategy: 'exclude' }
-      },
-      // nextToken: nextToken
-    } as ListPaginateWithPathInput);
+//     const result = await list({
+//       path: pathPrefix || "well-files/",
+//       pageSize: 10,
+//       options: {
+//         subpathStrategy: { strategy: 'exclude' }
+//       },
+//       // nextToken: nextToken
+//     } as ListPaginateWithPathInput);
 
-    console.log('list result: ', result)
+//     console.log('list result: ', result)
 
-    const objects: S3Asset[] = result.items.map((item) => ({
-      Key: item.path,
-      Size: item.size,
-      IsFolder: false
-    }));
+//     const objects: S3Asset[] = result.items.map((item) => ({
+//       Key: item.path,
+//       Size: item.size,
+//       IsFolder: false
+//     }));
 
-    if (result.excludedSubpaths) {
-      const folders: S3Asset[] = result.excludedSubpaths.map((item) => {
-        return {
-          Key: item.substring(pathPrefix.length),
-          Size: undefined,
-          IsFolder: true
-        }
-      })
+//     if (result.excludedSubpaths) {
+//       const folders: S3Asset[] = result.excludedSubpaths.map((item) => {
+//         return {
+//           Key: item.substring(pathPrefix.length),
+//           Size: undefined,
+//           IsFolder: true
+//         }
+//       })
 
-      objects.push(...folders)
-    }
+//       objects.push(...folders)
+//     }
 
-    return objects
+//     return objects
 
-  } catch (error) {
-    console.error('Error fetching S3 objects:', error);
-    return Promise.resolve([]); // Return an empty array in case of an error
-  }
-}
+//   } catch (error) {
+//     console.error('Error fetching S3 objects:', error);
+//     return Promise.resolve([]); // Return an empty array in case of an error
+//   }
+// }
 
 
 

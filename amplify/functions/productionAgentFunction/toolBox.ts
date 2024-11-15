@@ -11,6 +11,7 @@ import { AmplifyClientWrapper, JsonSchema, FieldDefinition } from '../utils/ampl
 import { processWithConcurrency, startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
 import { ToolMessageContentType } from '../../../src/utils/types'
+import { onFetchObjects } from '../../../src/utils/amplify-utils'
 
 import { invokeBedrockWithStructuredOutput } from '../graphql/queries'
 
@@ -130,6 +131,7 @@ const executeSQLQuerySchema = z.object({
         The DATE_SUB function is not available. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
         Include the dataSource, database, and tableName in the FROM element (ex: FROM <dataSourceName>.production.daily)
         Use "" arond all column names.
+        Column aliases defined in the SELECT clause cannot be referenced in the WHERE clause because the WHERE clause is evaluated before the SELECT clause during query processing.
         The first column in the returned result will be used as the x axis column. If the query contains a date, set it as the first column.
         `),
 });
@@ -227,7 +229,7 @@ const plotTableFromToolResponseSchema = z.object({
 });
 
 
-export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
+export const plotTableFromToolResponseTool = tool(
     async ({ chartTitle, numberOfPreviousTablesToInclude = 1 }) => {
 
         // console.log('Messages:\n', amplifyClientWrapper.chatMessages)
@@ -270,7 +272,7 @@ export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: Ampli
     },
     {
         name: "plotTableFromToolResponseToolBuilder",
-        description: "Plots tabular data returned from a previous tool call",
+        description: "Plots tabular data returned from previous tool messages",
         schema: plotTableFromToolResponseSchema,
     }
 );
@@ -287,12 +289,12 @@ export const wellTableSchema = z.object({
         columnName: z.string().describe('The name of a column'),
         columnDescription: z.string().describe('A description of the information which this column contains.'),
         columnDefinition: z.object({
-            type: z.enum(['string', 'integer', 'date', 'number', 'boolean', 'enum']).describe('The data type of the column.'),
+            type: z.enum(['string', 'integer', 'date', 'number', 'boolean']).describe('The data type of the column.'),
             format: z.string().describe('The format of the column.').optional(),
+            enum: z.array(z.string()).optional(),
             pattern: z.string().describe('The regex pattern for the column.').optional(),
             minimum: z.number().optional(),
             maximum: z.number().optional(),
-            values: z.array(z.string()).optional()
         })//.optional()
     })).describe("The column name and description for each column of the table. Choose the column best suited for a chart label as the first element."),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
@@ -308,12 +310,12 @@ function pivotLists<T>(lists: T[][]): T[][] {
 
 async function listFilesUnderPrefix(
     props: {
-    bucketName: string,
-    prefix: string,
-    suffix?: string
+        bucketName: string,
+        prefix: string,
+        suffix?: string
     }
 ): Promise<string[]> {
-    const {bucketName, prefix, suffix} = props
+    const { bucketName, prefix, suffix } = props
     // Create S3 client
     const files: string[] = [];
 
@@ -361,6 +363,46 @@ function removeSpaceAndLowerCase(str: string): string {
 
     return transformed;
 }
+
+async function listS3Folders(
+    props: {
+        bucketName: string, 
+        prefix: string
+    },
+  ): Promise<string[]> {
+    const {bucketName, prefix} = props
+
+    const s3Client = new S3Client({});
+    
+    // Add trailing slash if not present
+    const normalizedPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+    
+    const input: ListObjectsV2CommandInput = {
+      Bucket: bucketName,
+      Delimiter: '/',
+      Prefix: normalizedPrefix,
+    };
+  
+    try {
+      const command = new ListObjectsV2Command(input);
+      const response = await s3Client.send(command);
+
+    //   console.log('list folders s3 response:\n',response)
+  
+      // Get common prefixes (folders)
+      const folders = response.CommonPrefixes?.map(prefix => prefix.Prefix!.slice(normalizedPrefix.length)) || [];
+
+    //   console.log('folders: ', folders)
+      
+      // Filter out the current prefix itself and just get the part of the prefix after the normalizedPrefix
+      return folders
+        .filter(folder => folder !== normalizedPrefix)
+  
+    } catch (error) {
+      console.error('Error listing S3 folders:', error);
+      throw error;
+    }
+  }
 
 export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
     async ({ dataToInclude, tableColumns, wellApiNumber, dataToExclude }) => {
@@ -418,8 +460,8 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
         // const correctedColumnNameMap = tableColumns.map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
         const correctedColumnNameMap = Object.fromEntries(
             tableColumns
-            .filter(column => column.columnName !== removeSpaceAndLowerCase(column.columnName))
-            .map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
+                .filter(column => column.columnName !== removeSpaceAndLowerCase(column.columnName))
+                .map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
         );
 
         const fieldDefinitions: Record<string, FieldDefinition> = {};
@@ -439,21 +481,42 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
             required: Object.keys(fieldDefinitions),
         };
 
+        console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))
+
         let columnNames = tableColumns.map(column => column.columnName)
         //Add in the source and relevanceScore columns
         columnNames.push('s3Key')
 
-        const s3Prefix = `production-agent/well-files/field=SanJuanEast/uwi=${wellApiNumber}/`;
+        const s3Prefix = `production-agent/well-files/field=SanJuanEast/api=${wellApiNumber}/`;
         const wellFiles = await listFilesUnderPrefix({
-            bucketName: process.env.DATA_BUCKET_NAME, 
+            bucketName: process.env.DATA_BUCKET_NAME,
             prefix: s3Prefix,
             suffix: '.yaml'
         })
         console.log('Well Files: ', wellFiles)
 
+        if (wellFiles.length === 0) {
+            const oneLevelUpS3Prefix = s3Prefix.split('/').slice(0,-2).join('/')
+            
+            console.log('one level up s3 prefix: ', oneLevelUpS3Prefix)
+            const s3Folders = await listS3Folders({
+                bucketName: process.env.DATA_BUCKET_NAME,
+                prefix: oneLevelUpS3Prefix
+            })//await onFetchObjects(oneLevelUpS3Prefix)
+            // const s3Folders = s3ObjectsOneLevelHigher.filter(s3Asset => s3Asset.IsFolder).map(s3Asset => s3Asset.Key)
+
+            return {
+                messageContentType: 'tool_json',
+                error: `
+                No files found for well API number: ${wellApiNumber}
+                Available well APIs:\n${s3Folders.join('\n')}
+                `
+            } as ToolMessageContentType
+        }
+
         const dataRows = await processWithConcurrency({
             items: wellFiles,
-            concurrency: 10,
+            concurrency: 20,
             fn: async (s3Key) => {
                 try {
 
@@ -464,7 +527,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
 
                     const objectContent = await getObjectResponse.Body?.transformToString()
                     if (!objectContent) throw new Error(`No object content for s3 key: ${s3Key}`)
-                    
+
                     const messageText = `ß
                     The user is asking you to extract information from a YAML object.
                     The YAML object contains information about a well.
@@ -481,6 +544,14 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
                             outputStructure: JSON.stringify(jsonSchema)
                         }
                     })
+
+                    // If the GQL query returns an error, return the error to the agent
+                    if (fileDataResponse.errors) {
+                        return {
+                            messageContentType: 'tool_json',
+                            error: fileDataResponse.errors.map((error) => error.message).join('\n\n')
+                        } as ToolMessageContentType
+                    }
 
                     const fileData = JSON.parse(fileDataResponse.data.invokeBedrockWithStructuredOutput || "")
 
@@ -518,7 +589,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
     },
     {
         name: "wellTableTool",
-        description: "This tool produces tabular information about a well.",
+        description: "This tool searches the well files to extract specified information about a well. Use this tool when asked to search the well files.",
         schema: wellTableSchema,
     }
 );

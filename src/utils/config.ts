@@ -11,8 +11,7 @@ export const defaultAgents: { [key: string]: defaultAgent } = {
             The history should show events like drilling the well, completing a zone, repairing artificial lift, and other events which impact the wellbore. 
             Make a table showing the type of operation, text from the report describing operational details, and document title. 
             Exclude information about changes in the transportation corporation or cathotic protection.`,
-            `Execute a SQL query and plot the result to get the total monthly oil, gas, and water production since 1990. 
-            Get the table definition so you know what to include in the query.`
+            `Execute a SQL query and plot the result to get the total monthly oil, gas, and water production since 1990.`
         ]
     },
     FoundationModel: {

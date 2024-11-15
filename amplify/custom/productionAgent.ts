@@ -33,8 +33,7 @@ const defaultProdDatabaseName = 'proddb'
 interface ProductionAgentProps {
     vpc: ec2.Vpc,
     s3Bucket: s3.IBucket,
-    deployedS3Bucket: s3.IBucket
-    // lambdaLlmAgentRole: iam.IRole
+    s3Deployment: cdk.aws_s3_deployment.BucketDeployment
 }
 
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
@@ -103,118 +102,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const ghostScriptLayer = lambda.LayerVersion.fromLayerVersionArn(scope, 'GhostScriptLayerVersion', ghostScriptLayerArn)
 
 
-
-    // // How AWS Amplify creates lambda functions: https://github.com/aws-amplify/amplify-backend/blob/d8692b0c96584fb699e892183ae68fe302740680/packages/backend-function/src/factory.ts#L368
-    // const queryReportImageLambda = new NodejsFunction(scope, 'QueryReportImagesTs', {
-    //     runtime: lambda.Runtime.NODEJS_20_X,
-    //     entry: path.join(__dirname, '..', 'functions', 'getInfoFromPdf', 'index.ts'),
-    //     bundling: {
-    //         format: OutputFormat.CJS,
-    //         loader: {
-    //             '.node': 'file',
-    //         },
-    //         bundleAwsSDK: true,
-    //         minify: true,
-    //         sourceMap: true,
-    //     },
-    //     timeout: cdk.Duration.minutes(15),
-    //     memorySize: 3000,
-    //     role: lambdaLlmAgentRole,
-    //     environment: {
-    //         'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
-    //         // 'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
-    //         'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
-    //     },
-    //     layers: [imageMagickLayer, ghostScriptLayer]
-    // });
-
-
-    // // Create a Step Functions state machine
-    // const queryImagesStateMachine = new sfn.StateMachine(scope, 'QueryReportImagesStateMachine', {
-    //     timeout: cdk.Duration.minutes(15),
-    //     stateMachineType: sfn.StateMachineType.EXPRESS,
-    //     logs: {
-    //         destination: new logs.LogGroup(scope, 'StateMachineLogGroup', {
-    //             logGroupName: `/aws/vendedlogs/states/${rootStack.stackName}/QueryReportImagesStateMachine`,
-    //             removalPolicy: cdk.RemovalPolicy.DESTROY
-    //         }),
-    //         level: sfn.LogLevel.ALL,
-    //         includeExecutionData: true
-    //     },
-    //     tracingEnabled: true,
-    //     definitionBody: sfn.DefinitionBody.fromChainable(
-    //         new sfnTasks.CallAwsService(scope, 'List S3 Objects', {
-    //             service: 's3',
-    //             action: 'listObjectsV2',
-    //             parameters: {
-    //                 Bucket: props.s3Bucket.bucketName,
-    //                 Prefix: sfn.JsonPath.stringAt('$.s3Prefix'),
-
-    //             },
-    //             iamAction: 's3:ListBucket',
-    //             iamResources: [
-    //                 `arn:aws:s3:::${props.s3Bucket.bucketName}`,
-    //                 `arn:aws:s3:::${props.s3Bucket.bucketName}/*`
-    //             ],
-    //             resultPath: '$.s3Result',
-
-    //         })
-    //             .next(
-    //                 new sfn.Map(scope, 'Map lambda to s3 keys', {
-    //                     inputPath: '$.s3Result.Contents',
-    //                     itemsPath: '$',
-    //                     maxConcurrency: 200,
-    //                     itemSelector: {
-    //                         "arguments": {
-    //                             "tableColumns.$": "$$.Execution.Input.tableColumns",
-    //                             "dataToExclude.$": "$$.Execution.Input.dataToExclude",
-    //                             "dataToInclude.$": "$$.Execution.Input.dataToInclude",
-    //                             "s3Key.$": "$$.Map.Item.Value.Key",
-    //                         }
-    //                     },
-    //                 })
-    //                     .itemProcessor(new sfnTasks.LambdaInvoke(
-    //                         scope, 'ProcessS3Object', {
-    //                         lambdaFunction: queryReportImageLambda,
-    //                         payloadResponseOnly: true,
-    //                     }).addRetry({
-    //                         maxAttempts: 10,
-    //                         interval: cdk.Duration.seconds(1),
-    //                         maxDelay: cdk.Duration.seconds(5),
-    //                         errors: [
-    //                             'ThrottlingException',
-    //                             // 'ValidationException' //This one is rare, but can be triggered by a claude model returning: Output blocked by content filtering policy
-    //                         ],
-    //                         jitterStrategy: sfn.JitterType.FULL,
-    //                     })
-    //                     )
-    //             )
-    //             .next(new sfn.Succeed(scope, 'Succeed'))
-    //     ),
-    // });
-
-    // // Now we'll create assets which convert all uploaded pdf files into a JSON file with the same information.
-    // const athenaDataSourceRule = new events.Rule(scope, 'AthenaDataSourceRule', {
-    //     eventPattern: {
-    //       source: ['aws.athena'],
-    //       detailType: ['AWS API Call via CloudTrail'],
-    //       detail: {
-    //         eventSource: ['athena.amazonaws.com'],
-    //         eventName: [
-    //           'CreateDataCatalog',
-    //           'UpdateDataCatalog'
-    //         ],
-    //         // You can add additional filters in the detail section if needed
-    //         requestParameters: {
-    //           tags: {
-    //             'AgentsForEnergy': ['true']
-    //           }
-    //         }
-    //       }
-    //     }
-    //   });
-
-
     const convertPdfToYamlFunction = new NodejsFunction(scope, 'ConvertPdfToYamlFunction', {
         runtime: lambda.Runtime.NODEJS_20_X,
         entry: path.join(__dirname, '..', 'functions', 'convertPdfToYaml', 'index.ts'),
@@ -251,9 +138,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             suffix: '.pdf' // Only trigger for files with this extension
         }
     );
-
-
-    //This event bridge rule triggers when 
 
     //https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
     const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb-1', { //TODO remove the 1
@@ -336,7 +220,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     })
 
     const productionAgentTableDefDataSource = new bedrock.CfnDataSource(scope, 'sqlTableDefinitions', {
-        name: "sqlTableDefinitions-1",
+        name: "sqlTableDefinitions-1", //TODO - remove the 
         dataSourceConfiguration: {
             type: 'S3',
             s3Configuration: {
@@ -477,7 +361,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
     }
 
-    const prodDbConfigurator = new cr.AwsCustomResource(scope, `configureProdDbAndExportTableDefs`, {
+    const prodDbConfigurator = new cr.AwsCustomResource(scope, `configureProdDbAndExportTableInfo`, {
         onCreate: invokeConfigureProdDbFunctionServiceCall,
         onUpdate: invokeConfigureProdDbFunctionServiceCall,
         policy: cr.AwsCustomResourcePolicy.fromStatements([
@@ -488,7 +372,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ]),
     });
     prodDbConfigurator.node.addDependency(writerNode)
-    prodDbConfigurator.node.addDependency(props.deployedS3Bucket) //Make sure the bucket deployment is finished before writing to the bucket
+    prodDbConfigurator.node.addDependency(props.s3Deployment.deployedBucket) //Make sure the bucket deployment is finished before writing to the bucket
 
     // Start the knowledge base ingestion job
     //// https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/BedrockAgent.html#startIngestionJob-property
@@ -671,13 +555,16 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         action: 'startExecution',
         parameters: {
             stateMachineArn: runCrawlerRecordTableDefintionStateMachine.stateMachineArn,
-            input: JSON.stringify({ action: 'create' }),
+            input: JSON.stringify({ 
+                action: 'create',
+                s3BucketDeploymentId: props.s3Deployment.node.id
+            }),
         },
         physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
     }
 
     // Create a Custom Resource that invokes the Step Function
-    const crawlerTriggerCustomResource = new cr.AwsCustomResource(scope, `TriggerCrawlerStepFunction`, {
+    const crawlerTriggerCustomResource = new cr.AwsCustomResource(scope, `TriggerCrawlerStateMachine`, {
         onCreate: invokeStepFunctionSDKCall,
         policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
             resources: [runCrawlerRecordTableDefintionStateMachine.stateMachineArn],
@@ -685,7 +572,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
 
     //Make sure the bucket deployment finishs before 
-    crawlerTriggerCustomResource.node.addDependency(props.deployedS3Bucket)
+    crawlerTriggerCustomResource.node.addDependency(props.s3Deployment.deployedBucket)
 
 
     return {
