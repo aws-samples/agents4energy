@@ -361,7 +361,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
     }
 
-    const prodDbConfigurator = new cr.AwsCustomResource(scope, `configureProdDbAndExportTableInfo`, {
+    const prodDbConfigurator = new cr.AwsCustomResource(scope, `configureProdDbAndExportTableInfo-${props.s3Deployment.node.id}`, {
         onCreate: invokeConfigureProdDbFunctionServiceCall,
         onUpdate: invokeConfigureProdDbFunctionServiceCall,
         policy: cr.AwsCustomResourcePolicy.fromStatements([

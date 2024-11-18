@@ -7,7 +7,7 @@ import { S3Client, GetObjectCommand, ListObjectsV2Command, ListObjectsV2CommandI
 import { tool } from "@langchain/core/tools";
 import { env } from '$amplify/env/production-agent-function';
 
-import { AmplifyClientWrapper, JsonSchema, FieldDefinition } from '../utils/amplifyUtils'
+import { AmplifyClientWrapper, FieldDefinition } from '../utils/amplifyUtils'
 import { processWithConcurrency, startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
 import { ToolMessageContentType } from '../../../src/utils/types'
@@ -127,11 +127,12 @@ export const getTableDefinitionsTool = tool(
 const executeSQLQuerySchema = z.object({
     query: z.string().describe(`
         The Trino SQL query to be executed.
-        To use date functions on a column with varchar type, cast the column to a date first.
-        The DATE_SUB function is not available. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
         Include the dataSource, database, and tableName in the FROM element (ex: FROM <dataSourceName>.production.daily)
         Use "" arond all column names.
-        Column aliases defined in the SELECT clause cannot be referenced in the WHERE clause because the WHERE clause is evaluated before the SELECT clause during query processing.
+        To use date functions on a column with varchar type, cast the column to a date first.
+        The DATE_SUB function is not available. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
+        The function DATE_TRUNC can be called with these arguments: DATE_TRUNC(varchar(x), date), DATE_TRUNC(varchar(x), timestamp(p)), DATE_TRUNC(varchar(x), timestamp(p) with time zone), DATE_TRUNC(varchar(x), time(p)), DATE_TRUNC(varchar(x), time(p) with time zone)
+        Column aliases defined in the SELECT clause cannot be referenced in the WHERE or GROUP BY clauses because they are evaluated before the SELECT clause during query processing.
         The first column in the returned result will be used as the x axis column. If the query contains a date, set it as the first column.
         `),
 });

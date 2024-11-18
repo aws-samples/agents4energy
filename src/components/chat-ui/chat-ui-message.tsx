@@ -135,32 +135,6 @@ function generateColor(index: number): string {
   return `hsl(${hue}, 70%, 60%)`;
 }
 
-// function wrapText(text: string, maxWidth: number) {
-//   const words = text.split(' ');
-//   const lines = [];
-//   let currentLine = words[0];
-
-//   for (let i = 1; i < words.length; i++) {
-//     if (currentLine.length + words[i].length < maxWidth) {
-//       currentLine += ' ' + words[i];
-//     } else {
-//       lines.push(currentLine);
-//       currentLine = words[i];
-//     }
-//   }
-//   lines.push(currentLine);
-//   return lines;
-// }
-
-// // Helper function to format tooltip content
-// const formatTooltip = (data: AnnotationData): string[] => {
-//   const lines: string[] = [];
-//   if (data.title) lines.push(data.title);
-//   if (data.description) lines.push(data.description);
-//   if (data.additionalInfo) lines.push(data.additionalInfo);
-//   return lines;
-// };
-
 function getMessageCatigory(message: Message): messageContentType {
   if (!message.tool_name) {
     //This is an AI message
@@ -221,7 +195,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             queryResponseData: RowDataInput,
           }
 
-          if (chartContent.queryResponseData.length === 0) return
+          if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
 
           const chartDataObject = transformListToObject(chartContent.queryResponseData)
 
@@ -271,58 +245,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 ]
               }
 
-              // const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
-              //   datasets: [{
-              //       // data: zipLists(chartDataObject[chartTrendNames[0]], chartDataObject[columnName]),
-              // data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
-              //   x: new Date(xValue), // Convert to Date object
-              //   // x: xValue, // Convert to Date object
-              //   // y: Number(chartDataObject[columnName][i])
-              // })),
-              //       // mode: 'lines+markers',
-              //       // backgroundColor:
-              //       //   (columnName.toLocaleLowerCase().includes('oil')) ?
-              //       //     `hsl(120, 70%, 30%)` : // bright green
-              //       //     (columnName.toLocaleLowerCase().includes('gas')) ?
-              //       //       `hsl(0, 70%, 60%)` : // bright red
-              //       //       (columnName.toLocaleLowerCase().includes('water')) ?
-              //       //         `hsl(240, 70%, 60%)` : //bright blue
-              //       //         generateColor(index),
-              //       // label: columnName,
-              //     }
-              //   ]
-              //     )
-              // }
-
               data.datasets.push(...newEventData.datasets)
-              break
-              // const annotationValues = chartContent.queryResponseData
-              //   .map((event) => ({
-              //     type: 'label',
-              //     xValue: event[chartTrendNames[0]], //The first column will be the x axis value
-              //     // yValue: 100,
-
-              //     backgroundColor: 'rgba(255, 255, 255, 1)',
-              //     // content: wrapText(event[chartTrendNames[1]] as string, 60), //The second column will be the label text
-              //     content: `Event`,
-              //     font: {
-              //       size: 12
-              //     },
-              //     borderWidth: 2,
-              //     click: () => {
-              //       const s3Key = (event['s3Key'] as string).slice(0, -5)
-              //       window.open(`/files/${s3Key}`, '_blank')
-              //     },
-              //     // click: () => (void), // Add click handler
-              //     // Make the annotation interactive
-              //     display: true,
-              //     rotation: 90,
-              //     data: {
-              //       additionalInfo: 'More details here'
-              //     }
-              //   }))
-              // const newAnnotations = Object.fromEntries(annotationValues.map((value, index) => [`text${selectedToolMessageIndex}_${index}`, value]))
-              // annotations = { ...annotations, ...newAnnotations }
               break
             case 'trend':
               const newData: ChartData<'scatter', ScatterDataPoint[]> = {
@@ -330,10 +253,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   .slice(1) // The first column will be used for the x axis
                   .filter((columnName) => (!isNaN(Number(chartDataObject[columnName][0]))))
                   .map((columnName, index) => ({
-                    // data: zipLists(chartDataObject[chartTrendNames[0]], chartDataObject[columnName]),
                     data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
                       x: new Date(xValue), // Convert to Date object
-                      // x: xValue, // Convert to Date object
                       y: Number(chartDataObject[columnName][i])
                     })),
                     mode: 'lines+markers',
@@ -399,8 +320,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               const index = elements[0].index;
               const url = data.datasets[datasetIndex].data[index].url
               if (data.datasets[datasetIndex].label === 'Events' && url) window.open(url, '_blank');
-              // const url = data.datasets[datasetIndex].urls[index];
-              // window.open(url, '_blank');
             }
           },
           plugins: {
@@ -423,30 +342,16 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 },
               }
             },
-            // annotation: {
-            //   annotations: annotations
-            // },
             datalabels: {
               display: 'auto', //Hide overlapped data
               color: 'black',
               backgroundColor: 'white',
               borderRadius: 4,
-              // padding: 6,
-              // font: function (context) {
-              //   var w = context.chart.width;
-              //   return {
-              //     size: w < 512 ? 12 : 14,
-              //     weight: 'bold',
-              //   };
-              // },
+              font: {
+                weight: "bold"
+              },
               formatter: function () {//value, context) {
-                // const datasetIndex = elements[0].datasetIndex;
-                return 'event'//JSON.stringify(context.dataIndex)
-                // return 'testValue'
-                // if (context.chart.data.labels) {
-                //   return context!.chart!.data!.labels[context.dataIndex]
-                // }
-
+                return 'event'
               }
             },
 
@@ -469,36 +374,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 }
               }
             }
-
-            // tooltip: {
-            //   // enabled: true,
-            //   // callbacks: {
-            //   //   label: (context: any) => {
-            //   //     return 'Bananna'
-            //   //   }
-            //   // }
-
-
-            //   // callbacks: {
-            //   //   label: () => "dummy label"
-            //   //   // (context: any) => {
-            //   //   //   const chart = context.chart;
-            //   //   //   const annotations = chart.options.plugins.annotation.annotations;
-
-            //   //   //   for (const key in annotations) {
-            //   //   //     const annotation = annotations[key];
-            //   //   //     // For point/label annotations
-            //   //   //     if (annotation.xValue !== undefined && annotation.yValue !== undefined) {
-            //   //   //       if (context.raw.x === annotation.xValue && 
-            //   //   //           context.raw.y === annotation.yValue) {
-            //   //   //         return formatTooltip(annotation.data);
-            //   //   //       }
-            //   //   //     }
-
-            //   //   //   }
-            //   //   // }
-            //   // }
-            // }
 
           }
         };
@@ -875,9 +750,19 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         props.message?.role === 'human' && (
           <>
             <strong>{formatDate(props.message.createdAt)}</strong>
-            <ReactMarkdown>
+            {/* <ReactMarkdown>
               {props.message.content}
-            </ReactMarkdown>
+            </ReactMarkdown> */}
+            <pre
+              style={{ //Wrap long lines
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+              }}
+            >
+              {props.message.content}
+            </pre>
+
           </>
         )
       }
