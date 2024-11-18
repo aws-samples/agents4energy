@@ -1,3 +1,4 @@
+import { validate } from 'jsonschema';
 import { Amplify } from 'aws-amplify';
 import { generateClient, Client } from 'aws-amplify/data';
 import * as APITypes from "../graphql/API";
@@ -44,17 +45,8 @@ export function getLangChainMessageTextContent(message: HumanMessage | AIMessage
 
     let messageTextContent: string = ''
 
-
-    // if (message instanceof ToolMessage) {
-    //     messageTextContent += `Tool Response (${message.name}): \n\n`
-    //     console.log('Tool message: ', message)
-    //     console.log('Tool message content type: ', typeof message.content)
-    // }
-
     if (typeof message.content === 'string') {
         messageTextContent += message.content
-        // } else if ((message.content[0] as MessageContentText).text !== undefined) {
-        //     messageTextContent += (message.content[0] as MessageContentText).text
     } else {
         message.content.forEach((contentBlock) => {
             if ((contentBlock as MessageContentText).text !== undefined) messageTextContent += (contentBlock as MessageContentText).text + '\n'
@@ -64,6 +56,50 @@ export function getLangChainMessageTextContent(message: HumanMessage | AIMessage
 
     return messageTextContent
 
+}
+
+export interface FieldDefinition {
+    type: string;
+    description: string;
+    format?: string;
+    pattern?: string;
+    minimum?: number;
+    maximum?: number;
+    default?: any;
+    items?: any;
+}
+
+export interface JsonSchema {
+    title: string;
+    description: string;
+    type: string;
+    properties: Record<string, FieldDefinition>;
+    required: string[];
+}
+
+export async function correctStructuredOutputResponse(
+    model: { invoke: (arg0: any) => any; }, 
+    response: { raw: BaseMessage; parsed: Record<string, any>;}, 
+    targetJsonSchema: JsonSchema | {}, 
+    messages: BaseMessage[]
+) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const validationReslut = validate(response.parsed, targetJsonSchema);
+        console.log(`Data validation result (${attempt}): `, validationReslut.valid);
+        if (validationReslut.valid) break
+
+        console.log("Data validation error:", validationReslut.errors.join('\n'));
+        console.log('Model response which caused error: \n', response);
+        messages.push(
+            new AIMessage({ content: JSON.stringify(response.parsed) }),
+            new HumanMessage({ content: `Data validation error: ${validationReslut.errors.join('\n')}. Please try again.` })
+        );
+        response = await model.invoke(messages)
+    }
+
+    if (!response.parsed) throw new Error("No parsed response from model");
+
+    return response
 }
 
 export type PublishMessageCommandInput = { chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage }
@@ -236,35 +272,6 @@ export class AmplifyClientWrapper {
         this.chatMessages = messages
         // }
 
-        // async function testFunction(props: {chatSessionId: string, latestHumanMessageText: string }) {
-        //     const convertPdfToImagesResponse = await amplifyClient.graphql({
-        //         query: convertPdfToImages,
-        //         variables: {
-        //             s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf"
-        //         }
-        //     })
-        //     return JSON.parse(convertPdfToImagesResponse.data.convertPdfToImages || "").imageMessaggeContentBlocks
-        // }
-
-
-        // }
     }
-
-    // async function testFunction(props: {chatSessionId: string, latestHumanMessageText: string }) {
-    //     const convertPdfToImagesResponse = await amplifyClient.graphql({
-    //         query: convertPdfToImages,
-    //         variables: {
-    //             s3Key: "production-agent/well-files/field=SanJuanEast/uwi=30-039-07715/30-039-07715_00131.pdf"
-    //         }
-    //     })
-    //     return JSON.parse(convertPdfToImagesResponse.data.convertPdfToImages || "").imageMessaggeContentBlocks
-    // }
-
-
-    // return {
-    //     amplifyClient: amplifyClient,
-    //     getChatMessageHistory: getChatMessageHistory,
-    //     publishMessage: publishMessage
-    // };
 
 }

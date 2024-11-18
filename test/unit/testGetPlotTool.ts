@@ -11,7 +11,7 @@ import { getDeployedResourceArn, getLambdaEnvironmentVariables } from "../utils"
 
 import outputs from '@/../amplify_outputs.json';
 
-import { plotTableFromToolResponseToolBuilder } from '../../amplify/functions/productionAgentFunction/toolBox';
+import { plotTableFromToolResponseTool } from '../../amplify/functions/productionAgentFunction/toolBox';
 
 const stsClient = new STSClient();
 
@@ -51,7 +51,7 @@ export const main = async () => {
     chatSessionId: "",
     env: process.env
   })
-  const plotTableFromToolResponseTool = plotTableFromToolResponseToolBuilder(amplifyClientWrapper)
+  // const plotTableFromToolResponseTool = plotTableFromToolResponseTool(amplifyClientWrapper)
   //Create a new chat session for testing
   console.log('creating chat session')
   const testChatSession = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
@@ -127,12 +127,9 @@ export const main = async () => {
   await amplifyClientWrapper.getChatMessageHistory({})
 
   const toolResponse = await plotTableFromToolResponseTool.invoke({
-    // toolCallId: "tooluse_hny127d-R--qBs-gbj1vHA",
-    columnNameFromQueryForXAxis: "date",
-    chartTitle: "Hello World"
+    chartTitle: "Hello World",
+    numberOfPreviousTablesToInclude: 2
   })
-
-
 
   console.log('Tool response: ', toolResponse)
 }

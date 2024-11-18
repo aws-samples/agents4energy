@@ -11,6 +11,28 @@ import {
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 const athenaClient = new AthenaClient();
 
+export async function processWithConcurrency<T, R>(
+    props: {
+        items: T[],
+        concurrency: number,
+        fn: (item: T) => Promise<R>
+    }
+  ): Promise<R[]> {
+    const {items, concurrency, fn } = props
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += concurrency) {
+      chunks.push(items.slice(i, i + concurrency));
+    }
+  
+    const results: R[] = [];
+    for (const chunk of chunks) {
+      const chunkResults = await Promise.all(chunk.map(fn));
+      results.push(...chunkResults);
+    }
+  
+    return results;
+  }
+
 export async function startQueryExecution(props: { query: string, workgroup: string }): Promise<string> {
     const params: StartQueryExecutionInput = {
         QueryString: props.query,
@@ -67,6 +89,7 @@ export function transformColumnOfAthenaQueryToList(props: {queryResult: GetQuery
 
 
 export async function uploadStringToS3(props: {
+    bucket?: string,
     key: string,
     content: string,
     contentType?: string
@@ -76,7 +99,7 @@ export async function uploadStringToS3(props: {
 
     try {
         const command = new PutObjectCommand({
-            Bucket: process.env.S3_BUCKET_NAME,
+            Bucket: props.bucket || process.env.S3_BUCKET_NAME,
             Key: props.key,
             Body: props.content,
             ContentType: props.contentType || "text/plain",
@@ -101,24 +124,38 @@ export function transformResultSet(resultSet: ResultSet) {
     );
 
     // Initialize result object with empty arrays for each column
-    const result: { [key: string]: (string | number)[] } = {};
-    columnNames.forEach(name => {
-        result[name] = [];
-    });
+    // const result: { [key: string]: (string | number)[] } = {};
+    const queryResult: { [key: string]: (string | number) }[] = [];
+    
+    // columnNames.forEach(name => {
+    //     result[name] = [];
+    // });
 
     // Skip the header row (first row) and process data rows
     const dataRows = resultSet.Rows.slice(1);
 
     dataRows.forEach(row => {
         if (!row.Data) return;
+        const rowObject = Object.fromEntries(
+            row.Data
+            .map((cell, columnIndex) => [columnNames[columnIndex], cell.VarCharValue || ""])
+        );
 
-        row.Data.forEach((cell, columnIndex) => {
-            const columnName = columnNames[columnIndex];
-            if (columnName) {
-                result[columnName].push(cell.VarCharValue || "");
-            }
-        });
+        queryResult.push(rowObject)
+
+        // row.Data.forEach((cell, columnIndex) => {
+        //     const columnName = columnNames[columnIndex];
+        //     const rowObject = Object.fromEntries(
+        //         tableColumns
+        //         .filter(column => column.columnName !== removeSpaceAndLowerCase(column.columnName))
+        //         .map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
+        //     );
+
+        //     if (columnName) {
+        //         result[columnName].push(cell.VarCharValue || "");
+        //     }
+        // });
     });
 
-    return result;
+    return queryResult;
 }

@@ -1,6 +1,6 @@
 "use client"
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { Link } from '@mui/material';
+import { Link, Box } from '@mui/material';
 
 import {
   Button,
@@ -24,6 +24,9 @@ import { Message, messageContentType, ToolMessageContentType } from "../../utils
 
 // import PlotComponent from '../PlotComponent'
 import { Scatter } from 'react-chartjs-2';
+// import annotationPlugin from 'chartjs-plugin-annotation';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+
 import {
   Chart as ChartJS,
   LinearScale,
@@ -32,9 +35,8 @@ import {
   LineElement,
   Tooltip,
   Legend,
+  ChartData,
   TimeScale,
-  // ChartData,
-  // Point,
   ChartOptions
 } from 'chart.js';
 import zoomPlugin from 'chartjs-plugin-zoom';
@@ -49,15 +51,26 @@ ChartJS.register(
   Tooltip,
   Legend,
   TimeScale,
-  zoomPlugin
+  zoomPlugin,
+  ChartDataLabels,
+  // annotationPlugin
 );
 
 export interface ChatUIMessageProps {
   // message: Schema["ChatMessage"]["type"];
   message: Message;
+  messages: Message[];
   allMessages: Message[];
   showCopyButton?: boolean;
 }
+
+// // Define types for annotations
+// interface AnnotationData {
+//   additionalInfo: string;
+//   title?: string;
+//   description?: string;
+//   // Add any other custom data fields you need
+// }
 
 //https://json-schema.org/understanding-json-schema/reference/array
 const getDataQualityCheckSchema = {
@@ -87,43 +100,35 @@ function isValidJSON(str: string): boolean {
   }
 }
 
-function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
-  const minLength = Math.min(list1.length, list2.length);
-  const result: { x: T, y: U }[] = [];
+// function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
+//   const minLength = Math.min(list1.length, list2.length);
+//   const result: { x: T, y: U }[] = [];
 
-  for (let i = 0; i < minLength; i++) {
-    result.push({ x: list1[i], y: list2[i] });
-  }
+//   for (let i = 0; i < minLength; i++) {
+//     result.push({ x: list1[i], y: list2[i] });
+//   }
 
-  return result;
+//   return result;
+// }
+
+function transformListToObject<T extends Record<string, string | number>>(
+  list: T[]
+): { [K in keyof T]: T[K][] } {
+  return Object.keys(list[0]).reduce((acc, key) => {
+    return {
+      ...acc,
+      [key]: list.map(item => item[key as keyof T])
+    };
+  }, {}) as { [K in keyof T]: T[K][] };
 }
-
-type TransformToDataRowsInputData = {
-  [key: string]: (string | number)[]
-};
+type RowDataInput = {
+  [key: string]: (string | number)
+}[];
 
 type TransformToDataRowsOutputData = {
   id: string;
   [key: string]: string;
 };
-
-function transformDataToRows(input: TransformToDataRowsInputData): TransformToDataRowsOutputData[] {
-  const keys = Object.keys(input);
-  const firstArrayLength = input[keys[0]].length;
-
-  // Check if all arrays have the same length
-  if (!keys.every(key => input[key].length === firstArrayLength)) {
-    throw new Error("All arrays must have the same length");
-  }
-
-  return Array.from({ length: firstArrayLength }, (_, i) =>
-    keys.reduce((obj, key) => {
-      obj["id"] = `${i}`
-      obj[key] = `${input[key][i]}`;
-      return obj;
-    }, {} as TransformToDataRowsOutputData)
-  );
-}
 
 function generateColor(index: number): string {
   const hue = (index * 137.508) % 360; // Use golden angle approximation
@@ -153,26 +158,134 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   const messageContentCategory = getMessageCatigory(props.message);
 
   useEffect(() => {
+    const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation', 'includeScore']
     switch (messageContentCategory) {
       case 'tool_plot':
-        //TODO - Make oil green, gas red, water blue, ...
-        const { chartData, columnNameFromQueryForXAxis, chartTitle } = JSON.parse(props.message.content) as {
-          chartData: { [key: string]: (string | number)[] },
-          columnNameFromQueryForXAxis: string,
-          chartTitle: string | undefined
+        const { chartTitle, numberOfPreviousTablesToInclude } = JSON.parse(props.message.content) as {
+          // columnNameFromQueryForXAxis: string,
+          chartTitle: string | undefined,
+          numberOfPreviousTablesToInclude: number
         }
 
-        const datasets = Object.keys(chartData)
-          .filter(key => key !== columnNameFromQueryForXAxis)
-          .map((columnName, index) => ({
-            data: zipLists(chartData[columnNameFromQueryForXAxis], chartData[columnName]),
-            mode: 'lines+markers',
-            backgroundColor: generateColor(index),
-            label: columnName,
+        const toolResponseMessages = props.messages.filter(
+          (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
+        )
+
+        console.log('Tool Response Messages:\n', toolResponseMessages)
+
+        const selectedToolMessages = toolResponseMessages.slice(-1 * numberOfPreviousTablesToInclude)
+
+        console.log("Selected messages: ", selectedToolMessages)
+
+        if (selectedToolMessages.length === 0) return
+
+        interface ScatterDataPoint {
+          x: Date;
+          y?: number;
+          url?: string;
+          rowData?: string;
+        }
+
+        const data: ChartData<'scatter', ScatterDataPoint[]> = { datasets: [] }
+        // let annotations = {}
+
+        selectedToolMessages.map((selectedToolMessage) => {
+
+          const chartContent = JSON.parse(selectedToolMessage.content) as {
+            queryResponseData: RowDataInput,
           }
-          ))
+
+          if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
+
+          const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+          // console.log('chart data: ', chartDataObject)
+
+          const chartTrendNames = Object.keys(chartDataObject)
+
+          const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+
+          console.log('table type: ', tableType)
+
+          switch (tableType) {
+            case 'events':
+              const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
+                // labels: ['event'.repeat(chartDataObject[chartTrendNames[0]].length)],
+                datasets: [
+                  {
+                    data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
+                      x: new Date(xValue), // Convert to Date object
+                      // x: xValue, // Convert to Date object
+                      y: 100,
+                      url: `/files/${chartDataObject['s3Key'][i]}`.slice(0, -5),//Remove the .yaml,
+                      rowData: stringify(Object.keys(chartDataObject)
+                        .filter((columnName) => !nonDefaultColumns.includes(columnName))
+                        .reduce((acc, key) => ({ //Create a yaml string with the row's data
+                          ...acc,
+                          [key]: chartDataObject[key][i]
+                        }), {})
+                      )
+                    })),
+                    pointRadius: 20,
+                    datalabels: {
+                      display: "auto",
+                      rotation: 90
+                    },
+                    borderColor: "transparent",
+                    backgroundColor: "transparent",
+                    // datalabels: {
+                    //   color: '#FFCE56'
+                    // },
+                    label: "Events",
+                    // tension: 0.1,
+
+                    // borderColor: 'rgb(75, 192, 192)',
+                    // pointBackgroundColor: 'rgb(75, 192, 192)',
+                  }
+                ]
+              }
+
+              data.datasets.push(...newEventData.datasets)
+              break
+            case 'trend':
+              const newData: ChartData<'scatter', ScatterDataPoint[]> = {
+                datasets: chartTrendNames
+                  .slice(1) // The first column will be used for the x axis
+                  .filter((columnName) => (!isNaN(Number(chartDataObject[columnName][0]))))
+                  .map((columnName, index) => ({
+                    data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
+                      x: new Date(xValue), // Convert to Date object
+                      y: Number(chartDataObject[columnName][i])
+                    })),
+                    mode: 'lines+markers',
+                    datalabels: {
+                      display: false
+                    },
+                    backgroundColor:
+                      (columnName.toLocaleLowerCase().includes('oil')) ?
+                        `hsl(120, 70%, 30%)` : // bright green
+                        (columnName.toLocaleLowerCase().includes('gas')) ?
+                          `hsl(0, 70%, 60%)` : // bright red
+                          (columnName.toLocaleLowerCase().includes('water')) ?
+                            `hsl(240, 70%, 60%)` : //bright blue
+                            generateColor(index),
+                    label: columnName,
+                  })
+                  )
+              }
+
+              data.datasets.push(...newData.datasets)
+              break
+          }
+        })
+
+
+
+        console.log('chart data:\n', data)
+
 
         const options: ChartOptions<'scatter'> = {
+          // responsive: true,
           scales: {
             x: {
               type: 'time' as const,
@@ -180,12 +293,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 unit: 'day' as const,
                 tooltipFormat: 'PP',
                 displayFormats: {
-                  day: 'MMM d',
+                  day: 'yyyy MMM d',
                 },
               },
               title: {
                 display: true,
-                text: columnNameFromQueryForXAxis,
+                text: 'date',
               },
               adapters: {
                 date: {
@@ -201,15 +314,19 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               },
             },
           },
+          onClick: (_event, elements) => {
+            if (elements.length > 0) {
+              const datasetIndex = elements[0].datasetIndex;
+              const index = elements[0].index;
+              const url = data.datasets[datasetIndex].data[index].url
+              if (data.datasets[datasetIndex].label === 'Events' && url) window.open(url, '_blank');
+            }
+          },
           plugins: {
             title: {
               text: chartTitle,
               display: true
             },
-            // title: {
-            //   display: true,
-            //   text: 'Custom Chart Title'
-            // },
             zoom: {
               pan: {
                 enabled: true,
@@ -224,7 +341,40 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   modifierKey: "shift"
                 },
               }
+            },
+            datalabels: {
+              display: 'auto', //Hide overlapped data
+              color: 'black',
+              backgroundColor: 'white',
+              borderRadius: 4,
+              font: {
+                weight: "bold"
+              },
+              formatter: function () {//value, context) {
+                return 'event'
+              }
+            },
+
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  // Check if the dataset label is "Events"
+                  if (context.dataset.label === "Events") {
+                    // Custom tooltip for Events
+                    const datasetIndex = context.datasetIndex;
+                    const index = context.dataIndex
+                    const rowData = data.datasets[datasetIndex].data[index].rowData
+                    return rowData?.split('\n')
+                    // return `Line 1\nLine 2\nLine 3`.split("\n");
+                    // return `Events: ${context.parsed.y}`; // Modify this according to your needs
+                  }
+                  // Return default tooltip for other datasets
+                  return `${context.dataset.label}\n${context.parsed.y}\n${new Date(context.parsed.x)}`.split('\n');
+                  // return [context.dataset.label,  context.parsed.y!, context.parsed.x!]
+                }
+              }
             }
+
           }
         };
 
@@ -237,12 +387,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 overflowWrap: 'break-word',
               }}
             >
-              {stringify(JSON.parse(props.message.content))}
+              {stringify(chartDataObject)}
             </pre> */}
             <Scatter
-              data={{
-                datasets: datasets,
-              }}
+              data={data}
               options={options}
             />
           </>
@@ -250,19 +398,28 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         ))
       case 'tool_table':
         // https://mui.com/x/react-data-grid/
-        const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
+        // const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
+        const queryResponseData: RowDataInput = JSON.parse(props.message.content as string).queryResponseData
 
-        if (!queryResponseData) {
+        if (!queryResponseData || queryResponseData.length === 0) {
           console.log('no query response data')
           return
         }
 
         console.log('Query Response Data: ', queryResponseData)
+        if (!queryResponseData[0]) {
+          console.warn('No query response data')
+          return
+        }
 
-        const columnNames = Object.keys(queryResponseData)
+        const columnNames = Object.keys(queryResponseData[0])
+
+        console.log('Column Names: ', columnNames)
+
+
 
         const columns: GridColDef<TransformToDataRowsOutputData>[] = columnNames
-          .filter((columnName) => columnName !== 's3Key')
+          .filter((columnName) => !nonDefaultColumns.includes(columnName))
           .map((name) => ({
             field: `${name}`,
             headerName: `${name}`,
@@ -283,19 +440,27 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         if (columnNames.includes('s3Key')) {
           columns.push({
             field: 's3Key',
-            headerName: 's3Key',
+            headerName: 'Document Links',
             flex: 1,
             minWidth: 150,
             renderCell: (params) => (
-              <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
-                {params.value}
-              </Link>
+              <Box display='flex' flexDirection='column'>
+                <Link href={`/files/${params.value.slice(0, -5)}`} target="_blank" rel="noopener">
+                  pdf link
+                </Link>
+                <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
+                  yaml link
+                </Link>
+              </Box>
             ),
 
           })
         }
 
-        const rowData = transformDataToRows(queryResponseData)
+        const rowData: TransformToDataRowsOutputData[] = queryResponseData.map((item, index) => ({
+          id: `${index}`,
+          ...item
+        }))
 
         console.log('Row Data: ', rowData)
 
@@ -349,19 +514,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         ))
 
-
-      // const rows: {id: string}[] = data.date.map((date, index) => ({
-      //   id: index,
-      //   date: date,
-      //   value: data.value[index],
-      // }));
-
-      // const columns: GridColDef<(typeof rows)[number]>[] = []
-
-
-
     }
-  }, [props.message, messageContentCategory])
+  }, [props.message, props.messages, messageContentCategory])
 
   // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
   async function getGlossary(message: Message) {
@@ -566,39 +720,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                       props.message.content
                   }
                 </pre>/* Render as YAML */;
-              // case 'tool_table':
-              //   return <ReactMarkdown
-              //     remarkPlugins={[remarkGfm]}
-              //     components={{
-              //       table: ({ ...props }) => (
-              //         <table className={styles.markdownTable} {...props} />
-              //       ),
-              //       tr: ({ ...props }) => {
-
-              //         //Get the value of the relevance score in each table row
-              //         const children = React.Children.toArray(props.children);
-
-              //         const relevanceScoreTd = children[children.length - 2]; // should be second from the last
-
-              //         if (!(React.isValidElement(relevanceScoreTd))) throw new Error("Invalid second from last <td> element");
-
-              //         const relevanceScoreTdValue = relevanceScoreTd?.props?.children || '10'; // Here you can impliment conditional hiding of rows
-
-              //         // console.log("relevanceScore <td> value:", relevanceScoreTdValue); // This will log the value
-
-              //         //Hide rows with a low relevanceScore
-              //         if (hideRows && parseInt(relevanceScoreTdValue) < 4) return <tr className={styles.hiddenRow} {...props} />
-
-              //         // Add a 📄 to the second from the last child in props
-              //         // children.splice(children.length - 2, 0, ' ���');
-              //         // children[children.length - 2].props?.children = 'hello'
-
-              //         else return <tr {...props} />
-              //       },
-              //     }}
-              //   >
-              //     {props.message.content}
-              //   </ReactMarkdown>;
               default: //Default will be to render markdown
                 return <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -629,9 +750,19 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         props.message?.role === 'human' && (
           <>
             <strong>{formatDate(props.message.createdAt)}</strong>
-            <ReactMarkdown>
+            {/* <ReactMarkdown>
               {props.message.content}
-            </ReactMarkdown>
+            </ReactMarkdown> */}
+            <pre
+              style={{ //Wrap long lines
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+              }}
+            >
+              {props.message.content}
+            </pre>
+
           </>
         )
       }

@@ -12,19 +12,19 @@ async function main() {
     // console.log('ATHENA_WORKGROUP_NAME: ', process.env.ATHENA_WORKGROUP_NAME)
 
     const tableDefinitions = await executeSQLQueryTool.invoke({
-        // query: /* sql */ ` 
-        //     SELECT 
-        //     oil ,
-        //     gas , 
-        //     water,
-        //     proddate
-        //     FROM "${sampleAthenaDataSource}".production.daily
-        //     WHERE proddate >= date_add('week', -12, current_date)`,
+        query: /* sql */ ` 
+            SELECT 
+            oil ,
+            gas , 
+            water,
+            proddate
+            FROM "${sampleAthenaDataSource}".production.daily
+            WHERE proddate >= date_add('week', -12, current_date)`,
 
 
-        query: /* sql */ `
-            SHOW TABLES FROM AwsDataCatalog.prod_db_e1d;
-        `,
+        // query: /* sql */ `
+        //     SHOW TABLES FROM AwsDataCatalog.prod_db_e1d;
+        // `,
 
         // query: /* sql */ `
         //     SELECT schema_name 

@@ -1,5 +1,7 @@
 import { generateClient } from "aws-amplify/data";
-import { type Schema } from "@/../amplify/data/resource";
+import { list, ListPaginateWithPathInput } from 'aws-amplify/storage';
+
+import { type Schema } from "../../amplify/data/resource";
 
 export const amplifyClient = generateClient<Schema>();
 
@@ -31,4 +33,52 @@ export const invokeBedrockModelParseBodyGetText = async (prompt: string) => {
     const bedrockResponseBody = JSON.parse(response.data.body) as BedrockAnthropicBodyType
     console.log('Bedrock Response Body: ', bedrockResponseBody)
     return bedrockResponseBody.content.map(item => item.text).join('\n')
+}
+
+
+export interface S3Asset {
+    Key: string;
+    Size: number | undefined;
+    IsFolder: boolean;
+}
+
+export const onFetchObjects = async (pathPrefix: string): Promise<readonly S3Asset[]> => {
+    console.log('pathPrefix', pathPrefix)
+    try {
+
+        const result = await list({
+            path: pathPrefix || "well-files/",
+            pageSize: 10,
+            options: {
+                subpathStrategy: { strategy: 'exclude' }
+            },
+            // nextToken: nextToken
+        } as ListPaginateWithPathInput);
+
+        console.log('list result: ', result)
+
+        const objects: S3Asset[] = result.items.map((item) => ({
+            Key: item.path,
+            Size: item.size,
+            IsFolder: false
+        }));
+
+        if (result.excludedSubpaths) {
+            const folders: S3Asset[] = result.excludedSubpaths.map((item) => {
+                return {
+                    Key: item.substring(pathPrefix.length),
+                    Size: undefined,
+                    IsFolder: true
+                }
+            })
+
+            objects.push(...folders)
+        }
+
+        return objects
+
+    } catch (error) {
+        console.error('Error fetching S3 objects:', error);
+        return Promise.resolve([]); // Return an empty array in case of an error
+    }
 }

@@ -10,7 +10,13 @@ export const invokeBedrockAgentFunction = defineFunction({
 export const getStructuredOutputFromLangchainFunction = defineFunction({
   name: 'get-structured-output',
   entry: '../functions/getStructuredOutputFromLangchain.ts',
-  timeoutSeconds: 120
+  timeoutSeconds: 120,
+  environment: {
+    // MODEL_ID: 'us.anthropic.claude-3-5-sonnet-20240620-v1:0'
+    MODEL_ID: 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
+    // MODEL_ID: 'us.anthropic.claude-3-sonnet-20240229-v1:0'
+    // MODEL_ID: 'us.anthropic.claude-3-haiku-20240307-v1:0'
+  },
 });
 
 export const productionAgentFunction = defineFunction({
@@ -58,7 +64,6 @@ const schema = a.schema({
       })
     })
     .authorization((allow) => [allow.owner(), allow.authenticated().to(['read'])]), //The allow.authenticated() allows other users to view chat sessions.
-  // TODO: let authenticated only read
 
   ChatMessage: a
     .model({
@@ -133,22 +138,22 @@ const schema = a.schema({
     .handler(a.handler.function(productionAgentFunction))
     .authorization((allow) => [allow.authenticated()]),
 
-  getInfoFromPdf: a
-    .query()
-    .arguments({
-      s3Key: a.string().required(),
-      tableColumns: a.json().required(),
-      dataToExclude: a.json(),
-      dataToInclude: a.json()
-    })
-    .returns(a.json()),
+  // getInfoFromPdf: a
+  //   .query()
+  //   .arguments({
+  //     s3Key: a.string().required(),
+  //     tableColumns: a.json().required(),
+  //     dataToExclude: a.json(),
+  //     dataToInclude: a.json()
+  //   })
+  //   .returns(a.json()),
 
-  convertPdfToJson: a
-    .query()
-    .arguments({
-      s3Key: a.string().required()
-    })
-    .returns(a.json()),
+  // convertPdfToJson: a
+  //   .query()
+  //   .arguments({
+  //     s3Key: a.string().required()
+  //   })
+  //   .returns(a.json()),
 
   //These assets enable token level streaming from the model
   ResponseStreamChunk: a

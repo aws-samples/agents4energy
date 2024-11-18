@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -8,21 +9,52 @@ import {
   custom_resources as cr,
   aws_logs as logs,
 } from 'aws-cdk-lib'
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 
-// import { Construct } from "@aws-cdk/core";
 import * as cdk from 'aws-cdk-lib';
-// import * as stepfunctions from 'aws-cdk-lib/aws-stepfunctions';
-// import * as stepfunctions_tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-// import * as lambda from 'aws-cdk-lib/aws-lambda';
-// import * as cloudformation from 'aws-cdk-lib/aws-cloudformation';
 import { Construct } from 'constructs';
-// import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
-// import * as sfnTasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
-// import * as cr from 'aws-cdk-lib/custom-resources';
-// import * as logs from 'aws-cdk-lib/aws-logs';
-// import * as iam from 'aws-cdk-lib/aws-iam';
-import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
-// import { bedrock } from '@cdklabs/generative-ai-cdk-constructs'
+
+import { data } from '../data/resource'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(__dirname, '..');
+
+//These reasurces allow a custom resource to trigger when the AppSync Schema changes.
+import * as crypto from 'crypto';
+const dataDefinition = JSON.stringify(data, null, 2)
+// console.log('data definition:\n', dataDefinition)
+const dataDefinitionHash = crypto.createHash('md5').update(dataDefinition).digest('hex')
+
+// function createDummy<T>(): T {
+//   function createDummyValue(type: any): any {
+//     // Handle primitive types
+//     if (type === String || type === 'String') return '';
+//     if (type === Number || type === 'Number') return 0;
+//     if (type === Boolean || type === 'Boolean') return false;
+//     if (type === Date || type === 'Date') return new Date();
+//     if (type === Array || Array.isArray(type)) return [];
+//     if (type === null) return null;
+//     if (type === undefined) return undefined;
+
+//     // Handle objects
+//     const obj: any = {};
+    
+//     // If type has properties, recursively create dummy values
+//     if (type && typeof type === 'object') {
+//       Object.keys(type).forEach(key => {
+//         obj[key] = createDummyValue(type[key]);
+//       });
+//     }
+
+//     return obj;
+//   }
+
+//   return createDummyValue({} as T) as T;
+// }
+// import { Schema } from '../data/resource'
+// const dummySchemaString = JSON.stringify(createDummy<Schema>(), null, 2)
+// console.log('Dummy Schema Object:\n', dummySchemaString)
+// const dummySchemaHash = crypto.createHash('md5').update(dummySchemaString).digest('hex')
 
 export interface AppConfiguratorProps {
   hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
@@ -32,6 +64,7 @@ export interface AppConfiguratorProps {
   s3Bucket: cdk.aws_s3.IBucket
   preSignUpFunction: lambda.IFunction
   cognitoUserPool: cdk.aws_cognito.IUserPool
+  appSyncApi: cdk.aws_appsync.IGraphqlApi
   // sqlTableDefBedrockKnoledgeBase: bedrock.KnowledgeBase
 }
 
@@ -40,21 +73,12 @@ export class AppConfigurator extends Construct {
   constructor(scope: Construct, id: string, props: AppConfiguratorProps) {
     super(scope, id);
 
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const rootDir = path.resolve(__dirname, '..');
+
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
 
-    // // Grant the user pool the authorization to invoke the pre sign up lambda function
-    // props.cognitoUserPool.grant(props.preSignUpFunction, 'lambda:InvokeFunction')
-
     props.preSignUpFunction.grantInvoke(new cdk.aws_iam.ServicePrincipal('cognito-idp.amazonaws.com'))
-
-    // preSignUpFunction.addPermission('AllowCognitoInvoke', {
-    //   principal: new iam.ServicePrincipal('cognito-idp.amazonaws.com'),
-    //   sourceArn: userPool.userPoolArn,
-    // });
 
     // This function and custom resource will update the GraphQL schema to allow for @aws_iam access to all resources 
     const addIamDirectiveFunction = new NodejsFunction(scope, 'addIamDirective', {
@@ -62,19 +86,25 @@ export class AppConfigurator extends Construct {
       entry: path.join(rootDir, 'functions', 'addIamDirectiveToAllAssets.ts'),
       timeout: cdk.Duration.seconds(60),
       environment: {
-        ROOT_STACK_NAME: rootStack.stackName
+        ROOT_STACK_NAME: rootStack.stackName,
+        APPSYNC_API_ID: props.appSyncApi.apiId,
       },
     });
 
     addIamDirectiveFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
       actions: [
-        'appsync:ListGraphqlApis',
-        'appsync:ListTagsForResource',
+        // 'appsync:ListGraphqlApis',
+        // 'appsync:ListTagsForResource',
         'appsync:GetIntrospectionSchema',
         'appsync:StartSchemaCreation',
         'appsync:GetSchemaCreationStatus',
       ],
-      resources: [`arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`],
+      resources: [
+        // `arn:aws:appsync:${rootStack.region}:${rootStack.account}:*`,
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:/v1/apis/${props.appSyncApi.apiId}/*`,
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:/apis/${props.appSyncApi.apiId}`,
+        `arn:aws:appsync:${rootStack.region}:${rootStack.account}:/apis/${props.appSyncApi.apiId}/*`
+      ],
     }))
 
 
@@ -119,6 +149,7 @@ export class AppConfigurator extends Construct {
     });
 
     // This step will add the iam directive to the graphql schema
+    // The step function has a wait loop to let the stack complete deployment to ensure that the schema is updated after all changes to the schema are complete.
     const invokeAddIamDirectiveFunction = new sfn_tasks.LambdaInvoke(this, 'InvokeLambda', {
       lambdaFunction: addIamDirectiveFunction,
     })
@@ -170,15 +201,17 @@ export class AppConfigurator extends Construct {
       action: 'startExecution',
       parameters: {
         stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
-        input: JSON.stringify({ action: 'create' }),
+        input: JSON.stringify({
+          action: 'create',
+          // schemaFileContentHash: dummySchemaHash //This causes the custom resource to trigger when the scheama is updated.
+          // startTime: Date.now(),
+        }),
       },
       physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
     }
 
     // Create a Custom Resource that invokes the Step Function on every stack update
-    // TODO- make this trigger with an event bridge stack complete event instead of this custom reasource.
-    // new cr.AwsCustomResource(this, `TriggerStepFunction-${Date.now().toString().slice(-5)}`, {
-      new cr.AwsCustomResource(this, `TriggerStepFunction`, {
+    const triggerStepFunctionCustomResource = new cr.AwsCustomResource(this, `TriggerStepFunction-${dataDefinitionHash.slice(4)}`, {
       onCreate: invokeStepFunctionSDKCall,
       onUpdate: invokeStepFunctionSDKCall,
       policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
@@ -186,32 +219,7 @@ export class AppConfigurator extends Construct {
       }),
     });
 
-    // // Create a Custom Resource that invokes only if the dependencies change
-    // new cr.AwsCustomResource(this, `TriggerOnDepChange`, {
-    //   onCreate: {
-    //     service: 'Lambda',
-    //     action: 'invoke',
-    //     parameters: {
-    //       FunctionName: configureProdDbFunction.functionName,
-    //       Payload: JSON.stringify({}), // No need to pass SQL here
-    //     },
-    //     physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
-    //   },
-    //   onUpdate: {
-    //     service: 'Lambda',
-    //     action: 'invoke',
-    //     parameters: {
-    //       FunctionName: configureProdDbFunction.functionName,
-    //       Payload: JSON.stringify({}), // No need to pass SQL here
-    //     },
-    //     physicalResourceId: cr.PhysicalResourceId.of('SqlExecutionResource'),
-    //   },
-    //   policy: cr.AwsCustomResourcePolicy.fromStatements([
-    //     new iam.PolicyStatement({
-    //       actions: ['lambda:InvokeFunction'],
-    //       resources: [configureProdDbFunction.functionArn],
-    //     }),
-    //   ]),
-    // });
+    triggerStepFunctionCustomResource.node.addDependency(props.appSyncApi) //Trigger the custom resource whenever the app sync api is updated.
+
   }
 }

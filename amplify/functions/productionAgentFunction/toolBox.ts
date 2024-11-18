@@ -1,26 +1,21 @@
-import { stringify } from 'yaml'
+// import { stringify } from 'yaml'
 import { z } from "zod";
 
-import { LambdaClient, InvokeCommand, InvokeCommandInput } from "@aws-sdk/client-lambda";
 import { BedrockAgentRuntimeClient, RetrieveCommand } from "@aws-sdk/client-bedrock-agent-runtime";
-import { SFNClient, StartSyncExecutionCommand } from "@aws-sdk/client-sfn";
+import { S3Client, GetObjectCommand, ListObjectsV2Command, ListObjectsV2CommandInput } from "@aws-sdk/client-s3";
 
 import { tool } from "@langchain/core/tools";
 import { env } from '$amplify/env/production-agent-function';
 
-import { AmplifyClientWrapper } from '../utils/amplifyUtils'
-import { startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
-
-// import * as Plotly from 'plotly.js';
-// import { ChartData } from 'chart.js';
+import { AmplifyClientWrapper, FieldDefinition } from '../utils/amplifyUtils'
+import { processWithConcurrency, startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
 import { ToolMessageContentType } from '../../../src/utils/types'
+import { onFetchObjects } from '../../../src/utils/amplify-utils'
 
-// type ToolMessageWithContentType = {
-//     messageContentType: string;
-//     [key: string]: any;
-// };
+import { invokeBedrockWithStructuredOutput } from '../graphql/queries'
 
+const s3Client = new S3Client();
 
 //////////////////////////////////////////
 //////////// Calculator Tool /////////////
@@ -120,7 +115,7 @@ export const getTableDefinitionsTool = tool(
     },
     {
         name: "getTableDefinitionsTool",
-        description: "Can retrieve database table definitons which can help answer a user's question.",
+        description: "Always call this tool before executing a SQL query. Can retrieve database table definitons available for SQL queries.",
         schema: getTableDefinitionsSchema,
     }
 );
@@ -131,34 +126,38 @@ export const getTableDefinitionsTool = tool(
 
 const executeSQLQuerySchema = z.object({
     query: z.string().describe(`
-        The Trino SQL query to be executed. 
-        Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
-        Include the dataSource, database, and tableName in the FROM element (ex: FROM postgres_sample_992.production.daily)
+        The Trino SQL query to be executed.
+        Include the dataSource, database, and tableName in the FROM element (ex: FROM <dataSourceName>.production.daily)
         Use "" arond all column names.
+        To use date functions on a column with varchar type, cast the column to a date first.
+        The DATE_SUB function is not available. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
+        The function DATE_TRUNC can be called with these arguments: DATE_TRUNC(varchar(x), date), DATE_TRUNC(varchar(x), timestamp(p)), DATE_TRUNC(varchar(x), timestamp(p) with time zone), DATE_TRUNC(varchar(x), time(p)), DATE_TRUNC(varchar(x), time(p) with time zone)
+        Column aliases defined in the SELECT clause cannot be referenced in the WHERE or GROUP BY clauses because they are evaluated before the SELECT clause during query processing.
+        The first column in the returned result will be used as the x axis column. If the query contains a date, set it as the first column.
         `),
 });
 
 function doesFromLineContainOneDot(sqlQuery: string): boolean {
     // Split the query into lines
     const lines = sqlQuery.split('\n');
-  
+
     // Find the line that starts with "FROM" (case-insensitive)
     const fromLine = lines.find(line => line.trim().toUpperCase().startsWith('FROM'));
-  
+
     // If there's no FROM line, return false
     if (!fromLine) {
-      return false;
+        return false;
     }
-  
+
     // Extract the part after "FROM"
     const afterFrom = fromLine.trim().substring(4).trim();
-  
+
     // Count the number of dots
     const dotCount = (afterFrom.match(/\./g) || []).length;
-  
+
     // Return true if there's exactly one dot
     return dotCount === 1;
-  }
+}
 
 export const executeSQLQueryTool = tool(
     async ({ query }) => {
@@ -208,13 +207,13 @@ export const executeSQLQueryTool = tool(
             console.error('Error executing sql query:', error);
             return {
                 messageContentType: 'tool_json',
-                error: error instanceof Error ? error.message : `An unknown error occurred.\n${JSON.stringify(error)}`
+                error: error instanceof Error ? error.message : `Error:\n ${JSON.stringify(error)}`
             } as ToolMessageContentType
         }
     },
     {
         name: "executeSQLQuery",
-        description: "Can execute a Trino SQL query and returns the results as a table.",
+        description: "Always call the getTableDefinitionsTool before calling this tool. This tool can execute a Trino SQL query and returns the results as a table.",
         schema: executeSQLQuerySchema,
     }
 );
@@ -225,241 +224,373 @@ export const executeSQLQueryTool = tool(
 
 const plotTableFromToolResponseSchema = z.object({
     // toolCallId: z.string().describe("The tool call ID which produced the table to plot. Ex: tooluse_xxxxxxx"),
-    columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
+    // columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
     chartTitle: z.string().describe("The title of the plot."),
+    numberOfPreviousTablesToInclude: z.number().int().optional().describe("The number of previous tables to include in the plot. Default is 1."),
 });
 
 
-export const plotTableFromToolResponseToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
-    async ({ columnNameFromQueryForXAxis, chartTitle }) => {
+export const plotTableFromToolResponseTool = tool(
+    async ({ chartTitle, numberOfPreviousTablesToInclude = 1 }) => {
 
-        // // // Get the most recent set of chat messages, including tool messages created since the last user message
-        // await amplifyClientWrapper.getChatMessageHistory({}) //TODO - Push the messages directly to amplifyClientWrapper.chatMessages, instead of going through the api here. Better Performance.
-        
-        console.log('Messages:\n', amplifyClientWrapper.chatMessages)
+        // console.log('Messages:\n', amplifyClientWrapper.chatMessages)
 
-        const toolResponseMessages = amplifyClientWrapper.chatMessages.filter(
-            (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
-        )
+        // const toolResponseMessages = amplifyClientWrapper.chatMessages.filter(
+        //     (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
+        // )
 
-        console.log('Tool Response Messages:\n', toolResponseMessages)
+        // console.log('Tool Response Messages:\n', toolResponseMessages)
 
-        const selectedToolMessage = toolResponseMessages.slice(-1)[0]
-        
-        console.log("Selected message: ", selectedToolMessage)
-        
-        const queryResponseData = JSON.parse(selectedToolMessage.content as string).queryResponseData
-        
-        console.log('data object: ', queryResponseData)
+        // const selectedToolMessages = toolResponseMessages.slice(-1*numberOfPreviousTablesToInclude)
 
-        // Functions must return strings
-        if (!(columnNameFromQueryForXAxis in queryResponseData)) {
-            return {
-                messageContentType: 'tool_json',
-                error: `
-                    Column name "${columnNameFromQueryForXAxis}" is not present in the result of the SQL query column names: ${queryResponseData.keys}
-                    Be sure to select a column from the sql query for the x axis.
-                    `
-            } as ToolMessageContentType
-        }
+        // console.log("Selected messages: ", selectedToolMessages)
+
+        // for (const selectedToolMessage of selectedToolMessages) {
+        //     const queryResponseData = JSON.parse(selectedToolMessage.content as string).queryResponseData
+
+        //     console.log('data object: ', queryResponseData)
+
+        //     // Functions must return strings
+        //     if (!(columnNameFromQueryForXAxis in queryResponseData[0])) {
+        //         return {
+        //             messageContentType: 'tool_json',
+        //             error: `
+        //                 Column name "${columnNameFromQueryForXAxis}" is not present in the result of the SQL query column names: ${queryResponseData.keys}
+        //                 Be sure to select a column from the sql query for the x axis.
+        //                 `
+        //         } as ToolMessageContentType
+        //     }
+        // }
 
         return {
             messageContentType: 'tool_plot',
-            columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
+            // columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
             chartTitle: chartTitle,
-            chartData: queryResponseData
+            numberOfPreviousTablesToInclude: numberOfPreviousTablesToInclude
+            // chartData: queryResponseData
         } as ToolMessageContentType
 
     },
     {
         name: "plotTableFromToolResponseToolBuilder",
-        description: "Plots tabular data returned from a previous tool call",
+        description: "Plots tabular data returned from previous tool messages",
         schema: plotTableFromToolResponseSchema,
     }
 );
 
 
 //////////////////////////////////////////
-/////////// PDF to JSON Tool /////////////
-//////////////////////////////////////////
-
-const convertPdfToJsonSchema = z.object({
-    s3Key: z.string().describe("The S3 key of the PDF file to convert."),
-});
-
-export const convertPdfToJsonTool = tool(
-    async ({ s3Key }) => {
-        const lambdaClient = new LambdaClient();
-        const params: InvokeCommandInput = {
-            FunctionName: env.CONVERT_PDF_TO_JSON_LAMBDA_ARN,
-            Payload: JSON.stringify({ arguments: { s3Key: s3Key } }),
-        };
-        const response = await lambdaClient.send(new InvokeCommand(params));
-        if (!response.Payload) throw new Error("No payload returned from Lambda")
-
-        const jsonContent = JSON.parse(Buffer.from(response.Payload).toString())
-        console.log('Json Content: ', jsonContent)
-
-        // console.log(`Converting s3 key ${s3Key} into content blocks`)
-
-        // const pdfImageBuffers = await convertPdfToB64Strings({s3BucketName: env.DATA_BUCKET_NAME, s3Key: s3Key})
-
-        return {
-            messageContentType: 'tool_json',
-            content: jsonContent,
-        } as ToolMessageContentType
-    },
-    {
-        name: "convertPdfToJson",
-        description: "Can convert a pdf stored in s3 into a JSON object. Use it to get details about a specific file.",
-        schema: convertPdfToJsonSchema,
-    }
-);
-
-//////////////////////////////////////////
 //////// PDF Reports to Table Tool ///////
 //////////////////////////////////////////
 
-const wellTableSchema = z.object({
+export const wellTableSchema = z.object({
     dataToExclude: z.string().optional().describe("List of criteria to exclude data from the table"),
     dataToInclude: z.string().optional().describe("List of criteria to include data in the table"),
     tableColumns: z.array(z.object({
         columnName: z.string().describe('The name of a column'),
         columnDescription: z.string().describe('A description of the information which this column contains.'),
-    })).describe("The column name and description for each column of the table."),
+        columnDefinition: z.object({
+            type: z.enum(['string', 'integer', 'date', 'number', 'boolean']).describe('The data type of the column.'),
+            format: z.string().describe('The format of the column.').optional(),
+            enum: z.array(z.string()).optional(),
+            pattern: z.string().describe('The regex pattern for the column.').optional(),
+            minimum: z.number().optional(),
+            maximum: z.number().optional(),
+        })//.optional()
+    })).describe("The column name and description for each column of the table. Choose the column best suited for a chart label as the first element."),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
 });
 
 function pivotLists<T>(lists: T[][]): T[][] {
     if (lists.length === 0) return [];
-    
-    return lists[0].map((_, colIndex) => 
+
+    return lists[0].map((_, colIndex) =>
         lists.map(row => row[colIndex])
     );
 }
 
-export const wellTableTool = tool(
+async function listFilesUnderPrefix(
+    props: {
+        bucketName: string,
+        prefix: string,
+        suffix?: string
+    }
+): Promise<string[]> {
+    const { bucketName, prefix, suffix } = props
+    // Create S3 client
+    const files: string[] = [];
+
+    // Prepare the initial command input
+    const input: ListObjectsV2CommandInput = {
+        Bucket: bucketName,
+        Prefix: prefix,
+    };
+
+    try {
+        let isTruncated = true;
+
+        while (isTruncated) {
+            const command = new ListObjectsV2Command(input);
+            const response = await s3Client.send(command);
+
+            // Add only the files that match the suffix to our array
+            response.Contents?.forEach((item) => {
+                if (item.Key && item.Key.endsWith(suffix || "")) {
+                    files.push(item.Key);
+                }
+            });
+
+            // Check if there are more files to fetch
+            isTruncated = response.IsTruncated || false;
+
+            // If there are more files, set the continuation token
+            if (isTruncated && response.NextContinuationToken) {
+                input.ContinuationToken = response.NextContinuationToken;
+            }
+        }
+
+        return files;
+    } catch (error) {
+        console.error('Error listing files:', error);
+        throw error;
+    }
+}
+
+function removeSpaceAndLowerCase(str: string): string {
+    //return a string that matches regex pattern '^[a-zA-Z0-9_-]{1,64}$'
+    let transformed = str.replaceAll(" ", "").toLowerCase()
+    transformed = transformed.replaceAll(/[^a-zA-Z0-9_-]/g, '');
+    transformed = transformed.slice(0, 64);
+
+    return transformed;
+}
+
+async function listS3Folders(
+    props: {
+        bucketName: string, 
+        prefix: string
+    },
+  ): Promise<string[]> {
+    const {bucketName, prefix} = props
+
+    const s3Client = new S3Client({});
+    
+    // Add trailing slash if not present
+    const normalizedPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+    
+    const input: ListObjectsV2CommandInput = {
+      Bucket: bucketName,
+      Delimiter: '/',
+      Prefix: normalizedPrefix,
+    };
+  
+    try {
+      const command = new ListObjectsV2Command(input);
+      const response = await s3Client.send(command);
+
+    //   console.log('list folders s3 response:\n',response)
+  
+      // Get common prefixes (folders)
+      const folders = response.CommonPrefixes?.map(prefix => prefix.Prefix!.slice(normalizedPrefix.length)) || [];
+
+    //   console.log('folders: ', folders)
+      
+      // Filter out the current prefix itself and just get the part of the prefix after the normalizedPrefix
+      return folders
+        .filter(folder => folder !== normalizedPrefix)
+  
+    } catch (error) {
+      console.error('Error listing S3 folders:', error);
+      throw error;
+    }
+  }
+
+export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
     async ({ dataToInclude, tableColumns, wellApiNumber, dataToExclude }) => {
-        const sfnClient = new SFNClient({
-            region: process.env.AWS_REGION,
-            maxAttempts: 3,
-        });
+        if (!process.env.DATA_BUCKET_NAME) throw new Error("DATA_BUCKET_NAME environment variable is not set")
+        // const sfnClient = new SFNClient({
+        //     region: process.env.AWS_REGION,
+        //     maxAttempts: 3,
+        // });
         //If tableColumns contains a column with columnName date, remove it. The user may ask for one, and one will automatically be added later.
         tableColumns = tableColumns.filter(column => column.columnName.toLowerCase() !== 'date')
         // Here add in the default table columns date and excludeRow
+
         tableColumns.unshift({
-            columnName: 'date', columnDescription: `The date of the event in YYYY-MM-DD format.`
+            columnName: 'date',
+            columnDescription: `The date of the event in YYYY-MM-DD format.`,
+            columnDefinition: {
+                type: 'string',
+                format: 'date',
+                pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
+            }
         })
 
-        // tableColumns.push({
-        //     columnName: 'excludeRow', columnDescription: `
-        //     Does this file contain any of the criteria below? 
-        //     ${dataToExclude}
-        //     `
-        // })
+        tableColumns.unshift({
+            columnName: 'includeScore',
+            columnDescription: `
+            If the JSON object contains information related to [${dataToExclude}], give a score of 1.
+            If not, give a score of 10 if JSON object contains information related to [${dataToInclude}].
+            Most scores should be around 5. Reserve 10 for exceptional cases.
+            `,
+            columnDefinition: {
+                type: 'integer',
+                minimum: 0,
+                maximum: 10
+            }
+        })
 
-        console.log('Table Columns: ', JSON.stringify(tableColumns))
+        tableColumns.unshift({
+            columnName: 'includeScoreExplanation',
+            columnDescription: `Why did you choose that score?`,
+            columnDefinition: {
+                type: 'string',
+            }
+        })
+
+        tableColumns.unshift({
+            columnName: 'relevantPartOfJsonObject',
+            columnDescription: `Which part of the object caused you to give that score?`,
+            columnDefinition: {
+                type: 'string',
+            }
+        })
+
+        console.log('Input Table Columns: ', tableColumns)
+
+        // const correctedColumnNameMap = tableColumns.map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
+        const correctedColumnNameMap = Object.fromEntries(
+            tableColumns
+                .filter(column => column.columnName !== removeSpaceAndLowerCase(column.columnName))
+                .map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
+        );
+
+        const fieldDefinitions: Record<string, FieldDefinition> = {};
+        for (const column of tableColumns) {
+            const correctedColumnName = removeSpaceAndLowerCase(column.columnName)
+
+            fieldDefinitions[correctedColumnName] = {
+                ...(column.columnDefinition ? column.columnDefinition : { type: 'string' }),
+                description: column.columnDescription
+            };
+        }
+        const jsonSchema = {
+            title: "getKeyInformationFromImages",
+            description: "Fill out these arguments based on the image data",
+            type: "object",
+            properties: fieldDefinitions,
+            required: Object.keys(fieldDefinitions),
+        };
+
+        console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))
 
         let columnNames = tableColumns.map(column => column.columnName)
-
-        const s3Prefix = `production-agent/well-files/field=SanJuanEast/uwi=${wellApiNumber}/`;
-
-        const command = new StartSyncExecutionCommand({
-            stateMachineArn: env.STEP_FUNCTION_ARN,
-            input: JSON.stringify({
-                tableColumns: tableColumns,
-                dataToInclude: dataToInclude || "[anything]",
-                dataToExclude: dataToExclude || "[]",
-                s3Prefix: s3Prefix,
-            })
-        });
-
-        console.log('Calling Step Function with command: ', command)
-
-        const sfnResponse = await sfnClient.send(command);
-        console.log('Step Function Response: ', sfnResponse)
-
-        if (!sfnResponse.output) {
-            throw new Error(`No output from step function. Step function response:\n${JSON.stringify(sfnResponse, null, 2)}`);
-        }
-
-        // console.log('sfnResponse.output: ', sfnResponse.output)
-
         //Add in the source and relevanceScore columns
-        columnNames.push('includeScore')
         columnNames.push('s3Key')
 
-        // const numColumns = columnNames.length
-        const tableRows = []
-        let dataRows: string[][] = []
-        const tableHeader = columnNames.join(' | ')
-        tableRows.push(tableHeader)
+        const s3Prefix = `production-agent/well-files/field=SanJuanEast/api=${wellApiNumber}/`;
+        const wellFiles = await listFilesUnderPrefix({
+            bucketName: process.env.DATA_BUCKET_NAME,
+            prefix: s3Prefix,
+            suffix: '.yaml'
+        })
+        console.log('Well Files: ', wellFiles)
 
-        const tableDivider = columnNames.map(columnName => Array(columnName.length + 3).join('-')).join('|')
-        tableRows.push(tableDivider)
+        if (wellFiles.length === 0) {
+            const oneLevelUpS3Prefix = s3Prefix.split('/').slice(0,-2).join('/')
+            
+            console.log('one level up s3 prefix: ', oneLevelUpS3Prefix)
+            const s3Folders = await listS3Folders({
+                bucketName: process.env.DATA_BUCKET_NAME,
+                prefix: oneLevelUpS3Prefix
+            })//await onFetchObjects(oneLevelUpS3Prefix)
+            // const s3Folders = s3ObjectsOneLevelHigher.filter(s3Asset => s3Asset.IsFolder).map(s3Asset => s3Asset.Key)
 
-        // const dummyData = Array(numColumns).fill('dummy').join('|')
+            return {
+                messageContentType: 'tool_json',
+                error: `
+                No files found for well API number: ${wellApiNumber}
+                Available well APIs:\n${s3Folders.join('\n')}
+                `
+            } as ToolMessageContentType
+        }
 
-        const rowData = JSON.parse(sfnResponse.output)
+        const dataRows = await processWithConcurrency({
+            items: wellFiles,
+            concurrency: 20,
+            fn: async (s3Key) => {
+                try {
 
-        console.log('rowData: ', rowData)
+                    const getObjectResponse = await s3Client.send(new GetObjectCommand({
+                        Bucket: process.env.DATA_BUCKET_NAME,
+                        Key: s3Key
+                    }))
 
-        rowData.forEach((s3ObjectResult: any) => {
-            // console.log('s3ObjectResult: ', s3ObjectResult)
-            if (s3ObjectResult.content) {
-                s3ObjectResult.content.forEach((content: any) => { //TODO give content a type based on the column names
-                    // console.log('content: ', content)
+                    const objectContent = await getObjectResponse.Body?.transformToString()
+                    if (!objectContent) throw new Error(`No object content for s3 key: ${s3Key}`)
 
-                    const newRow: string[] = []
+                    const messageText = `ß
+                    The user is asking you to extract information from a YAML object.
+                    The YAML object contains information about a well.
+                    <YamlObject>
+                    ${objectContent}
+                    </YamlObject>
+                    `
 
-                    columnNames.forEach((key) => {
-                        if (key === 's3Key') {
-                            //Add the link the the s3 source
-                            newRow.push(`${s3ObjectResult.document_source_s3_key}`)
+                    const fileDataResponse = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
+                        query: invokeBedrockWithStructuredOutput,
+                        variables: {
+                            chatSessionId: 'dummy',
+                            lastMessageText: messageText,
+                            outputStructure: JSON.stringify(jsonSchema)
                         }
-                        else {
-                            // If the key exists in content, remove all non-printable characters and add the data to the new row
-                            const cellValue = `${content[key]}`.replace(/[\r\n\t]/g, '')
-                            if (cellValue) {
-                                // const cleanedStr = cellValue.replace(/[\r\n\t]/g, '');
-                                newRow.push(cellValue)
-                            } else {
-                                newRow.push(" ")
-                            }
-                        }
-
                     })
 
-                    dataRows.push(newRow)
+                    // If the GQL query returns an error, return the error to the agent
+                    if (fileDataResponse.errors) {
+                        return {
+                            messageContentType: 'tool_json',
+                            error: fileDataResponse.errors.map((error) => error.message).join('\n\n')
+                        } as ToolMessageContentType
+                    }
 
-                });
+                    const fileData = JSON.parse(fileDataResponse.data.invokeBedrockWithStructuredOutput || "")
+
+                    //Replace the keys in file Data with those from correctedColumnNameMap
+                    Object.keys(fileData).forEach(key => {
+                        if (key in correctedColumnNameMap) {
+                            const correctedKey = correctedColumnNameMap[key]
+                            fileData[correctedKey] = fileData[key]
+                            delete fileData[key]
+                        }
+                    })
+
+                    return {
+                        ...fileData,
+                        s3Key: s3Key
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
             }
-        });
+        })
 
-        // console.log('dataRows: ', dataRows)
+
+        // console.log('data Rows: ', dataRows)
+
         //Sort the data rows by date (first column)
-        dataRows.sort((a, b) => a[0].localeCompare(b[0]));
+        dataRows.sort((a, b) => a?.date.localeCompare(b?.date));
 
-        const dataRowsPivoted = pivotLists(dataRows)
-
-        const dataObject = columnNames.reduce((acc, columnName, index) => {
-            acc[columnName] = dataRowsPivoted[index];
-            return acc;
-        }, {} as Record<string, string[]>)
-
-        // tableRows.push(...dataRows.map(row => row.join(' | ')))
-
-        // const outputTable = tableRows.map(val => '|' + val + '|').join('\n')
+        console.log('data Rows: ', dataRows)
 
         return {
             messageContentType: 'tool_table',
-            queryResponseData: dataObject
+            queryResponseData: dataRows
         } as ToolMessageContentType
-        // return [tableHeader, tableDivider, dummyData, dummyData].map(val => '|' + val + '|').join('\n')
     },
     {
         name: "wellTableTool",
-        description: "This tool produces tabular information about a well.",
+        description: "This tool searches the well files to extract specified information about a well. Use this tool when asked to search the well files.",
         schema: wellTableSchema,
     }
 );
