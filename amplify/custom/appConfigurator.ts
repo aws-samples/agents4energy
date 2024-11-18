@@ -14,44 +14,47 @@ import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 
+import { data } from '../data/resource'
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 
 //These reasurces allow a custom resource to trigger when the AppSync Schema changes.
 import * as crypto from 'crypto';
-const schemaFileContent = fs.readFileSync(path.join(__dirname, '../data/resource.ts'), 'utf8');
-const schemaFileContentHash = crypto.createHash('md5').update(schemaFileContent).digest('hex')
+const dataDefinition = JSON.stringify(data, null, 2)
+// console.log('data definition:\n', dataDefinition)
+const dataDefinitionHash = crypto.createHash('md5').update(dataDefinition).digest('hex')
 
-function createDummy<T>(): T {
-  function createDummyValue(type: any): any {
-    // Handle primitive types
-    if (type === String || type === 'String') return '';
-    if (type === Number || type === 'Number') return 0;
-    if (type === Boolean || type === 'Boolean') return false;
-    if (type === Date || type === 'Date') return new Date();
-    if (type === Array || Array.isArray(type)) return [];
-    if (type === null) return null;
-    if (type === undefined) return undefined;
+// function createDummy<T>(): T {
+//   function createDummyValue(type: any): any {
+//     // Handle primitive types
+//     if (type === String || type === 'String') return '';
+//     if (type === Number || type === 'Number') return 0;
+//     if (type === Boolean || type === 'Boolean') return false;
+//     if (type === Date || type === 'Date') return new Date();
+//     if (type === Array || Array.isArray(type)) return [];
+//     if (type === null) return null;
+//     if (type === undefined) return undefined;
 
-    // Handle objects
-    const obj: any = {};
+//     // Handle objects
+//     const obj: any = {};
     
-    // If type has properties, recursively create dummy values
-    if (type && typeof type === 'object') {
-      Object.keys(type).forEach(key => {
-        obj[key] = createDummyValue(type[key]);
-      });
-    }
+//     // If type has properties, recursively create dummy values
+//     if (type && typeof type === 'object') {
+//       Object.keys(type).forEach(key => {
+//         obj[key] = createDummyValue(type[key]);
+//       });
+//     }
 
-    return obj;
-  }
+//     return obj;
+//   }
 
-  return createDummyValue({} as T) as T;
-}
-import { Schema } from '../data/resource'
-const dummySchemaString = JSON.stringify(createDummy<Schema>(), null, 2)
-console.log('Dummy Schema Object:\n', dummySchemaString)
-const dummySchemaHash = crypto.createHash('md5').update(dummySchemaString).digest('hex')
+//   return createDummyValue({} as T) as T;
+// }
+// import { Schema } from '../data/resource'
+// const dummySchemaString = JSON.stringify(createDummy<Schema>(), null, 2)
+// console.log('Dummy Schema Object:\n', dummySchemaString)
+// const dummySchemaHash = crypto.createHash('md5').update(dummySchemaString).digest('hex')
 
 export interface AppConfiguratorProps {
   hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
@@ -200,7 +203,7 @@ export class AppConfigurator extends Construct {
         stateMachineArn: appConfiguratorStateMachine.stateMachineArn,
         input: JSON.stringify({
           action: 'create',
-          schemaFileContentHash: dummySchemaHash //This causes the custom resource to trigger when the scheama is updated.
+          // schemaFileContentHash: dummySchemaHash //This causes the custom resource to trigger when the scheama is updated.
           // startTime: Date.now(),
         }),
       },
@@ -208,7 +211,7 @@ export class AppConfigurator extends Construct {
     }
 
     // Create a Custom Resource that invokes the Step Function on every stack update
-    const triggerStepFunctionCustomResource = new cr.AwsCustomResource(this, `TriggerStepFunction`, {
+    const triggerStepFunctionCustomResource = new cr.AwsCustomResource(this, `TriggerStepFunction-${dataDefinitionHash.slice(4)}`, {
       onCreate: invokeStepFunctionSDKCall,
       onUpdate: invokeStepFunctionSDKCall,
       policy: cr.AwsCustomResourcePolicy.fromSdkCalls({

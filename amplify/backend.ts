@@ -185,7 +185,7 @@ applyTagsToRootStack()
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'well-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sample-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'

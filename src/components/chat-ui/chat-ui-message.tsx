@@ -184,7 +184,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   const messageContentCategory = getMessageCatigory(props.message);
 
   useEffect(() => {
-    const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation']
+    const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation', 'includeScore']
     switch (messageContentCategory) {
       case 'tool_plot':
         const { chartTitle, numberOfPreviousTablesToInclude } = JSON.parse(props.message.content) as {
@@ -208,13 +208,14 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         interface ScatterDataPoint {
           x: Date;
           y?: number;
-          url?: string
+          url?: string;
+          rowData?: string;
         }
 
         const data: ChartData<'scatter', ScatterDataPoint[]> = { datasets: [] }
         // let annotations = {}
 
-        selectedToolMessages.map((selectedToolMessage, selectedToolMessageIndex) => {
+        selectedToolMessages.map((selectedToolMessage) => {
 
           const chartContent = JSON.parse(selectedToolMessage.content) as {
             queryResponseData: RowDataInput,
@@ -235,24 +236,35 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           switch (tableType) {
             case 'events':
               const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
-                labels: ['event'.repeat(chartDataObject[chartTrendNames[0]].length)],
+                // labels: ['event'.repeat(chartDataObject[chartTrendNames[0]].length)],
                 datasets: [
                   {
                     data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
                       x: new Date(xValue), // Convert to Date object
                       // x: xValue, // Convert to Date object
-                      y: 10,
-                      url: `/files/${chartDataObject['s3Key'][i]}`.slice(0, -5)//Remove the .yaml
+                      y: 100,
+                      url: `/files/${chartDataObject['s3Key'][i]}`.slice(0, -5),//Remove the .yaml,
+                      rowData: stringify(Object.keys(chartDataObject)
+                        .filter((columnName) => !nonDefaultColumns.includes(columnName))
+                        .reduce((acc, key) => ({ //Create a yaml string with the row's data
+                          ...acc,
+                          [key]: chartDataObject[key][i]
+                        }), {})
+                      )
                     })),
+                    pointRadius: 20,
                     datalabels: {
-                      display: "auto"
+                      display: "auto",
+                      rotation: 90
                     },
+                    borderColor: "transparent",
+                    backgroundColor: "transparent",
                     // datalabels: {
                     //   color: '#FFCE56'
                     // },
                     label: "Events",
                     // tension: 0.1,
-                    
+
                     // borderColor: 'rgb(75, 192, 192)',
                     // pointBackgroundColor: 'rgb(75, 192, 192)',
                   }
@@ -420,23 +432,44 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               backgroundColor: 'white',
               borderRadius: 4,
               // padding: 6,
-              font: function(context) {
-                var w = context.chart.width;
-                return {
-                  size: w < 512 ? 12 : 14,
-                  weight: 'bold',
-                };
-              },
-              formatter: function(value, context) {
+              // font: function (context) {
+              //   var w = context.chart.width;
+              //   return {
+              //     size: w < 512 ? 12 : 14,
+              //     weight: 'bold',
+              //   };
+              // },
+              formatter: function () {//value, context) {
                 // const datasetIndex = elements[0].datasetIndex;
                 return 'event'//JSON.stringify(context.dataIndex)
                 // return 'testValue'
                 // if (context.chart.data.labels) {
                 //   return context!.chart!.data!.labels[context.dataIndex]
                 // }
-                
+
               }
             },
+
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  // Check if the dataset label is "Events"
+                  if (context.dataset.label === "Events") {
+                    // Custom tooltip for Events
+                    const datasetIndex = context.datasetIndex;
+                    const index = context.dataIndex
+                    const rowData = data.datasets[datasetIndex].data[index].rowData
+                    return rowData?.split('\n')
+                    // return `Line 1\nLine 2\nLine 3`.split("\n");
+                    // return `Events: ${context.parsed.y}`; // Modify this according to your needs
+                  }
+                  // Return default tooltip for other datasets
+                  return `${context.dataset.label}\n${context.parsed.y}\n${new Date(context.parsed.x)}`.split('\n');
+                  // return [context.dataset.label,  context.parsed.y!, context.parsed.x!]
+                }
+              }
+            }
+
             // tooltip: {
             //   // enabled: true,
             //   // callbacks: {

@@ -449,12 +449,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //   ]),
     // });
 
-
-
-
-
-
-
     // // Add dependency to ensure database is created before crawler
     // crawler.addDependency(productionGlueDatabase);
 
@@ -557,18 +551,18 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             stateMachineArn: runCrawlerRecordTableDefintionStateMachine.stateMachineArn,
             input: JSON.stringify({ 
                 action: 'create',
-                s3BucketDeploymentId: props.s3Deployment.node.id
             }),
         },
         physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
     }
 
     // Create a Custom Resource that invokes the Step Function
-    const crawlerTriggerCustomResource = new cr.AwsCustomResource(scope, `TriggerCrawlerStateMachine`, {
+    const crawlerTriggerCustomResource = new cr.AwsCustomResource(scope, `TriggerCrawlerStateMachine-${props.s3Deployment.node.id}`, {
         onCreate: invokeStepFunctionSDKCall,
         policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
             resources: [runCrawlerRecordTableDefintionStateMachine.stateMachineArn],
         }),
+
     });
 
     //Make sure the bucket deployment finishs before 
