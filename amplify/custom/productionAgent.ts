@@ -549,7 +549,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         action: 'startExecution',
         parameters: {
             stateMachineArn: runCrawlerRecordTableDefintionStateMachine.stateMachineArn,
-            input: JSON.stringify({ 
+            input: JSON.stringify({
                 action: 'create',
             }),
         },
@@ -562,18 +562,45 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
             resources: [runCrawlerRecordTableDefintionStateMachine.stateMachineArn],
         }),
-
     });
 
     //Make sure the bucket deployment finishs before 
     crawlerTriggerCustomResource.node.addDependency(props.s3Deployment.deployedBucket)
 
+    // Create a Lambda function that will start the Step Function
+    const triggerCrawlerSfnFunction = new lambda.Function(scope, `TriggerCrawlerSfnFunction`, {
+        runtime: lambda.Runtime.NODEJS_LATEST,
+        handler: 'index.handler',
+        code: lambda.Code.fromInline(`
+            const { SFNClient, StartExecutionCommand } = require('@aws-sdk/client-sfn');
+
+            const stepfunctions = new SFNClient(); // Specify the region
+
+            exports.handler = async (event) => {
+                const params = {
+                    stateMachineArn: '${runCrawlerRecordTableDefintionStateMachine.stateMachineArn}',
+                    input: JSON.stringify(event)
+                };
+                
+                const command = new StartExecutionCommand(params);
+                await stepfunctions.send(command);
+            };
+            
+            `),
+    });
+
+    runCrawlerRecordTableDefintionStateMachine.grantStartExecution(triggerCrawlerSfnFunction)
+
+    wellFileDriveBucket.addEventNotification(
+        s3.EventType.OBJECT_CREATED, // Triggers on file upload
+        new s3n.LambdaDestination(triggerCrawlerSfnFunction),
+        {
+            prefix: 'production-agent/additional-data/', // Only trigger for files in this prefix
+        }
+    );
+
 
     return {
-        // queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,
-        // imageMagickLayer: imageMagickLayer,
-        // ghostScriptLayer: ghostScriptLayer,
-        // getInfoFromPdfFunction: queryReportImageLambda,
         convertPdfToYamlFunction: convertPdfToYamlFunction,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,

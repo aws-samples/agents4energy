@@ -8,18 +8,11 @@ type GeneratedQuery<InputType, OutputType> = string & {
   __generatedQueryOutput: OutputType;
 };
 
-export const convertPdfToJson = /* GraphQL */ `query ConvertPdfToJson($s3Key: String!) {
-  convertPdfToJson(s3Key: $s3Key)
-}
-` as GeneratedQuery<
-  APITypes.ConvertPdfToJsonQueryVariables,
-  APITypes.ConvertPdfToJsonQuery
->;
 export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
   getChatMessage(id: $id) {
     chatSessionId
+    chatSessionIdDashFieldName
     content
-    contentBlocks
     createdAt
     id
     owner
@@ -29,6 +22,8 @@ export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
       firstMessageSummary
       id
       owner
+      pastSteps
+      planSteps
       updatedAt
       __typename
     }
@@ -61,6 +56,8 @@ export const getChatSession = /* GraphQL */ `query GetChatSession($id: ID!) {
       __typename
     }
     owner
+    pastSteps
+    planSteps
     updatedAt
     __typename
   }
@@ -68,23 +65,6 @@ export const getChatSession = /* GraphQL */ `query GetChatSession($id: ID!) {
 ` as GeneratedQuery<
   APITypes.GetChatSessionQueryVariables,
   APITypes.GetChatSessionQuery
->;
-export const getInfoFromPdf = /* GraphQL */ `query GetInfoFromPdf(
-  $dataToExclude: AWSJSON
-  $dataToInclude: AWSJSON
-  $s3Key: String!
-  $tableColumns: AWSJSON!
-) {
-  getInfoFromPdf(
-    dataToExclude: $dataToExclude
-    dataToInclude: $dataToInclude
-    s3Key: $s3Key
-    tableColumns: $tableColumns
-  )
-}
-` as GeneratedQuery<
-  APITypes.GetInfoFromPdfQueryVariables,
-  APITypes.GetInfoFromPdfQuery
 >;
 export const invokeBedrock = /* GraphQL */ `query InvokeBedrock($prompt: String) {
   invokeBedrock(prompt: $prompt) {
@@ -133,8 +113,31 @@ export const invokeBedrockWithStructuredOutput = /* GraphQL */ `query InvokeBedr
   APITypes.InvokeBedrockWithStructuredOutputQueryVariables,
   APITypes.InvokeBedrockWithStructuredOutputQuery
 >;
-export const invokeProductionAgent = /* GraphQL */ `query InvokeProductionAgent($chatSessionId: String, $input: String!) {
-  invokeProductionAgent(chatSessionId: $chatSessionId, input: $input)
+export const invokePlanAndExecuteAgent = /* GraphQL */ `query InvokePlanAndExecuteAgent(
+  $chatSessionId: String
+  $lastMessageText: String!
+) {
+  invokePlanAndExecuteAgent(
+    chatSessionId: $chatSessionId
+    lastMessageText: $lastMessageText
+  )
+}
+` as GeneratedQuery<
+  APITypes.InvokePlanAndExecuteAgentQueryVariables,
+  APITypes.InvokePlanAndExecuteAgentQuery
+>;
+export const invokeProductionAgent = /* GraphQL */ `query InvokeProductionAgent(
+  $chatSessionId: String
+  $lastMessageText: String!
+  $messageOwnerIdentity: String
+  $usePreviousMessageContext: Boolean
+) {
+  invokeProductionAgent(
+    chatSessionId: $chatSessionId
+    lastMessageText: $lastMessageText
+    messageOwnerIdentity: $messageOwnerIdentity
+    usePreviousMessageContext: $usePreviousMessageContext
+  )
 }
 ` as GeneratedQuery<
   APITypes.InvokeProductionAgentQueryVariables,
@@ -180,8 +183,8 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
   ) {
     items {
       chatSessionId
+      chatSessionIdDashFieldName
       content
-      contentBlocks
       createdAt
       id
       owner
@@ -201,6 +204,45 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
   APITypes.ListChatMessageByChatSessionIdAndCreatedAtQueryVariables,
   APITypes.ListChatMessageByChatSessionIdAndCreatedAtQuery
 >;
+export const listChatMessageByChatSessionIdDashFieldNameAndCreatedAt = /* GraphQL */ `query ListChatMessageByChatSessionIdDashFieldNameAndCreatedAt(
+  $chatSessionIdDashFieldName: String!
+  $createdAt: ModelStringKeyConditionInput
+  $filter: ModelChatMessageFilterInput
+  $limit: Int
+  $nextToken: String
+  $sortDirection: ModelSortDirection
+) {
+  listChatMessageByChatSessionIdDashFieldNameAndCreatedAt(
+    chatSessionIdDashFieldName: $chatSessionIdDashFieldName
+    createdAt: $createdAt
+    filter: $filter
+    limit: $limit
+    nextToken: $nextToken
+    sortDirection: $sortDirection
+  ) {
+    items {
+      chatSessionId
+      chatSessionIdDashFieldName
+      content
+      createdAt
+      id
+      owner
+      role
+      tool_call_id
+      tool_calls
+      tool_name
+      trace
+      updatedAt
+      __typename
+    }
+    nextToken
+    __typename
+  }
+}
+` as GeneratedQuery<
+  APITypes.ListChatMessageByChatSessionIdDashFieldNameAndCreatedAtQueryVariables,
+  APITypes.ListChatMessageByChatSessionIdDashFieldNameAndCreatedAtQuery
+>;
 export const listChatMessages = /* GraphQL */ `query ListChatMessages(
   $filter: ModelChatMessageFilterInput
   $limit: Int
@@ -209,8 +251,8 @@ export const listChatMessages = /* GraphQL */ `query ListChatMessages(
   listChatMessages(filter: $filter, limit: $limit, nextToken: $nextToken) {
     items {
       chatSessionId
+      chatSessionIdDashFieldName
       content
-      contentBlocks
       createdAt
       id
       owner
@@ -241,6 +283,8 @@ export const listChatSessions = /* GraphQL */ `query ListChatSessions(
       firstMessageSummary
       id
       owner
+      pastSteps
+      planSteps
       updatedAt
       __typename
     }

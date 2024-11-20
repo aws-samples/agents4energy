@@ -8,6 +8,7 @@ import {
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
+  planAndExecuteAgentFunction,
   // addIamDirectiveFunction
 } from './data/resource';
 import { preSignUp } from './functions/preSignUp/resource';
@@ -36,6 +37,7 @@ const backend = defineBackend({
   invokeBedrockAgentFunction,
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
+  planAndExecuteAgentFunction,
   preSignUp
 });
 
@@ -185,7 +187,7 @@ applyTagsToRootStack()
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sample-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sample-report-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   // destinationKeyPrefix: '/'
@@ -209,11 +211,17 @@ const {
 uploadToS3Deployment.node.addDependency(convertPdfToYamlFunction) //Don't deploy files until the convertPdfToYamlFunction function is done deploying
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
-// backend.productionAgentFunction.addEnvironment('STEP_FUNCTION_ARN', queryImagesStateMachineArn)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
 backend.productionAgentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', athenaWorkgroup.name)
 backend.productionAgentFunction.addEnvironment('DATABASE_NAME', defaultProdDatabaseName)
 backend.productionAgentFunction.addEnvironment('ATHENA_CATALOG_NAME', athenaPostgresCatalog.name)
+
+addLlmAgentPolicies({
+  role: backend.planAndExecuteAgentFunction.resources.lambda.role!,
+  rootStack: rootStack,
+  athenaWorkgroup: athenaWorkgroup,
+  s3Bucket: backend.storage.resources.bucket
+})
 
 addLlmAgentPolicies({
   role: backend.productionAgentFunction.resources.lambda.role!,

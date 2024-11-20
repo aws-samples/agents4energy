@@ -750,10 +750,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         props.message?.role === 'human' && (
           <>
             <strong>{formatDate(props.message.createdAt)}</strong>
-            {/* <ReactMarkdown>
+            <ReactMarkdown>
               {props.message.content}
-            </ReactMarkdown> */}
-            <pre
+            </ReactMarkdown>
+            {/* <pre
               style={{ //Wrap long lines
                 whiteSpace: 'pre-wrap',
                 wordWrap: 'break-word',
@@ -761,7 +761,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               }}
             >
               {props.message.content}
-            </pre>
+            </pre> */}
 
           </>
         )

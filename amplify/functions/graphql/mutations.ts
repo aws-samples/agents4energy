@@ -14,8 +14,8 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
 ) {
   createChatMessage(condition: $condition, input: $input) {
     chatSessionId
+    chatSessionIdDashFieldName
     content
-    contentBlocks
     createdAt
     id
     owner
@@ -25,6 +25,8 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
       firstMessageSummary
       id
       owner
+      pastSteps
+      planSteps
       updatedAt
       __typename
     }
@@ -60,6 +62,8 @@ export const createChatSession = /* GraphQL */ `mutation CreateChatSession(
       __typename
     }
     owner
+    pastSteps
+    planSteps
     updatedAt
     __typename
   }
@@ -74,8 +78,8 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
 ) {
   deleteChatMessage(condition: $condition, input: $input) {
     chatSessionId
+    chatSessionIdDashFieldName
     content
-    contentBlocks
     createdAt
     id
     owner
@@ -85,6 +89,8 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
       firstMessageSummary
       id
       owner
+      pastSteps
+      planSteps
       updatedAt
       __typename
     }
@@ -120,6 +126,8 @@ export const deleteChatSession = /* GraphQL */ `mutation DeleteChatSession(
       __typename
     }
     owner
+    pastSteps
+    planSteps
     updatedAt
     __typename
   }
@@ -145,8 +153,8 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
 ) {
   updateChatMessage(condition: $condition, input: $input) {
     chatSessionId
+    chatSessionIdDashFieldName
     content
-    contentBlocks
     createdAt
     id
     owner
@@ -156,6 +164,8 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
       firstMessageSummary
       id
       owner
+      pastSteps
+      planSteps
       updatedAt
       __typename
     }
@@ -191,6 +201,8 @@ export const updateChatSession = /* GraphQL */ `mutation UpdateChatSession(
       __typename
     }
     owner
+    pastSteps
+    planSteps
     updatedAt
     __typename
   }

@@ -131,10 +131,11 @@ const executeSQLQuerySchema = z.object({
         Use "" arond all column names.
         To use date functions on a column with varchar type, cast the column to a date first.
         The DATE_SUB function is not available. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
-        The function DATE_TRUNC can be called with these arguments: DATE_TRUNC(varchar(x), date), DATE_TRUNC(varchar(x), timestamp(p)), DATE_TRUNC(varchar(x), timestamp(p) with time zone), DATE_TRUNC(varchar(x), time(p)), DATE_TRUNC(varchar(x), time(p) with time zone)
+        Here's an example of how to use the DATE_TRUNC function: DATE_TRUNC('month', CAST("date" AS DATE))
+        In the WHERE or GROUP BY causes, do not use column aliases defined in the SELECT clause.
         Column aliases defined in the SELECT clause cannot be referenced in the WHERE or GROUP BY clauses because they are evaluated before the SELECT clause during query processing.
         The first column in the returned result will be used as the x axis column. If the query contains a date, set it as the first column.
-        `),
+        `.replace(/^\s+/gm, '')),
 });
 
 function doesFromLineContainOneDot(sqlQuery: string): boolean {
@@ -171,7 +172,7 @@ export const executeSQLQueryTool = tool(
                     error: `
                     DATE_SUB is not allowed in the SQL query. 
                     Re-write the query and use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Ex: DATE_ADD('year', -5, CURRENT_DATE)
-                    `
+                    `.replace(/^\s+/gm, '')
                 } as ToolMessageContentType
             }
 
@@ -181,8 +182,8 @@ export const executeSQLQueryTool = tool(
                     messageContentType: 'tool_json',
                     error: `
                     The FROM line in the SQL query does not the data source.
-                    Include the dataSource, database, and tableName in the FROM element (ex: FROM postgres_sample_992.production.daily)
-                    `
+                    Include the dataSource, database, and tableName in the FROM element (ex: FROM <dataSource>.production.daily)
+                    `.replace(/^\s+/gm, '')
                 } as ToolMessageContentType
             }
 
@@ -233,35 +234,6 @@ const plotTableFromToolResponseSchema = z.object({
 export const plotTableFromToolResponseTool = tool(
     async ({ chartTitle, numberOfPreviousTablesToInclude = 1 }) => {
 
-        // console.log('Messages:\n', amplifyClientWrapper.chatMessages)
-
-        // const toolResponseMessages = amplifyClientWrapper.chatMessages.filter(
-        //     (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
-        // )
-
-        // console.log('Tool Response Messages:\n', toolResponseMessages)
-
-        // const selectedToolMessages = toolResponseMessages.slice(-1*numberOfPreviousTablesToInclude)
-
-        // console.log("Selected messages: ", selectedToolMessages)
-
-        // for (const selectedToolMessage of selectedToolMessages) {
-        //     const queryResponseData = JSON.parse(selectedToolMessage.content as string).queryResponseData
-
-        //     console.log('data object: ', queryResponseData)
-
-        //     // Functions must return strings
-        //     if (!(columnNameFromQueryForXAxis in queryResponseData[0])) {
-        //         return {
-        //             messageContentType: 'tool_json',
-        //             error: `
-        //                 Column name "${columnNameFromQueryForXAxis}" is not present in the result of the SQL query column names: ${queryResponseData.keys}
-        //                 Be sure to select a column from the sql query for the x axis.
-        //                 `
-        //         } as ToolMessageContentType
-        //     }
-        // }
-
         return {
             messageContentType: 'tool_plot',
             // columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
@@ -301,13 +273,13 @@ export const wellTableSchema = z.object({
     wellApiNumber: z.string().describe('The API number of the well to find information about')
 });
 
-function pivotLists<T>(lists: T[][]): T[][] {
-    if (lists.length === 0) return [];
+// function pivotLists<T>(lists: T[][]): T[][] {
+//     if (lists.length === 0) return [];
 
-    return lists[0].map((_, colIndex) =>
-        lists.map(row => row[colIndex])
-    );
-}
+//     return lists[0].map((_, colIndex) =>
+//         lists.map(row => row[colIndex])
+//     );
+// }
 
 async function listFilesUnderPrefix(
     props: {
