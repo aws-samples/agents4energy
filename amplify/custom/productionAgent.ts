@@ -19,6 +19,8 @@ import {
     custom_resources as cr
 } from 'aws-cdk-lib';
 
+import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
+
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { CfnApplication } from 'aws-cdk-lib/aws-sam';
 
@@ -26,6 +28,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
+// import { BedrockKnowledgeBaseOSS } from "../constructs/bedrockKnowledgeBaseOSS";
 import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
 
 const defaultProdDatabaseName = 'proddb'
@@ -216,11 +219,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefinitionBedrockKnoledgeBase", {
         vpc: props.vpc,
-        bucket: props.s3Bucket
+        bucket: props.s3Bucket,
+        schemaName: 'bedrock_integration'
     })
 
     const productionAgentTableDefDataSource = new bedrock.CfnDataSource(scope, 'sqlTableDefinitions', {
-        name: "sqlTableDefinitions-1", //TODO - remove the 
+        name: "sqlTableDefinition",
         dataSourceConfiguration: {
             type: 'S3',
             s3Configuration: {
@@ -235,6 +239,67 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
         knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
     })
+
+    // const petroleumEngineeringKnowledgeBase = new AuroraBedrockKnoledgeBase(scope, "PetrolumEngineeringKB", {
+    //     vpc: props.vpc,
+    //     bucket: props.s3Bucket,
+    //     schemaName: 'petroleum_kb',
+    //     vectorStorePostgresCluster: sqlTableDefBedrockKnoledgeBase.vectorStorePostgresCluster
+    // })
+
+    // const PetroWikiKnowledgeBase = new BedrockKnowledgeBaseOSS(scope, 'PetroWikiKnowledgeBase', {
+    //     knowledgeBaseName: "petrowiki"
+    // })
+
+    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, 'EngineeringKb', {
+        embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
+        instruction: `You are a helpful question answering assistant. You answer
+        user questions factually and honestly related to petroleum engineering data`,
+        description: 'Petroleum Engineering Knowledge Base',
+    });
+
+
+    // const petroWikiDataSource = new bedrock.CfnDataSource(scope, 'PetroWikiDataSource', {
+    //     name: "petroWiki",
+    //     dataSourceConfiguration: {
+    //         type: 'WEB',
+    //         webConfiguration: {
+    //             sourceConfiguration: {
+    //                 urlConfiguration: {
+    //                     seedUrls: [{
+    //                         url: 'https://petrowiki.spe.org/',
+    //                     }],
+    //                 },
+    //             },
+    //         }
+    //     },
+    //     knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBase.attrKnowledgeBaseId
+    // })
+
+    // // Define the SDK call for starting the sync
+    // const startDataSourceSyncCall: cr.AwsSdkCall = {
+    //     service: '@aws-sdk/client-bedrock-agent',
+    //     action: 'startIngestionJob',
+    //     parameters: {
+    //         dataSourceId: petroWikiDataSource.attrDataSourceId,
+    //         knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
+    //     },
+    //     physicalResourceId: cr.PhysicalResourceId.of('startDataSourceSync')
+    // };
+
+    // // Create Custom Resource to trigger the sync
+    // const dataSourceSyncTrigger = new cr.AwsCustomResource(scope, 'StartDataSourceSync', {
+    //     onCreate: startDataSourceSyncCall,
+    //     policy: cr.AwsCustomResourcePolicy.fromStatements([
+    //         new iam.PolicyStatement({
+    //             actions: ['bedrock:startIngestionJob'],
+    //             resources: [petroleumEngineeringKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn]
+    //         })
+    //     ])
+    // });
+
+    // // Add dependency to ensure data source is created before starting sync
+    // dataSourceSyncTrigger.node.addDependency(petroWikiDataSource);
 
     lambdaLlmAgentRole.addToPrincipalPolicy(new iam.PolicyStatement({
         actions: ["bedrock:StartIngestionJob"],
@@ -398,8 +463,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
     // prodTableKbIngestionJobTrigger.node.addDependency(productionAgentTableDefDataSource)
     prodTableKbIngestionJobTrigger.node.addDependency(prodDbConfigurator)
-
-
 
     //This function will get table definitions from any athena data source with the AgentsForEnergy tag, upload them to s3, and start a knoledge base ingestion job to present them to an agent 
     const recordTableDefAndStarkKBIngestionJob = new NodejsFunction(scope, 'RecordTableDefAndStartKbIngestionJob', {

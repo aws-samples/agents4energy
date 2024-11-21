@@ -88,11 +88,6 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             temperature: 0
         });
 
-        // const agent2 = createReactAgent({
-        //     llm: agentModel,
-        //     tools: agentTools,
-        // });
-
 
         //Add retry to the agent
         const agent = await retryOperation(async () => createReactAgent({

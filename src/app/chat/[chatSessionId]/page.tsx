@@ -162,7 +162,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["type"]>>([]);
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
-    const [activeChatSession, setActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false);
     const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
@@ -170,25 +171,25 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
 
-    // //Set the chat session from params
-    // useEffect(() => {
-    //     if (params && params.chatSessionId) {
-    //         amplifyClient.models.ChatSession.get({ id: params.chatSessionId }).then(({ data: chatSession }) => {
-    //             if (chatSession) {
-    //                 setActiveChatSession(chatSession)
+    //Set the chat session from params
+    useEffect(() => {
+        if (params && params.chatSessionId) {
+            amplifyClient.models.ChatSession.get({ id: params.chatSessionId }).then(({ data: chatSession }) => {
+                if (chatSession) {
+                    setInitialActiveChatSession(chatSession)
 
-    //                 console.log('Loaded chat session. Ai Bot Info:', chatSession.aiBotInfo)
+                    console.log('Loaded chat session. Ai Bot Info:', chatSession.aiBotInfo)
 
-    //             } else {
-    //                 console.log(`Chat session ${params.chatSessionId} not found`)
-    //             }
-    //         })
-    //     } else {
-    //         console.log("No chat session id in params: ", params)
-    //     }
-    // }, [params])
+                } else {
+                    console.log(`Chat session ${params.chatSessionId} not found`)
+                }
+            })
+        } else {
+            console.log("No chat session id in params: ", params)
+        }
+    }, [params])
 
-    //Set the chat session from params and get updates as the chat session is updated
+    //Subscribe to updates of the active chat session
     useEffect(() => {
         if (params && params.chatSessionId) {
             amplifyClient.models.ChatSession.observeQuery({
@@ -197,7 +198,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     id: { eq: params.chatSessionId }
                 }
             }).subscribe({
-                next: (data) => setActiveChatSession(data.items[0]),
+                next: (data) => setLiveUpdateActiveChatSession(data.items[0]),
                 error: (error) => console.error('Error subscribing the chat session', error)
             })
         } else {
@@ -220,11 +221,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         //Set the default prompts if this is the first message
         if (
             !messages.length && //No messages currently in the chat
-            activeChatSession &&
-            activeChatSession.aiBotInfo &&
-            activeChatSession.aiBotInfo.aiBotId &&
-            activeChatSession.aiBotInfo.aiBotId in defaultAgents
-        ) setSuggestedPromptes(defaultAgents[activeChatSession.aiBotInfo.aiBotId].samplePrompts)
+            initialActiveChatSession &&
+            initialActiveChatSession.aiBotInfo &&
+            initialActiveChatSession.aiBotInfo.aiBotId &&
+            initialActiveChatSession.aiBotInfo.aiBotId in defaultAgents
+        ) setSuggestedPromptes(defaultAgents[initialActiveChatSession.aiBotInfo.aiBotId].samplePrompts)
 
         //If there are no messages, or the last message is an AI message with no tool calls, prepare for a human message
         if (
@@ -238,10 +239,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
             async function fetchAndSetSuggestedPrompts() {
                 setSuggestedPromptes([])
-                if (!activeChatSession || !activeChatSession.id) throw new Error("No active chat session")
+                if (!initialActiveChatSession || !initialActiveChatSession.id) throw new Error("No active chat session")
 
                 const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
-                    chatSessionId: activeChatSession?.id,
+                    chatSessionId: initialActiveChatSession?.id,
                     lastMessageText: "Suggest three follow up prompts",
                     outputStructure: JSON.stringify({
                         title: "RecommendNextPrompt",
@@ -272,7 +273,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             fetchAndSetSuggestedPrompts()
         } else if (messages.length) setIsLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
 
-    }, [messages, activeChatSession])
+    }, [messages, initialActiveChatSession])
 
     // List the user's chat sessions
     useEffect(() => {
@@ -292,10 +293,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     // Subscribe to messages of the active chat session
     useEffect(() => {
         setMessages([])
-        if (activeChatSession) {
+        if (initialActiveChatSession) {
             const sub = amplifyClient.models.ChatMessage.observeQuery({
                 filter: {
-                    chatSessionId: { eq: activeChatSession.id }
+                    chatSessionId: { eq: initialActiveChatSession.id }
                 }
             }).subscribe({
                 next: ({ items }) => { //isSynced is an option here to
@@ -306,12 +307,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             return () => sub.unsubscribe();
         }
 
-    }, [activeChatSession])
+    }, [initialActiveChatSession])
 
     // Subscribe to the token stream for this chat session
     useEffect(() => {
-        if (activeChatSession) {
-            const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: activeChatSession.id }).subscribe({
+        if (initialActiveChatSession) {
+            const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: initialActiveChatSession.id }).subscribe({
                 next: ({ chunk }) => {
                     // console.log('Message Stream Chunk: ', chunk)
 
@@ -326,7 +327,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             return () => sub.unsubscribe();
         }
 
-    }, [activeChatSession])
+    }, [initialActiveChatSession])
 
     // List the available bedrock agents
     useEffect(() => {
@@ -362,7 +363,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string }) {
-        const targetChatSessionId = activeChatSession?.id;
+        const targetChatSessionId = initialActiveChatSession?.id;
 
         if (targetChatSessionId) {
             return amplifyClient.models.ChatMessage.create({
@@ -377,8 +378,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     async function addUserChatMessage(body: string) {
         if (!messages.length) {
             console.log("This is the initial message. Getting summary for chat session")
-            if (!activeChatSession) throw new Error("No active chat session")
-            setChatSessionFirstMessageSummary(body, activeChatSession)
+            if (!initialActiveChatSession) throw new Error("No active chat session")
+            setChatSessionFirstMessageSummary(body, initialActiveChatSession)
         }
         await addChatMessage({ body: body, role: "human" })
         sendMessageToChatBot(body);
@@ -387,11 +388,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     async function sendMessageToChatBot(prompt: string) {
         setIsLoading(true);
 
-        if (activeChatSession?.aiBotInfo?.aiBotAliasId) {
-            const response = await invokeBedrockAgentParseBodyGetTextAndTrace(prompt, activeChatSession)
+        if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
+            const response = await invokeBedrockAgentParseBodyGetTextAndTrace(prompt, initialActiveChatSession)
             if (!response) throw new Error("No response from agent");
         } else {
-            switch (activeChatSession?.aiBotInfo?.aiBotName) {
+            switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
                 case defaultAgents.FoundationModel.name:
                     console.log("invoking the foundation model")
                     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
@@ -399,10 +400,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     addChatMessage({ body: responseText, role: "ai" })
                     break
                 case defaultAgents.ProductionAgent.name:
-                    await invokeProductionAgent(prompt, activeChatSession)
+                    await invokeProductionAgent(prompt, initialActiveChatSession)
                     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
-                    const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: activeChatSession.id })
+                    const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: initialActiveChatSession.id })
                     console.log('Plan and execute response: ', planAndExecuteResponse)
                     break;
                 default:
@@ -444,7 +445,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             drawerContent={
                 <>
                     <Typography variant="h5" sx={{ textAlign: 'center' }}>Plan and execute steps:</Typography>
-                    {activeChatSession?.pastSteps?.map((step) => {
+                    {LiveUpdateActiveChatSession?.pastSteps?.map((step) => {
                         try {
                             const stepContent = JSON.parse(step as string)
                             return (
@@ -482,7 +483,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                             return <p>{step}</p>
                         }
                     })}
-                    {activeChatSession?.planSteps?.map((step) => {
+                    {LiveUpdateActiveChatSession?.planSteps?.map((step) => {
                         try {
                             const { result, ...stepContent } = JSON.parse(step as string)// Remove the result if it exists from the plan steps
                             console.info(result)//TODO: remove this
@@ -608,7 +609,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
                         <Box>
                             <Typography variant="h4" gutterBottom>
-                                Chat with {activeChatSession?.aiBotInfo?.aiBotName}
+                                Chat with {initialActiveChatSession?.aiBotInfo?.aiBotName}
                             </Typography>
                         </Box>
                         <Box>

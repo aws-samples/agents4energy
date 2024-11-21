@@ -135,6 +135,20 @@ const executeSQLQuerySchema = z.object({
         In the WHERE or GROUP BY causes, do not use column aliases defined in the SELECT clause.
         Column aliases defined in the SELECT clause cannot be referenced in the WHERE or GROUP BY clauses because they are evaluated before the SELECT clause during query processing.
         The first column in the returned result will be used as the x axis column. If the query contains a date, set it as the first column.
+        
+        Here's an example sql query for total daily oil, gas and water production
+        <exampleSqlQuery>
+        SELECT
+            DATE_TRUNC('day', CAST("date" AS DATE)) AS day,
+            SUM("oil(bbls)") AS total_oil_production,
+            SUM("gas(mcf)") AS total_gas_production,
+            SUM("water(bbls)") AS total_water_production
+        FROM "AwsDataCatalog"."production_db_xxx"."crawler_production"
+        WHERE "well api" = '30-045-29202'
+            AND CAST("date" AS DATE) >= CAST('1900-01-01' AS DATE)
+        GROUP BY DATE_TRUNC('day', CAST("date" AS DATE))
+        ORDER BY day
+        </exampleSqlQuery>
         `.replace(/^\s+/gm, '')),
 });
 
