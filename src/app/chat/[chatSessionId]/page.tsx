@@ -37,7 +37,7 @@ import { ChatUIProps } from "@/components/chat-ui/chat-ui";
 import { withAuth } from '@/components/WithAuth';
 
 import dynamic from 'next/dynamic'
-import { error } from 'console';
+// import { error } from 'console';
 
 const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
     ssr: false,
@@ -485,6 +485,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     {activeChatSession?.planSteps?.map((step) => {
                         try {
                             const { result, ...stepContent } = JSON.parse(step as string)// Remove the result if it exists from the plan steps
+                            console.info(result)//TODO: remove this
                             return (
                                 <Tooltip
                                     key={step as string}
