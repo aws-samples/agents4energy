@@ -47,7 +47,8 @@ export interface KnowledgeBaseProps {
 //         resources: [props.vectorStorePostgresCluster.secret!.secretArn],
 //       }),
 //     ]),
-//   }))
+//   })
+// )
 
 export class AuroraBedrockKnoledgeBase extends Construct {
   public readonly knowledgeBase: bedrock.CfnKnowledgeBase;

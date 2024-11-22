@@ -28,7 +28,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
-// import { BedrockKnowledgeBaseOSS } from "../constructs/bedrockKnowledgeBaseOSS";
+
 import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
 
 const defaultProdDatabaseName = 'proddb'
@@ -129,6 +129,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
 
     // This is a way to prevent a circular dependency error when interacting with the well fiel drive bucket
+
+    
+
     const wellFileDriveBucket = s3.Bucket.fromBucketName(scope, 'ExistingBucket', props.s3Bucket.bucketName);
     //This causes a circular dependency error
     //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
@@ -251,13 +254,37 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     knowledgeBaseName: "petrowiki"
     // })
 
-    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, 'EngineeringKb', {
+    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, 'PetroleumEngKB', {
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         instruction: `You are a helpful question answering assistant. You answer
         user questions factually and honestly related to petroleum engineering data`,
         description: 'Petroleum Engineering Knowledge Base',
     });
 
+    const petroleumEngineeringDataSource = petroleumEngineeringKnowledgeBase.addWebCrawlerDataSource({
+        sourceUrls: ['https://petrowiki.spe.org/'],
+        filters: {
+            excludePatterns: ['https://petrowiki\.spe\.org/.+?/.+']//Exclude pages with additional path segments
+        }
+    })
+
+    new cr.AwsCustomResource(scope, 'StartIngestionPetroleumEngineeringDataSource', {
+        onCreate: {
+            service: '@aws-sdk/client-bedrock-agent',
+            action: 'startIngestionJob',
+            parameters: {
+                dataSourceId: petroleumEngineeringDataSource.dataSourceId,
+                knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId
+            },
+            physicalResourceId: cr.PhysicalResourceId.of('StartIngestionPetroleumEngineeringDataSource'),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromStatements([
+            new iam.PolicyStatement({
+                actions: ['bedrock:startIngestionJob'],
+                resources: [petroleumEngineeringKnowledgeBase.knowledgeBaseArn]
+            })
+        ])
+    })
 
     // const petroWikiDataSource = new bedrock.CfnDataSource(scope, 'PetroWikiDataSource', {
     //     name: "petroWiki",

@@ -15,9 +15,16 @@ import { preSignUp } from './functions/preSignUp/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
-import * as iam from 'aws-cdk-lib/aws-iam';
-import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
+// import * as iam from 'aws-cdk-lib/aws-iam';
+// import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
+// import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import {
+  aws_iam as iam,
+  aws_s3_deployment as s3Deployment,
+  aws_ec2 as ec2,
+  aws_lambda as lambda,
+  custom_resources as cr,
+} from 'aws-cdk-lib'
 
 import { productionAgentBuilder } from "./custom/productionAgent"
 import { AppConfigurator } from './custom/appConfigurator'
@@ -190,6 +197,7 @@ const rootDir = path.resolve(__dirname, '..');
 const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sample-report-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
+  prune: false
   // destinationKeyPrefix: '/'
 });
 
@@ -208,7 +216,29 @@ const {
   // appSyncApi: backend.data.resources.graphqlApi
 })
 
-uploadToS3Deployment.node.addDependency(convertPdfToYamlFunction) //Don't deploy files until the convertPdfToYamlFunction function is done deploying
+// Custom resource Lambda to introduce a delay between when the PDF to Yaml function finishes deploying, and when the objects are uploaded.
+const delayFunction = new lambda.Function(customStack, 'DelayFunction', {
+  runtime: lambda.Runtime.NODEJS_18_X,
+  handler: 'index.handler',
+  timeout: cdk.Duration.seconds(60),
+  code: lambda.Code.fromInline(`
+    exports.handler = async () => {
+      console.log('Waiting for 30 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 30000));
+      console.log('Wait complete.');
+      return { statusCode: 200 };
+    };
+  `),
+});
+const delayProvider = new cr.Provider(customStack, 'DelayProvider', {
+  onEventHandler: delayFunction,
+});
+const delayResource = new cdk.CustomResource(customStack, 'DelayResource', {
+  serviceToken: delayProvider.serviceToken,
+});
+delayResource.node.addDependency(convertPdfToYamlFunction)
+
+uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the convertPdfToYamlFunction function is done deploying
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
