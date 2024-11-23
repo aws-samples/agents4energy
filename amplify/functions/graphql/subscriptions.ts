@@ -26,6 +26,7 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
       id
       owner
       pastSteps
+      planGoal
       planSteps
       updatedAt
       __typename
@@ -63,6 +64,7 @@ export const onCreateChatSession = /* GraphQL */ `subscription OnCreateChatSessi
     }
     owner
     pastSteps
+    planGoal
     planSteps
     updatedAt
     __typename
@@ -90,6 +92,7 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
       id
       owner
       pastSteps
+      planGoal
       planSteps
       updatedAt
       __typename
@@ -127,6 +130,7 @@ export const onDeleteChatSession = /* GraphQL */ `subscription OnDeleteChatSessi
     }
     owner
     pastSteps
+    planGoal
     planSteps
     updatedAt
     __typename
@@ -154,6 +158,7 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
       id
       owner
       pastSteps
+      planGoal
       planSteps
       updatedAt
       __typename
@@ -191,6 +196,7 @@ export const onUpdateChatSession = /* GraphQL */ `subscription OnUpdateChatSessi
     }
     owner
     pastSteps
+    planGoal
     planSteps
     updatedAt
     __typename

@@ -75,6 +75,7 @@ const schema = a.schema({
         aiBotAliasId: a.string(),
         aiBotVersion: a.string(),
       }),
+      planGoal: a.string(),
       planSteps: a.string().array(),
       pastSteps: a.string().array(),
       // planState: a.customType({

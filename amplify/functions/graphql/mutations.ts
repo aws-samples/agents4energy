@@ -26,6 +26,7 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
       id
       owner
       pastSteps
+      planGoal
       planSteps
       updatedAt
       __typename
@@ -63,6 +64,7 @@ export const createChatSession = /* GraphQL */ `mutation CreateChatSession(
     }
     owner
     pastSteps
+    planGoal
     planSteps
     updatedAt
     __typename
@@ -90,6 +92,7 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
       id
       owner
       pastSteps
+      planGoal
       planSteps
       updatedAt
       __typename
@@ -127,6 +130,7 @@ export const deleteChatSession = /* GraphQL */ `mutation DeleteChatSession(
     }
     owner
     pastSteps
+    planGoal
     planSteps
     updatedAt
     __typename
@@ -165,6 +169,7 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
       id
       owner
       pastSteps
+      planGoal
       planSteps
       updatedAt
       __typename
@@ -202,6 +207,7 @@ export const updateChatSession = /* GraphQL */ `mutation UpdateChatSession(
     }
     owner
     pastSteps
+    planGoal
     planSteps
     updatedAt
     __typename

@@ -23,6 +23,7 @@ export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
       id
       owner
       pastSteps
+      planGoal
       planSteps
       updatedAt
       __typename
@@ -57,6 +58,7 @@ export const getChatSession = /* GraphQL */ `query GetChatSession($id: ID!) {
     }
     owner
     pastSteps
+    planGoal
     planSteps
     updatedAt
     __typename
@@ -284,6 +286,7 @@ export const listChatSessions = /* GraphQL */ `query ListChatSessions(
       id
       owner
       pastSteps
+      planGoal
       planSteps
       updatedAt
       __typename
