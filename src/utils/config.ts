@@ -22,7 +22,10 @@ export const defaultAgents: { [key: string]: defaultAgent } = {
     PlanAndExecuteAgent: {
         name: "Plan And Execute",
         samplePrompts: [
-            `What is the hometown of the 2015 Australian open winner?`
+            `What is the hometown of the 2015 Australian open winner?`,
+            `The well with API number 30-045-29202 recently fell in production to 10 MCFD. 
+            Try to find out what's wrong, make a procedure to repair the well, estimate the cost of the repair, 
+            and forecast the financial returns.`.replace(/^\s+/gm, '')
         ]
     },
 }
