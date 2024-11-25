@@ -53,21 +53,6 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                 }).catch((error) => {
                     console.log('Invoke production agent (timeout is expected): ', error)
                 })
-
-                // try {
-                //     amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-                //         query: invokeProductionAgent,
-                //         variables: {
-                //             chatSessionId: amplifyClientWrapper.chatSessionId,
-                //             lastMessageText: invocationText,
-                //             usePreviousMessageContext: false,
-                //             messageOwnerIdentity: chatMessageOwnerIdentity
-                //         }
-                //     })
-                // }
-                // catch (error) {
-                //     console.log('Invoke production agent (timeout is expected): ', error)
-                // }
                 
 
                 //TODO: Replace this with a subscription
@@ -88,7 +73,7 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                             const mostRecentChatMessage = testChatMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items[0]
 
                             if (mostRecentChatMessage) {
-                                console.log("Most recent chat message:\n", mostRecentChatMessage.content)
+                                console.log("\nMost recent chat message:\n", mostRecentChatMessage)
                             }
 
                             if (mostRecentChatMessage &&

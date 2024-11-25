@@ -180,7 +180,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         if (selectedToolMessages.length === 0) return
 
         interface ScatterDataPoint {
-          x: Date | Number;
+          x: Date | number;
           y?: number;
           url?: string;
           rowData?: string;
@@ -188,7 +188,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         const data: ChartData<'scatter', ScatterDataPoint[]> = { datasets: [] }
 
-        selectedToolMessages.map((selectedToolMessage) => {
+        const xAxisLabels = selectedToolMessages.map((selectedToolMessage) => {
 
           const chartContent = JSON.parse(selectedToolMessage.content) as {
             queryResponseData: RowDataInput,
@@ -254,7 +254,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   .filter((columnName) => (!isNaN(Number(chartDataObject[columnName][0]))))
                   .map((columnName, index) => ({
                     data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
-                      x: (xAxisIsNumberNotDate)?  new Number(xValue): new Date(xValue), // Convert to Date object if xValue is a string
+                      x: (xAxisIsNumberNotDate)?  new Number(xValue) as number: new Date(xValue), // Convert to Date object if xValue is a string
                       y: Number(chartDataObject[columnName][i])
                     })),
                     mode: 'lines+markers',
@@ -277,6 +277,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               data.datasets.push(...newData.datasets)
               break
           }
+          return chartTrendNames[0]
         })
 
 
@@ -307,7 +308,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   locale: enUS,
                 },
               },
-            }: undefined,
+            }: {//Here is the title if the x axis is numberic
+              title: {
+                display: true,
+                text: xAxisLabels.join('\n'),
+              }
+            },
             y: {
               type: 'logarithmic' as const,
               title: {

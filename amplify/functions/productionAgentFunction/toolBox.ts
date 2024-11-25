@@ -266,6 +266,42 @@ export const plotTableFromToolResponseTool = tool(
 
 
 //////////////////////////////////////////
+/////// Get Well File Info Tool //////////
+//////////////////////////////////////////
+
+const getWellFileInfoSchema = z.object({
+    s3Key: z.string().describe("The S3 key of the well file to get information about.")
+});
+
+export const getWellFileInfoTool = tool(
+    async ({ s3Key }) => {
+        const getObjectResponse = await s3Client.send(new GetObjectCommand({
+            Bucket: process.env.DATA_BUCKET_NAME,
+            Key: s3Key
+        }))
+
+        const objectContent = await getObjectResponse.Body?.transformToString()
+
+        if (!objectContent) {
+            return {
+                messageContentType: 'tool_json',
+                error: `
+                The S3 Key was not found. S3 Key: ${s3Key}
+                `
+            } as ToolMessageContentType
+        }
+
+        return objectContent
+    },
+    {
+        name: "getWellFileInfoTool",
+        description: "Can return the contents of a file.",
+        schema: getWellFileInfoSchema,
+    }
+);
+
+
+//////////////////////////////////////////
 //////// PDF Reports to Table Tool ///////
 //////////////////////////////////////////
 

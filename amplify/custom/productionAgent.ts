@@ -374,7 +374,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         targets: {
             s3Targets: [
                 {
-                    path: `s3://${props.s3Bucket.bucketName}/production-agent/additional-data/`,
+                    path: `s3://${props.s3Bucket.bucketName}/production-agent/structured-data-files/`,
                 },
             ],
         },
@@ -685,7 +685,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         s3.EventType.OBJECT_CREATED, // Triggers on file upload
         new s3n.LambdaDestination(triggerCrawlerSfnFunction),
         {
-            prefix: 'production-agent/additional-data/', // Only trigger for files in this prefix
+            prefix: 'production-agent/structured-data-files/', // Only trigger for files in this prefix
         }
     );
 

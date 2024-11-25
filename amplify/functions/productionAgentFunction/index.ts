@@ -9,7 +9,14 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
-import { calculatorTool, wellTableToolBuilder, getTableDefinitionsTool, executeSQLQueryTool, plotTableFromToolResponseTool } from './toolBox';
+import { 
+    calculatorTool, 
+    wellTableToolBuilder, 
+    getTableDefinitionsTool, 
+    executeSQLQueryTool, 
+    plotTableFromToolResponseTool, 
+    getWellFileInfoTool 
+} from './toolBox';
 
 async function retryOperation<T>(
     operation: () => Promise<T>,
@@ -59,7 +66,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     const agentTools = [
         calculatorTool,
         wellTableToolBuilder(amplifyClientWrapper),
-        // convertPdfToJsonTool,
+        getWellFileInfoTool,
         getTableDefinitionsTool,
         executeSQLQueryTool,
         plotTableFromToolResponseTool

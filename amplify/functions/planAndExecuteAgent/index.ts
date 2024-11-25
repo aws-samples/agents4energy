@@ -107,18 +107,18 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
                 for await (const streamEvent of eventStream) {
                     switch (streamEvent.event) {
-                        case "on_chat_model_stream":
-                            // console.log("Going to publish message: ", streamEvent.data.chunk)
-                            const streamChunkText = getLangChainMessageTextContent(streamEvent.data.chunk as AIMessageChunk) || ""
+                        // case "on_chat_model_stream":
+                        //     // console.log("Going to publish message: ", streamEvent.data.chunk)
+                        //     const streamChunkText = getLangChainMessageTextContent(streamEvent.data.chunk as AIMessageChunk) || ""
 
-                            //Write the blurb in green
-                            process.stdout.write(`\x1b[32m${streamChunkText}\x1b[0m`)
-                            await publishTokenStreamChunk({
-                                tokenStreamChunk: streamEvent.data.chunk,
-                                amplifyClientWrapper: amplifyClientWrapper
-                            })
-                            // console.log('Published mesage: ', streamEvent.data.chunk)
-                            break
+                        //     //Write the blurb in green
+                        //     process.stdout.write(`\x1b[32m${streamChunkText}\x1b[0m`)
+                        //     await publishTokenStreamChunk({
+                        //         tokenStreamChunk: streamEvent.data.chunk,
+                        //         amplifyClientWrapper: amplifyClientWrapper
+                        //     })
+                        //     // console.log('Published mesage: ', streamEvent.data.chunk)
+                        //     break
                         // case "on_chain_end":
                         //     console.log('resolving on_chain_end: ', streamEvent.data.output)
                         //     resolve({ output: streamEvent.data.output})
@@ -141,17 +141,17 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                                 streamChunkAIMessage.tool_calls[0].name === "extract"
                             ) resolve({ lastMessage: streamChunkAIMessage })
 
-                            if (
-                                !streamChunkAIMessage.tool_calls ||
-                                streamChunkAIMessage.tool_calls.length === 0
-                            ) {
-                                await amplifyClientWrapper.publishMessage({
-                                    chatSessionId: amplifyClientWrapper.chatSessionId,
-                                    owner: ('sub' in event.identity!) ? event.identity.sub : "",
-                                    message: streamChunkAIMessage
-                                })
-                                resolve({ lastMessage: streamChunkAIMessage })
-                            }
+                            // if (
+                            //     !streamChunkAIMessage.tool_calls ||
+                            //     streamChunkAIMessage.tool_calls.length === 0
+                            // ) {
+                            //     await amplifyClientWrapper.publishMessage({
+                            //         chatSessionId: amplifyClientWrapper.chatSessionId,
+                            //         owner: ('sub' in event.identity!) ? event.identity.sub : "",
+                            //         message: streamChunkAIMessage
+                            //     })
+                            //     resolve({ lastMessage: streamChunkAIMessage })
+                            // }
 
                             break
                         // default:
@@ -416,13 +416,13 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             console.log("New Plan from invoke: \n", stringify(newPlanFromInvoke))
             return { plan: newPlanFromInvoke.steps as PlanStep[] }
 
-            // return {plan: [
-            //     {
-            //         title: "Dummy Step",
-            //         description: "none",
-            //         role: 'ai'
-            //     }
-            // ] as PlanStep[]}
+            // // return {plan: [
+            // //     {
+            // //         title: "Dummy Step",
+            // //         description: "none",
+            // //         role: 'ai'
+            // //     }
+            // // ] as PlanStep[]}
 
 
             // const replannerResponse = await invokeAndStreamOutput({
@@ -445,16 +445,16 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             // console.log("New Plan: \n", stringify(newPlan))
 
             // return { plan: replannerResponse.lastMessage.tool_calls![0].args as PlanStep[]};
-
-            return {
-                plan: [
-                    {
-                        title: "Dummy Step",
-                        description: "none",
-                        role: 'ai'
-                    }
-                ] as PlanStep[]
-            }
+            // // return {}
+            // // return {
+            // //     plan: [
+            // //         {
+            // //             title: "Dummy Step",
+            // //             description: "none",
+            // //             role: 'ai'
+            // //         }
+            // //     ] as PlanStep[]
+            // // }
         }
 
         async function respondStep(
@@ -471,7 +471,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         function shouldEnd(state: typeof PlanExecuteState.State) {
             // If human input is requested, or there are no more steps, return true
-            // console.log("Deciding to end based on the state: \n", stringify(state))
+            console.log("Deciding to end based on the state: \n", stringify(state))
             if (!state.plan) return "false"
             if (state.plan.length === 0) return "true"
             if (state.plan[0].role === "human") return "true"
