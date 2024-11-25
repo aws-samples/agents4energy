@@ -180,14 +180,13 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         if (selectedToolMessages.length === 0) return
 
         interface ScatterDataPoint {
-          x: Date;
+          x: Date | Number;
           y?: number;
           url?: string;
           rowData?: string;
         }
 
         const data: ChartData<'scatter', ScatterDataPoint[]> = { datasets: [] }
-        // let annotations = {}
 
         selectedToolMessages.map((selectedToolMessage) => {
 
@@ -215,7 +214,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   {
                     data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
                       x: new Date(xValue), // Convert to Date object
-                      // x: xValue, // Convert to Date object
                       y: 100,
                       url: `/files/${chartDataObject['s3Key'][i]}`.slice(0, -5),//Remove the .yaml,
                       rowData: stringify(Object.keys(chartDataObject)
@@ -248,13 +246,15 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               data.datasets.push(...newEventData.datasets)
               break
             case 'trend':
+              const xAxisIsNumberNotDate = !isNaN(Number(chartDataObject[chartTrendNames[0]][0]))
+              console.log('xAxisIsNumberNotDate: ', xAxisIsNumberNotDate)
               const newData: ChartData<'scatter', ScatterDataPoint[]> = {
                 datasets: chartTrendNames
                   .slice(1) // The first column will be used for the x axis
                   .filter((columnName) => (!isNaN(Number(chartDataObject[columnName][0]))))
                   .map((columnName, index) => ({
                     data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
-                      x: new Date(xValue), // Convert to Date object
+                      x: (xAxisIsNumberNotDate)?  new Number(xValue): new Date(xValue), // Convert to Date object if xValue is a string
                       y: Number(chartDataObject[columnName][i])
                     })),
                     mode: 'lines+markers',
@@ -281,13 +281,15 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
 
 
-        console.log('chart data:\n', data)
+        // console.log('chart data:\n', data)
 
+        console.log("First X data Point: ", data.datasets[0].data[0].x)
+        console.log("First X data Point Is Date: ", data.datasets[0].data[0].x instanceof Date)
 
         const options: ChartOptions<'scatter'> = {
           // responsive: true,
-          scales: {
-            x: {
+          scales: {//If the first x data point is a number an not a date, use a number x axis
+            x: (data.datasets[0].data[0].x instanceof Date)? {
               type: 'time' as const,
               time: {
                 unit: 'day' as const,
@@ -305,7 +307,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   locale: enUS,
                 },
               },
-            },
+            }: undefined,
             y: {
               type: 'logarithmic' as const,
               title: {
