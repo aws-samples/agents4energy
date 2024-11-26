@@ -74,13 +74,13 @@ const Main = styled('main', {
             marginLeft: drawerWidth,
         }),
     } : {
-        marginRight: -drawerWidth,
+        marginRight: -drawerWidth*2,
         ...(open && {
             transition: theme.transitions.create('margin', {
                 easing: theme.transitions.easing.easeOut,
                 duration: theme.transitions.duration.enteringScreen,
             }),
-            marginRight: 0,
+            marginRight: -drawerWidth,
         }),
     }),
 }));
