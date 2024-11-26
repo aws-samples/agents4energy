@@ -19,8 +19,8 @@ import '@aws-amplify/ui-react/styles.css'
 import {
     Typography,
     Box,
-    Drawer,
-    Toolbar,
+    // Drawer,
+    // Toolbar,
     MenuItem,
     IconButton,
     Card,
@@ -43,7 +43,7 @@ const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/cha
     ssr: false,
 });
 
-const drawerWidth = 240;
+// const drawerWidth = 240;
 
 type ListBedrockAgentsResponseType = {
     agentSummaries: {
