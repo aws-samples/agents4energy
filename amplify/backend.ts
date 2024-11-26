@@ -144,7 +144,7 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
   })
 )
 
-const customStack = backend.createStack('customStack')
+const customStack = backend.createStack('productionAgentStack')
 const rootStack = cdk.Stack.of(customStack).nestedStackParent
 if (!rootStack) throw new Error('Root stack not found')
 
