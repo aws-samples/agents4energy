@@ -204,6 +204,7 @@ const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sam
 const {
   convertPdfToYamlFunction,
   triggerCrawlerSfnFunction,
+  pdfProcessingQueue,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
   sqlTableDefBedrockKnoledgeBase,
@@ -221,7 +222,7 @@ const {
 const delayFunction = new lambda.Function(customStack, 'DelayFunction', {
   runtime: lambda.Runtime.NODEJS_18_X,
   handler: 'index.handler',
-  timeout: cdk.Duration.seconds(60),
+  timeout: cdk.Duration.minutes(10),
   code: lambda.Code.fromInline(`
     exports.handler = async () => {
       console.log('Waiting for 60 seconds...');
@@ -239,6 +240,7 @@ const delayResource = new cdk.CustomResource(customStack, 'DelayResource', {
 });
 delayResource.node.addDependency(convertPdfToYamlFunction)
 delayResource.node.addDependency(triggerCrawlerSfnFunction)
+delayResource.node.addDependency(pdfProcessingQueue)
 
 uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the functions triggerCrawlerSfnFunction and convertPdfToYamlFunction are done deploying
 

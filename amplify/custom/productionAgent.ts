@@ -5,6 +5,7 @@ import {
     aws_bedrock as bedrock,
     aws_iam as iam,
     aws_lambda as lambda,
+    aws_lambda_event_sources as lambdaEvent,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as sfnTasks,
     aws_logs as logs,
@@ -13,6 +14,7 @@ import {
     aws_ec2 as ec2,
     aws_s3 as s3,
     aws_s3_notifications as s3n,
+    aws_sqs as sqs,
     aws_glue as glue,
     aws_events as events,
     aws_events_targets as eventsTargets,
@@ -130,20 +132,51 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // This is a way to prevent a circular dependency error when interacting with the well fiel drive bucket
 
-    
+    const pdfDlQueue = new sqs.Queue(scope, 'PdfToYamlDLQ', {
+        queueName: 'pdf-to-yaml-dlq',
+        retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days
+    });
+
+    // Create the main queue for processing
+    const pdfProcessingQueue = new sqs.Queue(scope, 'PdfToYamlQueue', {
+        queueName: 'pdf-to-yaml-processing-queue',
+        visibilityTimeout: cdk.Duration.seconds(300), // Should match or exceed lambda timeout
+        deadLetterQueue: {
+            queue: pdfDlQueue,
+            maxReceiveCount: 3 // Number of retries before sending to DLQ
+        },
+    });
+
+    // Grant the Lambda permission to read from the queue
+    pdfProcessingQueue.grantConsumeMessages(convertPdfToYamlFunction);
+
+    // Add SQS as trigger for Lambda
+    convertPdfToYamlFunction.addEventSource(new lambdaEvent.SqsEventSource(pdfProcessingQueue, {
+        batchSize: 1, // Process one message at a time
+    }));
 
     const wellFileDriveBucket = s3.Bucket.fromBucketName(scope, 'ExistingBucket', props.s3Bucket.bucketName);
-    //This causes a circular dependency error
-    //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
-    // Add S3 event notification
+
+    // Now update the S3 notification to send to SQS instead of directly to Lambda
     wellFileDriveBucket.addEventNotification(
-        s3.EventType.OBJECT_CREATED, // Triggers on file upload
-        new s3n.LambdaDestination(convertPdfToYamlFunction),
+        s3.EventType.OBJECT_CREATED,
+        new s3n.SqsDestination(pdfProcessingQueue),
         {
-            prefix: 'production-agent/well-files/', // Only trigger for files in this prefix
-            suffix: '.pdf' // Only trigger for files with this extension
+            prefix: 'production-agent/well-files/',
+            suffix: '.pdf'
         }
     );
+
+    // //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
+    // // Add S3 event notification
+    // wellFileDriveBucket.addEventNotification(
+    //     s3.EventType.OBJECT_CREATED, // Triggers on file upload
+    //     new s3n.LambdaDestination(convertPdfToYamlFunction),
+    //     {
+    //         prefix: 'production-agent/well-files/', // Only trigger for files in this prefix
+    //         suffix: '.pdf' // Only trigger for files with this extension
+    //     }
+    // );
 
     //https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
     const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb', { //TODO remove the 1
@@ -693,6 +726,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     return {
         convertPdfToYamlFunction: convertPdfToYamlFunction,
         triggerCrawlerSfnFunction: triggerCrawlerSfnFunction,
+        pdfProcessingQueue: pdfProcessingQueue,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
         sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
