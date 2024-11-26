@@ -140,7 +140,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // Create the main queue for processing
     const pdfProcessingQueue = new sqs.Queue(scope, 'PdfToYamlQueue', {
         queueName: 'pdf-to-yaml-processing-queue',
-        visibilityTimeout: cdk.Duration.seconds(300), // Should match or exceed lambda timeout
+        visibilityTimeout: cdk.Duration.seconds(1000), // Should match or exceed lambda timeout
         deadLetterQueue: {
             queue: pdfDlQueue,
             maxReceiveCount: 3 // Number of retries before sending to DLQ
