@@ -203,6 +203,7 @@ const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sam
 
 const {
   convertPdfToYamlFunction,
+  triggerCrawlerSfnFunction,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
   sqlTableDefBedrockKnoledgeBase,
@@ -223,8 +224,8 @@ const delayFunction = new lambda.Function(customStack, 'DelayFunction', {
   timeout: cdk.Duration.seconds(60),
   code: lambda.Code.fromInline(`
     exports.handler = async () => {
-      console.log('Waiting for 30 seconds...');
-      await new Promise(resolve => setTimeout(resolve, 30000));
+      console.log('Waiting for 60 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 60000));
       console.log('Wait complete.');
       return { statusCode: 200 };
     };
@@ -237,8 +238,9 @@ const delayResource = new cdk.CustomResource(customStack, 'DelayResource', {
   serviceToken: delayProvider.serviceToken,
 });
 delayResource.node.addDependency(convertPdfToYamlFunction)
+delayResource.node.addDependency(triggerCrawlerSfnFunction)
 
-uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the convertPdfToYamlFunction function is done deploying
+uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the functions triggerCrawlerSfnFunction and convertPdfToYamlFunction are done deploying
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)

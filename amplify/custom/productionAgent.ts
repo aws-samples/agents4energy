@@ -692,6 +692,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     return {
         convertPdfToYamlFunction: convertPdfToYamlFunction,
+        triggerCrawlerSfnFunction: triggerCrawlerSfnFunction,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
         sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
