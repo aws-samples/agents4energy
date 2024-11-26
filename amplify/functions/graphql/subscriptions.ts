@@ -14,8 +14,8 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
 ) {
   onCreateChatMessage(filter: $filter, owner: $owner) {
     chatSessionId
+    chatSessionIdDashFieldName
     content
-    contentBlocks
     createdAt
     id
     owner
@@ -25,6 +25,9 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
       firstMessageSummary
       id
       owner
+      pastSteps
+      planGoal
+      planSteps
       updatedAt
       __typename
     }
@@ -60,6 +63,9 @@ export const onCreateChatSession = /* GraphQL */ `subscription OnCreateChatSessi
       __typename
     }
     owner
+    pastSteps
+    planGoal
+    planSteps
     updatedAt
     __typename
   }
@@ -74,8 +80,8 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
 ) {
   onDeleteChatMessage(filter: $filter, owner: $owner) {
     chatSessionId
+    chatSessionIdDashFieldName
     content
-    contentBlocks
     createdAt
     id
     owner
@@ -85,6 +91,9 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
       firstMessageSummary
       id
       owner
+      pastSteps
+      planGoal
+      planSteps
       updatedAt
       __typename
     }
@@ -120,6 +129,9 @@ export const onDeleteChatSession = /* GraphQL */ `subscription OnDeleteChatSessi
       __typename
     }
     owner
+    pastSteps
+    planGoal
+    planSteps
     updatedAt
     __typename
   }
@@ -134,8 +146,8 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
 ) {
   onUpdateChatMessage(filter: $filter, owner: $owner) {
     chatSessionId
+    chatSessionIdDashFieldName
     content
-    contentBlocks
     createdAt
     id
     owner
@@ -145,6 +157,9 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
       firstMessageSummary
       id
       owner
+      pastSteps
+      planGoal
+      planSteps
       updatedAt
       __typename
     }
@@ -180,6 +195,9 @@ export const onUpdateChatSession = /* GraphQL */ `subscription OnUpdateChatSessi
       __typename
     }
     owner
+    pastSteps
+    planGoal
+    planSteps
     updatedAt
     __typename
   }
@@ -188,8 +206,8 @@ export const onUpdateChatSession = /* GraphQL */ `subscription OnUpdateChatSessi
   APITypes.OnUpdateChatSessionSubscriptionVariables,
   APITypes.OnUpdateChatSessionSubscription
 >;
-export const recieveResponseStreamChunk = /* GraphQL */ `subscription RecieveResponseStreamChunk {
-  recieveResponseStreamChunk {
+export const recieveResponseStreamChunk = /* GraphQL */ `subscription RecieveResponseStreamChunk($chatSessionId: String!) {
+  recieveResponseStreamChunk(chatSessionId: $chatSessionId) {
     chatSessionId
     chunk
     __typename

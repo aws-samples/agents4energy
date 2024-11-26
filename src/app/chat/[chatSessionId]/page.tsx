@@ -1,4 +1,6 @@
 "use client"
+import { stringify } from 'yaml'
+
 import React, { useEffect, useState } from 'react';
 import type { Schema } from '@/../amplify/data/resource';
 import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
@@ -7,9 +9,9 @@ import { useRouter } from 'next/navigation';
 
 import { formatDate } from "@/utils/date-utils";
 import DropdownMenu from '@/components/DropDownMenu';
+import AddSideBar from '@/components/SideBar';
 
 import { defaultAgents } from '@/utils/config'
-
 import { Message } from '@/utils/types'
 
 import '@aws-amplify/ui-react/styles.css'
@@ -17,14 +19,15 @@ import '@aws-amplify/ui-react/styles.css'
 import {
     Typography,
     Box,
-    Drawer,
-    Toolbar,
+    // Drawer,
+    // Toolbar,
     MenuItem,
     IconButton,
     Card,
     CardContent,
     CardActions,
     Button,
+    Tooltip
     // CircularProgress
 } from '@mui/material';
 
@@ -34,12 +37,13 @@ import { ChatUIProps } from "@/components/chat-ui/chat-ui";
 import { withAuth } from '@/components/WithAuth';
 
 import dynamic from 'next/dynamic'
+// import { error } from 'console';
 
 const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
     ssr: false,
 });
 
-const drawerWidth = 240;
+// const drawerWidth = 240;
 
 type ListBedrockAgentsResponseType = {
     agentSummaries: {
@@ -119,13 +123,10 @@ const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targe
             firstMessageSummary: messageIntentSummary
         })
     } else console.log('No structured output found in response: ', structuredResponse)
-
-
-
 }
 
 const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
-    amplifyClient.queries.invokeProductionAgent({ input: prompt, chatSessionId: chatSession.id }).then(
+    amplifyClient.queries.invokeProductionAgent({ lastMessageText: prompt, chatSessionId: chatSession.id }).then(
         (response) => {
             console.log("bot response: ", response)
         }
@@ -157,32 +158,12 @@ const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr
     });
 })
 
-//https://json-schema.org/understanding-json-schema/reference/array
-const getSuggestedPromptsOutputStructure = {
-    title: "RecommendNextPrompt",
-    description: "Help the user chose the next prompt to send.",
-    type: "object",
-    properties: {
-        suggestedPrompts: {
-            type: 'array',
-            items: {
-                type: 'string'
-            },
-            minItems: 3,
-            maxItems: 3,
-            description: `
-            Prompts to suggest to a user when interacting with a large language model
-            `
-        }
-    },
-    required: ['suggestedPrompts'],
-};
-
 function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["type"]>>([]);
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
-    const [activeChatSession, setActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false);
     const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
@@ -195,13 +176,30 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         if (params && params.chatSessionId) {
             amplifyClient.models.ChatSession.get({ id: params.chatSessionId }).then(({ data: chatSession }) => {
                 if (chatSession) {
-                    setActiveChatSession(chatSession)
+                    setInitialActiveChatSession(chatSession)
 
                     console.log('Loaded chat session. Ai Bot Info:', chatSession.aiBotInfo)
 
                 } else {
                     console.log(`Chat session ${params.chatSessionId} not found`)
                 }
+            })
+        } else {
+            console.log("No chat session id in params: ", params)
+        }
+    }, [params])
+
+    //Subscribe to updates of the active chat session
+    useEffect(() => {
+        if (params && params.chatSessionId) {
+            amplifyClient.models.ChatSession.observeQuery({
+                filter: {
+                    // owner: { eq: user.userId }
+                    id: { eq: params.chatSessionId }
+                }
+            }).subscribe({
+                next: (data) => setLiveUpdateActiveChatSession(data.items[0]),
+                error: (error) => console.error('Error subscribing the chat session', error)
             })
         } else {
             console.log("No chat session id in params: ", params)
@@ -223,11 +221,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         //Set the default prompts if this is the first message
         if (
             !messages.length && //No messages currently in the chat
-            activeChatSession &&
-            activeChatSession.aiBotInfo &&
-            activeChatSession.aiBotInfo.aiBotId &&
-            activeChatSession.aiBotInfo.aiBotId in defaultAgents
-        ) setSuggestedPromptes(defaultAgents[activeChatSession.aiBotInfo.aiBotId].samplePrompts)
+            initialActiveChatSession &&
+            initialActiveChatSession.aiBotInfo &&
+            initialActiveChatSession.aiBotInfo.aiBotId &&
+            initialActiveChatSession.aiBotInfo.aiBotId in defaultAgents
+        ) setSuggestedPromptes(defaultAgents[initialActiveChatSession.aiBotInfo.aiBotId].samplePrompts)
 
         //If there are no messages, or the last message is an AI message with no tool calls, prepare for a human message
         if (
@@ -241,12 +239,30 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
             async function fetchAndSetSuggestedPrompts() {
                 setSuggestedPromptes([])
-                if (!activeChatSession || !activeChatSession.id) throw new Error("No active chat session")
+                if (!initialActiveChatSession || !initialActiveChatSession.id) throw new Error("No active chat session")
 
                 const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
-                    chatSessionId: activeChatSession?.id,
+                    chatSessionId: initialActiveChatSession?.id,
                     lastMessageText: "Suggest three follow up prompts",
-                    outputStructure: JSON.stringify(getSuggestedPromptsOutputStructure)
+                    outputStructure: JSON.stringify({
+                        title: "RecommendNextPrompt",
+                        description: "Help the user chose the next prompt to send.",
+                        type: "object",
+                        properties: {
+                            suggestedPrompts: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                },
+                                minItems: 3,
+                                maxItems: 3,
+                                description: `
+                                Prompts to suggest to a user when interacting with a large language model
+                                `
+                            }
+                        },
+                        required: ['suggestedPrompts'],
+                    })
                 })
                 console.log("Suggested Prompts Response: ", suggestedPromptsResponse)
                 if (suggestedPromptsResponse.data) {
@@ -257,7 +273,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             fetchAndSetSuggestedPrompts()
         } else if (messages.length) setIsLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
 
-    }, [messages, activeChatSession])
+    }, [messages, initialActiveChatSession])
 
     // List the user's chat sessions
     useEffect(() => {
@@ -277,10 +293,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     // Subscribe to messages of the active chat session
     useEffect(() => {
         setMessages([])
-        if (activeChatSession) {
+        if (initialActiveChatSession) {
             const sub = amplifyClient.models.ChatMessage.observeQuery({
                 filter: {
-                    chatSessionId: { eq: activeChatSession.id }
+                    chatSessionId: { eq: initialActiveChatSession.id }
                 }
             }).subscribe({
                 next: ({ items }) => { //isSynced is an option here to
@@ -291,12 +307,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             return () => sub.unsubscribe();
         }
 
-    }, [activeChatSession])
+    }, [initialActiveChatSession])
 
     // Subscribe to the token stream for this chat session
     useEffect(() => {
-        if (activeChatSession) {
-            const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: activeChatSession.id }).subscribe({
+        if (initialActiveChatSession) {
+            const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: initialActiveChatSession.id }).subscribe({
                 next: ({ chunk }) => {
                     // console.log('Message Stream Chunk: ', chunk)
 
@@ -311,7 +327,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             return () => sub.unsubscribe();
         }
 
-    }, [activeChatSession])
+    }, [initialActiveChatSession])
 
     // List the available bedrock agents
     useEffect(() => {
@@ -347,7 +363,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string }) {
-        const targetChatSessionId = activeChatSession?.id;
+        const targetChatSessionId = initialActiveChatSession?.id;
 
         if (targetChatSessionId) {
             return amplifyClient.models.ChatMessage.create({
@@ -362,8 +378,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     async function addUserChatMessage(body: string) {
         if (!messages.length) {
             console.log("This is the initial message. Getting summary for chat session")
-            if (!activeChatSession) throw new Error("No active chat session")
-            setChatSessionFirstMessageSummary(body, activeChatSession)
+            if (!initialActiveChatSession) throw new Error("No active chat session")
+            setChatSessionFirstMessageSummary(body, initialActiveChatSession)
         }
         await addChatMessage({ body: body, role: "human" })
         sendMessageToChatBot(body);
@@ -371,28 +387,47 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     async function sendMessageToChatBot(prompt: string) {
         setIsLoading(true);
-        // const responseText = (activeChatSession?.aiBotInfo?.aiBotAliasId) ? await invokeBedrockAgentParseBodyGetText(prompt, activeChatSession)
-        //     : (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') ? await invokeBedrockModelParseBodyGetText(prompt)
-        //     : (activeChatSession?.aiBotInfo?.aiBotName === 'Production Agent') ? await invokeProductionAgentParseBodyGetText(prompt, activeChatSession)
-        //     : 'No Agent Configured';
 
-        if (activeChatSession?.aiBotInfo?.aiBotAliasId) {
-            const response = await invokeBedrockAgentParseBodyGetTextAndTrace(prompt, activeChatSession)
+        if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
+            const response = await invokeBedrockAgentParseBodyGetTextAndTrace(prompt, initialActiveChatSession)
             if (!response) throw new Error("No response from agent");
-            // Agent function now adds messages directly
-            // const { text, trace } = response
-            // if (!text ) throw new Error("No text in response from agent");
-            // if (!trace ) throw new Error("No text in response from agent");
-            // addChatMessage({body: text, trace: trace, role: "ai"})
-        } else if (activeChatSession?.aiBotInfo?.aiBotName === 'Foundation Model') {
-            const responseText = await invokeBedrockModelParseBodyGetText(prompt)
-            if (!responseText) throw new Error("No response from agent");
-            addChatMessage({ body: responseText, role: "ai" })
-        } else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.ProductionAgent.name) {
-            await invokeProductionAgent(prompt, activeChatSession)
         } else {
-            throw new Error("No Agent Configured");
+            switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
+                case defaultAgents.FoundationModel.name:
+                    console.log("invoking the foundation model")
+                    const responseText = await invokeBedrockModelParseBodyGetText(prompt)
+                    if (!responseText) throw new Error("No response from agent");
+                    addChatMessage({ body: responseText, role: "ai" })
+                    break
+                case defaultAgents.ProductionAgent.name:
+                    await invokeProductionAgent(prompt, initialActiveChatSession)
+                    break;
+                case defaultAgents.PlanAndExecuteAgent.name:
+                    const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: initialActiveChatSession.id })
+                    console.log('Plan and execute response: ', planAndExecuteResponse)
+                    break;
+                default:
+                    throw new Error("No Agent Configured");
+                    break;
+            }
         }
+
+
+
+
+        // else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.FoundationModel.name) {
+        //     console.log("invoking the foundation model")
+        //     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
+        //     if (!responseText) throw new Error("No response from agent");
+        //     addChatMessage({ body: responseText, role: "ai" })
+        // } else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.ProductionAgent.name) {
+        //     await invokeProductionAgent(prompt, activeChatSession)
+        // } else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name) {
+        //     const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: activeChatSession.id })
+        //     console.log('Plan and execute response: ', planAndExecuteResponse)
+        // } else {
+        //     throw new Error("No Agent Configured");
+        // }
 
         // console.log('Response Text: ', responseText)
         // if (!responseText) throw new Error("No response from agent");
@@ -401,132 +436,222 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         // addChatMessage(responseText, "ai")
     }
 
-
     return (
-        <div>
-            <Drawer
-                anchor='left'
-                open={true}
-                variant="persistent"
-                sx={{
-                    width: drawerWidth,
-                    flexShrink: 0,
-                    [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' }
-                }}
-            >
-                <Toolbar />
-                {/* <Typography sx={{ textAlign: 'center' }}>Chatting with {activeChatSession?.aiBotInfo?.aiBotName} Alias Id: {activeChatSession?.aiBotInfo?.aiBotAliasId}</Typography> */}
-                <Box sx={{ overflow: 'auto' }}>
-                    <DropdownMenu buttonText='New Chat Session'>
-                        {
-                            [
-                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
-                                ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
-                            ]
-                                .map((agent) => (
-                                    <MenuItem
-                                        key={agent.agentName}
-                                        onClick={async () => {
-                                            const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
-                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
+        <>
+        <AddSideBar
+            anchor="left"
+            drawerContent={
+                <>
+                    <Box sx={{ overflow: 'auto' }}>
+                        <DropdownMenu buttonText='New Chat Session'>
+                            {
+                                [
+                                    ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
+                                    ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
+                                ]
+                                    .map((agent) => (
+                                        <MenuItem
+                                            key={agent.agentName}
+                                            onClick={async () => {
+                                                const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
+                                                createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
+                                            }}
+                                        >
+                                            <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
+                                        </MenuItem>
+                                    ))
+                            }
+                        </DropdownMenu>
+
+
+                        <Typography sx={{ textAlign: 'center' }}>My Chat Sessions:</Typography>
+                        {chatSessions
+                            .slice()
+                            .sort((a, b) => {
+                                if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
+                                return a.createdAt < b.createdAt ? 1 : -1
+                            })
+                            .map((session) => (
+
+                                <Card key={session.id} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
+                                    <CardContent>
+                                        <Typography variant="h6" component="div" noWrap>
+                                            {session.firstMessageSummary?.slice(0, 50)}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {formatDate(session.createdAt)}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            AI: {session.aiBotInfo?.aiBotName || 'Unknown'}
+                                        </Typography>
+                                    </CardContent>
+                                    <CardActions>
+                                        <Button
+                                            size="small"
+                                            onClick={() => router.push(`/chat/${session.id}`)}
+                                        >
+                                            Open Chat
+                                        </Button>
+                                        <IconButton
+                                            aria-label="delete"
+                                            onClick={() => deleteChatSession(session)}
+                                            sx={{ marginLeft: 'auto' }}
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </CardActions>
+                                </Card>
+                            ))
+                        }
+                    </Box>
+                </>
+            }
+        >
+
+            <AddSideBar
+                initiallyOpen={(initialActiveChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name)}
+                floatingButton={(initialActiveChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name)}
+                anchor="right"
+                drawerContent={
+                    <>
+                        <Typography variant="h5" sx={{ textAlign: 'center' }}>Plan and execute steps:</Typography>
+                        {LiveUpdateActiveChatSession?.pastSteps?.map((step) => {
+                            try {
+                                const stepContent = JSON.parse(step as string)
+                                return (
+                                    <Tooltip
+                                        key={step as string}
+                                        title={<pre
+                                            style={{ //Wrap long lines
+                                                whiteSpace: 'pre-wrap',
+                                                wordWrap: 'break-word',
+                                                overflowWrap: 'break-word',
+                                            }}
+                                        >
+                                            {stringify(stepContent)}
+                                        </pre>}
+                                        arrow
+                                        placement="left"
+                                        slotProps={{
+                                            tooltip: {
+                                                sx: {
+                                                    maxWidth: 800,
+                                                },
+                                            },
                                         }}
                                     >
-                                        <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
-                                    </MenuItem>
-                                ))
-                        }
-                    </DropdownMenu>
-
-
-                    <Typography sx={{ textAlign: 'center' }}>My Chat Sessions:</Typography>
-                    {chatSessions
-                        .slice()
-                        .sort((a, b) => {
-                            if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-                            return a.createdAt < b.createdAt ? 1 : -1
-                        })
-                        .map((session) => (
-
-                            <Card key={session.id} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
-                                <CardContent>
-                                    <Typography variant="h6" component="div" noWrap>
-                                        {session.firstMessageSummary?.slice(0, 50)}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {formatDate(session.createdAt)}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                        AI: {session.aiBotInfo?.aiBotName || 'Unknown'}
-                                    </Typography>
-                                </CardContent>
-                                <CardActions>
-                                    <Button
-                                        size="small"
-                                        onClick={() => router.push(`/chat/${session.id}`)}
+                                        <Card key={step as string} sx={{ marginBottom: 2, backgroundColor: '#e3f2fd', flexShrink: 0 }}>
+                                            <CardContent>
+                                                <Typography variant="h6" component="div">
+                                                    {stepContent.title}
+                                                </Typography>
+                                            </CardContent>
+                                        </Card>
+                                    </Tooltip>
+                                )
+                            } catch {
+                                return <p>{step}</p>
+                            }
+                        })}
+                        {LiveUpdateActiveChatSession?.planSteps?.map((step) => {
+                            try {
+                                const { result, ...stepContent } = JSON.parse(step as string)// Remove the result if it exists from the plan steps
+                                console.info(result)//TODO: remove this
+                                return (
+                                    <Tooltip
+                                        key={step as string}
+                                        title={<pre
+                                            style={{ //Wrap long lines
+                                                whiteSpace: 'pre-wrap',
+                                                wordWrap: 'break-word',
+                                                overflowWrap: 'break-word',
+                                            }}
+                                        >
+                                            {stringify(stepContent)}
+                                        </pre>}
+                                        arrow
+                                        placement="left"
+                                        slotProps={{
+                                            tooltip: {
+                                                sx: {
+                                                    maxWidth: 800,
+                                                },
+                                            },
+                                        }}
                                     >
-                                        Open Chat
+                                        <Card key={step as string} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
+                                            <CardContent>
+                                                <Typography variant="h6" component="div">
+                                                    {stepContent.title}
+                                                </Typography>
+                                            </CardContent>
+                                        </Card>
+                                    </Tooltip>
+
+                                )
+                            } catch {
+                                return <p>{step}</p>
+                            }
+                        })}
+                    </>
+
+                }
+            >
+                {params ? //Show the chat UI if there is an active chat session
+                    // <div 
+                    // // style={{ marginLeft: '210px', padding: '20px' }}
+                    // >
+                    <Box
+                    // sx={{ alignItems: 'center', gap: 2 }}
+                    >
+                        {/* <Toolbar /> */}
+
+                        <Box>
+                            <Typography variant="h4" gutterBottom>
+                                Chat with {initialActiveChatSession?.aiBotInfo?.aiBotName}
+                            </Typography>
+                        </Box>
+                        <Box>
+
+                            <DynamicChatUI
+                                onSendMessage={addUserChatMessage}
+                                messages={[
+                                    ...messages,
+                                    ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                                ]}
+                                running={isLoading}
+                            />
+
+
+                        </Box>
+                        <Box sx={{ mt: 5 }}>
+                            {
+                                !isLoading && (suggestedPrompts.length || !messages.length) ? (
+                                    <Typography variant="body2">
+                                        Suggested Follow Ups:
+                                    </Typography>
+                                ) : (
+                                    null
+                                    // <CircularProgress />
+                                )
+                            }
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            {!isLoading && suggestedPrompts.map((prompt) => (
+                                <div key={prompt}>
+                                    <Button onClick={() => addUserChatMessage(prompt)} >
+                                        {prompt}
                                     </Button>
-                                    <IconButton
-                                        aria-label="delete"
-                                        onClick={() => deleteChatSession(session)}
-                                        sx={{ marginLeft: 'auto' }}
-                                    >
-                                        <DeleteIcon />
-                                    </IconButton>
-                                </CardActions>
-                            </Card>
-                        ))
-                    }
-                </Box>
-            </Drawer>
-            {params ? //Show the chat UI if there is an active chat session
-                <div style={{ marginLeft: '260px', padding: '20px' }}>
-                    <Toolbar />
-
-                    <Box>
-                        <Typography variant="h4" gutterBottom>
-                            Chat with {activeChatSession?.aiBotInfo?.aiBotName}
-                        </Typography>
+                                </div>
+                            ))
+                            }
+                        </Box>
                     </Box>
-                    <Box>
-
-                        <DynamicChatUI
-                            onSendMessage={addUserChatMessage}
-                            messages={[
-                                ...messages,
-                                ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
-                            ]}
-                            running={isLoading}
-                        />
-
-
-                    </Box>
-                    <Box sx={{ mt: 5 }}>
-                        {
-                            !isLoading && (suggestedPrompts.length || !messages.length) ? (
-                                <Typography variant="body2">
-                                    Suggested Follow Ups:
-                                </Typography>
-                            ) : (
-                                null
-                                // <CircularProgress />
-                            )
-                        }
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {!isLoading && suggestedPrompts.map((prompt) => (
-                            <div key={prompt}>
-                                <Button onClick={() => addUserChatMessage(prompt)} >
-                                    {prompt}
-                                </Button>
-                            </div>
-                        ))
-                        }
-                    </Box>
-
-                </div>
-                : null}
-        </div>
+                    // </div>
+                    : null}
+            </AddSideBar>
+        </AddSideBar>
+        </>
 
     );
 };

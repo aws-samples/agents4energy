@@ -5,8 +5,8 @@
 export type ChatMessage = {
   __typename: "ChatMessage",
   chatSessionId?: string | null,
+  chatSessionIdDashFieldName?: string | null,
   content: string,
-  contentBlocks?: string | null,
   createdAt?: string | null,
   id: string,
   owner?: string | null,
@@ -34,6 +34,9 @@ export type ChatSession = {
   id: string,
   messages?: ModelChatMessageConnection | null,
   owner?: string | null,
+  pastSteps?: Array< string | null > | null,
+  planGoal?: string | null,
+  planSteps?: Array< string | null > | null,
   updatedAt: string,
 };
 
@@ -76,8 +79,8 @@ export type ModelStringKeyConditionInput = {
 export type ModelChatMessageFilterInput = {
   and?: Array< ModelChatMessageFilterInput | null > | null,
   chatSessionId?: ModelIDInput | null,
+  chatSessionIdDashFieldName?: ModelStringInput | null,
   content?: ModelStringInput | null,
-  contentBlocks?: ModelStringInput | null,
   createdAt?: ModelStringInput | null,
   id?: ModelIDInput | null,
   not?: ModelChatMessageFilterInput | null,
@@ -166,6 +169,9 @@ export type ModelChatSessionFilterInput = {
   not?: ModelChatSessionFilterInput | null,
   or?: Array< ModelChatSessionFilterInput | null > | null,
   owner?: ModelStringInput | null,
+  pastSteps?: ModelStringInput | null,
+  planGoal?: ModelStringInput | null,
+  planSteps?: ModelStringInput | null,
   updatedAt?: ModelStringInput | null,
 };
 
@@ -178,8 +184,8 @@ export type ModelChatSessionConnection = {
 export type ModelChatMessageConditionInput = {
   and?: Array< ModelChatMessageConditionInput | null > | null,
   chatSessionId?: ModelIDInput | null,
+  chatSessionIdDashFieldName?: ModelStringInput | null,
   content?: ModelStringInput | null,
-  contentBlocks?: ModelStringInput | null,
   createdAt?: ModelStringInput | null,
   not?: ModelChatMessageConditionInput | null,
   or?: Array< ModelChatMessageConditionInput | null > | null,
@@ -194,8 +200,8 @@ export type ModelChatMessageConditionInput = {
 
 export type CreateChatMessageInput = {
   chatSessionId?: string | null,
+  chatSessionIdDashFieldName?: string | null,
   content: string,
-  contentBlocks?: string | null,
   createdAt?: string | null,
   id?: string | null,
   owner?: string | null,
@@ -213,6 +219,9 @@ export type ModelChatSessionConditionInput = {
   not?: ModelChatSessionConditionInput | null,
   or?: Array< ModelChatSessionConditionInput | null > | null,
   owner?: ModelStringInput | null,
+  pastSteps?: ModelStringInput | null,
+  planGoal?: ModelStringInput | null,
+  planSteps?: ModelStringInput | null,
   updatedAt?: ModelStringInput | null,
 };
 
@@ -220,6 +229,9 @@ export type CreateChatSessionInput = {
   aiBotInfo?: ChatSessionAiBotInfoInput | null,
   firstMessageSummary?: string | null,
   id?: string | null,
+  pastSteps?: Array< string | null > | null,
+  planGoal?: string | null,
+  planSteps?: Array< string | null > | null,
 };
 
 export type ChatSessionAiBotInfoInput = {
@@ -245,8 +257,8 @@ export type ResponseStreamChunk = {
 
 export type UpdateChatMessageInput = {
   chatSessionId?: string | null,
+  chatSessionIdDashFieldName?: string | null,
   content?: string | null,
-  contentBlocks?: string | null,
   createdAt?: string | null,
   id: string,
   owner?: string | null,
@@ -261,13 +273,16 @@ export type UpdateChatSessionInput = {
   aiBotInfo?: ChatSessionAiBotInfoInput | null,
   firstMessageSummary?: string | null,
   id: string,
+  pastSteps?: Array< string | null > | null,
+  planGoal?: string | null,
+  planSteps?: Array< string | null > | null,
 };
 
 export type ModelSubscriptionChatMessageFilterInput = {
   and?: Array< ModelSubscriptionChatMessageFilterInput | null > | null,
   chatSessionId?: ModelSubscriptionIDInput | null,
+  chatSessionIdDashFieldName?: ModelSubscriptionStringInput | null,
   content?: ModelSubscriptionStringInput | null,
-  contentBlocks?: ModelSubscriptionStringInput | null,
   createdAt?: ModelSubscriptionStringInput | null,
   id?: ModelSubscriptionIDInput | null,
   or?: Array< ModelSubscriptionChatMessageFilterInput | null > | null,
@@ -317,15 +332,10 @@ export type ModelSubscriptionChatSessionFilterInput = {
   id?: ModelSubscriptionIDInput | null,
   or?: Array< ModelSubscriptionChatSessionFilterInput | null > | null,
   owner?: ModelStringInput | null,
+  pastSteps?: ModelSubscriptionStringInput | null,
+  planGoal?: ModelSubscriptionStringInput | null,
+  planSteps?: ModelSubscriptionStringInput | null,
   updatedAt?: ModelSubscriptionStringInput | null,
-};
-
-export type ConvertPdfToJsonQueryVariables = {
-  s3Key: string,
-};
-
-export type ConvertPdfToJsonQuery = {
-  convertPdfToJson?: string | null,
 };
 
 export type GetChatMessageQueryVariables = {
@@ -336,8 +346,8 @@ export type GetChatMessageQuery = {
   getChatMessage?:  {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
+    chatSessionIdDashFieldName?: string | null,
     content: string,
-    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -348,6 +358,9 @@ export type GetChatMessageQuery = {
       firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
+      pastSteps?: Array< string | null > | null,
+      planGoal?: string | null,
+      planSteps?: Array< string | null > | null,
       updatedAt: string,
     } | null,
     tool_call_id?: string | null,
@@ -380,19 +393,11 @@ export type GetChatSessionQuery = {
       nextToken?: string | null,
     } | null,
     owner?: string | null,
+    pastSteps?: Array< string | null > | null,
+    planGoal?: string | null,
+    planSteps?: Array< string | null > | null,
     updatedAt: string,
   } | null,
-};
-
-export type GetInfoFromPdfQueryVariables = {
-  dataToExclude?: string | null,
-  dataToInclude?: string | null,
-  s3Key: string,
-  tableColumns: string,
-};
-
-export type GetInfoFromPdfQuery = {
-  getInfoFromPdf?: string | null,
 };
 
 export type InvokeBedrockQueryVariables = {
@@ -432,9 +437,20 @@ export type InvokeBedrockWithStructuredOutputQuery = {
   invokeBedrockWithStructuredOutput?: string | null,
 };
 
+export type InvokePlanAndExecuteAgentQueryVariables = {
+  chatSessionId?: string | null,
+  lastMessageText: string,
+};
+
+export type InvokePlanAndExecuteAgentQuery = {
+  invokePlanAndExecuteAgent?: string | null,
+};
+
 export type InvokeProductionAgentQueryVariables = {
   chatSessionId?: string | null,
-  input: string,
+  lastMessageText: string,
+  messageOwnerIdentity?: string | null,
+  usePreviousMessageContext?: boolean | null,
 };
 
 export type InvokeProductionAgentQuery = {
@@ -479,8 +495,39 @@ export type ListChatMessageByChatSessionIdAndCreatedAtQuery = {
     items:  Array< {
       __typename: "ChatMessage",
       chatSessionId?: string | null,
+      chatSessionIdDashFieldName?: string | null,
       content: string,
-      contentBlocks?: string | null,
+      createdAt?: string | null,
+      id: string,
+      owner?: string | null,
+      role?: ChatMessageRole | null,
+      tool_call_id?: string | null,
+      tool_calls?: string | null,
+      tool_name?: string | null,
+      trace?: string | null,
+      updatedAt: string,
+    } | null >,
+    nextToken?: string | null,
+  } | null,
+};
+
+export type ListChatMessageByChatSessionIdDashFieldNameAndCreatedAtQueryVariables = {
+  chatSessionIdDashFieldName: string,
+  createdAt?: ModelStringKeyConditionInput | null,
+  filter?: ModelChatMessageFilterInput | null,
+  limit?: number | null,
+  nextToken?: string | null,
+  sortDirection?: ModelSortDirection | null,
+};
+
+export type ListChatMessageByChatSessionIdDashFieldNameAndCreatedAtQuery = {
+  listChatMessageByChatSessionIdDashFieldNameAndCreatedAt?:  {
+    __typename: "ModelChatMessageConnection",
+    items:  Array< {
+      __typename: "ChatMessage",
+      chatSessionId?: string | null,
+      chatSessionIdDashFieldName?: string | null,
+      content: string,
       createdAt?: string | null,
       id: string,
       owner?: string | null,
@@ -507,8 +554,8 @@ export type ListChatMessagesQuery = {
     items:  Array< {
       __typename: "ChatMessage",
       chatSessionId?: string | null,
+      chatSessionIdDashFieldName?: string | null,
       content: string,
-      contentBlocks?: string | null,
       createdAt?: string | null,
       id: string,
       owner?: string | null,
@@ -538,6 +585,9 @@ export type ListChatSessionsQuery = {
       firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
+      pastSteps?: Array< string | null > | null,
+      planGoal?: string | null,
+      planSteps?: Array< string | null > | null,
       updatedAt: string,
     } | null >,
     nextToken?: string | null,
@@ -553,8 +603,8 @@ export type CreateChatMessageMutation = {
   createChatMessage?:  {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
+    chatSessionIdDashFieldName?: string | null,
     content: string,
-    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -565,6 +615,9 @@ export type CreateChatMessageMutation = {
       firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
+      pastSteps?: Array< string | null > | null,
+      planGoal?: string | null,
+      planSteps?: Array< string | null > | null,
       updatedAt: string,
     } | null,
     tool_call_id?: string | null,
@@ -598,6 +651,9 @@ export type CreateChatSessionMutation = {
       nextToken?: string | null,
     } | null,
     owner?: string | null,
+    pastSteps?: Array< string | null > | null,
+    planGoal?: string | null,
+    planSteps?: Array< string | null > | null,
     updatedAt: string,
   } | null,
 };
@@ -611,8 +667,8 @@ export type DeleteChatMessageMutation = {
   deleteChatMessage?:  {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
+    chatSessionIdDashFieldName?: string | null,
     content: string,
-    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -623,6 +679,9 @@ export type DeleteChatMessageMutation = {
       firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
+      pastSteps?: Array< string | null > | null,
+      planGoal?: string | null,
+      planSteps?: Array< string | null > | null,
       updatedAt: string,
     } | null,
     tool_call_id?: string | null,
@@ -656,6 +715,9 @@ export type DeleteChatSessionMutation = {
       nextToken?: string | null,
     } | null,
     owner?: string | null,
+    pastSteps?: Array< string | null > | null,
+    planGoal?: string | null,
+    planSteps?: Array< string | null > | null,
     updatedAt: string,
   } | null,
 };
@@ -682,8 +744,8 @@ export type UpdateChatMessageMutation = {
   updateChatMessage?:  {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
+    chatSessionIdDashFieldName?: string | null,
     content: string,
-    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -694,6 +756,9 @@ export type UpdateChatMessageMutation = {
       firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
+      pastSteps?: Array< string | null > | null,
+      planGoal?: string | null,
+      planSteps?: Array< string | null > | null,
       updatedAt: string,
     } | null,
     tool_call_id?: string | null,
@@ -727,6 +792,9 @@ export type UpdateChatSessionMutation = {
       nextToken?: string | null,
     } | null,
     owner?: string | null,
+    pastSteps?: Array< string | null > | null,
+    planGoal?: string | null,
+    planSteps?: Array< string | null > | null,
     updatedAt: string,
   } | null,
 };
@@ -740,8 +808,8 @@ export type OnCreateChatMessageSubscription = {
   onCreateChatMessage?:  {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
+    chatSessionIdDashFieldName?: string | null,
     content: string,
-    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -752,6 +820,9 @@ export type OnCreateChatMessageSubscription = {
       firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
+      pastSteps?: Array< string | null > | null,
+      planGoal?: string | null,
+      planSteps?: Array< string | null > | null,
       updatedAt: string,
     } | null,
     tool_call_id?: string | null,
@@ -785,6 +856,9 @@ export type OnCreateChatSessionSubscription = {
       nextToken?: string | null,
     } | null,
     owner?: string | null,
+    pastSteps?: Array< string | null > | null,
+    planGoal?: string | null,
+    planSteps?: Array< string | null > | null,
     updatedAt: string,
   } | null,
 };
@@ -798,8 +872,8 @@ export type OnDeleteChatMessageSubscription = {
   onDeleteChatMessage?:  {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
+    chatSessionIdDashFieldName?: string | null,
     content: string,
-    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -810,6 +884,9 @@ export type OnDeleteChatMessageSubscription = {
       firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
+      pastSteps?: Array< string | null > | null,
+      planGoal?: string | null,
+      planSteps?: Array< string | null > | null,
       updatedAt: string,
     } | null,
     tool_call_id?: string | null,
@@ -843,6 +920,9 @@ export type OnDeleteChatSessionSubscription = {
       nextToken?: string | null,
     } | null,
     owner?: string | null,
+    pastSteps?: Array< string | null > | null,
+    planGoal?: string | null,
+    planSteps?: Array< string | null > | null,
     updatedAt: string,
   } | null,
 };
@@ -856,8 +936,8 @@ export type OnUpdateChatMessageSubscription = {
   onUpdateChatMessage?:  {
     __typename: "ChatMessage",
     chatSessionId?: string | null,
+    chatSessionIdDashFieldName?: string | null,
     content: string,
-    contentBlocks?: string | null,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
@@ -868,6 +948,9 @@ export type OnUpdateChatMessageSubscription = {
       firstMessageSummary?: string | null,
       id: string,
       owner?: string | null,
+      pastSteps?: Array< string | null > | null,
+      planGoal?: string | null,
+      planSteps?: Array< string | null > | null,
       updatedAt: string,
     } | null,
     tool_call_id?: string | null,
@@ -901,11 +984,15 @@ export type OnUpdateChatSessionSubscription = {
       nextToken?: string | null,
     } | null,
     owner?: string | null,
+    pastSteps?: Array< string | null > | null,
+    planGoal?: string | null,
+    planSteps?: Array< string | null > | null,
     updatedAt: string,
   } | null,
 };
 
 export type RecieveResponseStreamChunkSubscriptionVariables = {
+  chatSessionId: string,
 };
 
 export type RecieveResponseStreamChunkSubscription = {

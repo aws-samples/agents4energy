@@ -4,76 +4,34 @@ import Container from '@cloudscape-design/components/container';
 // import S3ResourceSelector from "@cloudscape-design/components/s3-resource-selector";
 // import FileUpload from "@cloudscape-design/components/file-upload";
 import FormField from "@cloudscape-design/components/form-field";
-// import Input from "@cloudscape-design/components/input";
+import Input from "@cloudscape-design/components/input";
 
 import styles from './page.module.css'
 // import './page.module.css'
 
-import {remove } from 'aws-amplify/storage';
+import { remove } from 'aws-amplify/storage';
 // import { it } from "node:test";
 // import { useAuthenticator } from '@aws-amplify/ui-react';
 // import { redirect } from 'next/navigation';
 
 import { withAuth } from '@/components/WithAuth';
-import {S3Asset, onFetchObjects } from "@/utils/amplify-utils";
+import { S3Asset, onFetchObjects } from "@/utils/amplify-utils";
 
-//https://aws-amplify.github.io/amplify-js/api/
-//https://docs.amplify.aws/nextjs/build-a-backend/storage/list-files/
+import { StorageManager } from '@aws-amplify/ui-react-storage';
 
-// interface S3Asset {
-//   Key: string;
-//   Size: number | undefined;
-//   IsFolder: boolean;
-// }
+import '@aws-amplify/ui-react/styles.css';
 
-// export const onFetchObjects = async (pathPrefix: string): Promise<readonly S3Asset[]> => {
-//   console.log('pathPrefix', pathPrefix)
-//   try {
-
-//     const result = await list({
-//       path: pathPrefix || "well-files/",
-//       pageSize: 10,
-//       options: {
-//         subpathStrategy: { strategy: 'exclude' }
-//       },
-//       // nextToken: nextToken
-//     } as ListPaginateWithPathInput);
-
-//     console.log('list result: ', result)
-
-//     const objects: S3Asset[] = result.items.map((item) => ({
-//       Key: item.path,
-//       Size: item.size,
-//       IsFolder: false
-//     }));
-
-//     if (result.excludedSubpaths) {
-//       const folders: S3Asset[] = result.excludedSubpaths.map((item) => {
-//         return {
-//           Key: item.substring(pathPrefix.length),
-//           Size: undefined,
-//           IsFolder: true
-//         }
-//       })
-
-//       objects.push(...folders)
-//     }
-
-//     return objects
-
-//   } catch (error) {
-//     console.error('Error fetching S3 objects:', error);
-//     return Promise.resolve([]); // Return an empty array in case of an error
-//   }
-// }
-
-
+const addSlashIfDefined = (path: string): string => {
+  if (!path) return path;
+  return path.endsWith('/') ? path : path + '/';
+};
 
 function Page() {
   // const PAGE_SIZE = 20;
   // const [resource, setResource] = React.useState({ uri: "" });
   const [s3PathSegments, setS3PathSegments] = React.useState<string[]>(["production-agent/"])
-  // const [uploadTargetApiNumber, setUploadTargetApiNumber] = useState('')
+  const [uploadedFileKeys, setUploadedFileKeys] = React.useState<string[]>([])
+  const [additionalS3PrefixSegment, setAdditionalS3PrefixSegment] = React.useState("")
   const [s3Assets, setS3Assets] = useState<S3Asset[]>([]);
   // const [selectedObject, setSelectedObject] = useState<string | null>(null);
   // const [nextToken, setNextToken] = useState<string | null>(); // TODO: Impliment Paganation
@@ -82,7 +40,7 @@ function Page() {
     onFetchObjects(s3PathSegments.join("")).then((objects) => {
       setS3Assets([...objects]);
     });
-  }, [s3PathSegments]);
+  }, [s3PathSegments, uploadedFileKeys]);
 
   const onRemoveObject = async (key: string) => {
     //Create an alert to confirm the user wants to delete the file
@@ -118,50 +76,75 @@ function Page() {
   }
 
   return (
-    <Container>
-      <FormField
-        label="View Files"
-      >
-        {/* <b>{s3PathSegments}</b> */}
-
-        <ul
-          className={styles['horizontal-list']}
+    <>
+      <Container>
+        <FormField
+          label="View Files"
         >
-          {
-            s3PathSegments.map((item, index) => (
-              <li key={index} className={styles['horizontal-list-item']}
-                onClick={() => setS3PathSegments(s3PathSegments.slice(0, index + 1))}>
-                {item}
-              </li>
-            ))
-          }
-        </ul>
+          {/* <b>{s3PathSegments}</b> */}
 
-        <table className={styles['custom-table']}>
-          <thead>
-            <tr>
-              <th>Name (click to open)</th>
-              <th>Size</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {s3Assets.map((item, index) => (
-              <tr key={index}>
-                <td>{displayFolderOrObject({ item })}</td>
-                <td>{item.Size}</td>
-                <td>
-                  {!item.IsFolder ? 
-                  <button onClick={() => onRemoveObject(item.Key)}>Remove File</button>
-                  : ""}
-                  
-                </td>
+          <ul
+            className={styles['horizontal-list']}
+          >
+            {
+              s3PathSegments.map((item, index) => (
+                <li key={index} className={styles['horizontal-list-item']}
+                  onClick={() => setS3PathSegments(s3PathSegments.slice(0, index + 1))}>
+                  {item}
+                </li>
+              ))
+            }
+          </ul>
+
+          <table className={styles['custom-table']}>
+            <thead>
+              <tr>
+                <th>Name (click to open)</th>
+                <th>Size</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </FormField>
-    </Container>
+            </thead>
+            <tbody>
+              {s3Assets.map((item, index) => (
+                <tr key={index}>
+                  <td>{displayFolderOrObject({ item })}</td>
+                  <td>{item.Size}</td>
+                  <td>
+                    {!item.IsFolder ?
+                      <button onClick={() => onRemoveObject(item.Key)}>Remove File</button>
+                      : ""}
+
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </FormField>
+      </Container>
+      <Container>
+        <FormField label="Upload files">
+          <Input
+            onChange={({ detail }) => setAdditionalS3PrefixSegment(detail.value)}
+            value={additionalS3PrefixSegment}
+            placeholder="Optional: Name of folder"
+          />
+        </FormField>
+        <StorageManager
+          acceptedFileTypes={['*']}
+          path={s3PathSegments.join("") + addSlashIfDefined(additionalS3PrefixSegment)}
+          maxFileCount={1000}
+          isResumable
+          onUploadSuccess={({ key }) => {
+            if (key) {
+              setUploadedFileKeys((previousKeys) => ([
+                ...previousKeys,
+                key
+              ]))
+            }
+          }}
+        />
+      </Container>
+    </>
   );
 }
 

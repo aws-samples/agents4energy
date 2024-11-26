@@ -19,6 +19,8 @@ import {
     custom_resources as cr
 } from 'aws-cdk-lib';
 
+import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
+
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { CfnApplication } from 'aws-cdk-lib/aws-sam';
 
@@ -26,6 +28,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
+
 import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
 
 const defaultProdDatabaseName = 'proddb'
@@ -126,6 +129,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
 
     // This is a way to prevent a circular dependency error when interacting with the well fiel drive bucket
+
+    
+
     const wellFileDriveBucket = s3.Bucket.fromBucketName(scope, 'ExistingBucket', props.s3Bucket.bucketName);
     //This causes a circular dependency error
     //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
@@ -216,11 +222,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefinitionBedrockKnoledgeBase", {
         vpc: props.vpc,
-        bucket: props.s3Bucket
+        bucket: props.s3Bucket,
+        schemaName: 'bedrock_integration'
     })
 
     const productionAgentTableDefDataSource = new bedrock.CfnDataSource(scope, 'sqlTableDefinitions', {
-        name: "sqlTableDefinitions-1", //TODO - remove the 
+        name: "sqlTableDefinition",
         dataSourceConfiguration: {
             type: 'S3',
             s3Configuration: {
@@ -235,6 +242,91 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
         knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
     })
+
+    // const petroleumEngineeringKnowledgeBase = new AuroraBedrockKnoledgeBase(scope, "PetrolumEngineeringKB", {
+    //     vpc: props.vpc,
+    //     bucket: props.s3Bucket,
+    //     schemaName: 'petroleum_kb',
+    //     vectorStorePostgresCluster: sqlTableDefBedrockKnoledgeBase.vectorStorePostgresCluster
+    // })
+
+    // const PetroWikiKnowledgeBase = new BedrockKnowledgeBaseOSS(scope, 'PetroWikiKnowledgeBase', {
+    //     knowledgeBaseName: "petrowiki"
+    // })
+
+    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, 'PetEngKB', {
+        embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
+        instruction: `You are a helpful question answering assistant. You answer
+        user questions factually and honestly related to petroleum engineering data`,
+        description: 'Petroleum Engineering Knowledge Base',
+    });
+
+    const petroleumEngineeringDataSource = petroleumEngineeringKnowledgeBase.addWebCrawlerDataSource({
+        sourceUrls: ['https://petrowiki.spe.org/'],
+        filters: {
+            excludePatterns: ['https://petrowiki\.spe\.org/.+?/.+']//Exclude pages with additional path segments
+        }
+    })
+
+    new cr.AwsCustomResource(scope, 'StartIngestionPetroleumEngineeringDataSource', {
+        onCreate: {
+            service: '@aws-sdk/client-bedrock-agent',
+            action: 'startIngestionJob',
+            parameters: {
+                dataSourceId: petroleumEngineeringDataSource.dataSourceId,
+                knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId
+            },
+            physicalResourceId: cr.PhysicalResourceId.of('StartIngestionPetroleumEngineeringDataSource'),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromStatements([
+            new iam.PolicyStatement({
+                actions: ['bedrock:startIngestionJob'],
+                resources: [petroleumEngineeringKnowledgeBase.knowledgeBaseArn]
+            })
+        ])
+    })
+
+    // const petroWikiDataSource = new bedrock.CfnDataSource(scope, 'PetroWikiDataSource', {
+    //     name: "petroWiki",
+    //     dataSourceConfiguration: {
+    //         type: 'WEB',
+    //         webConfiguration: {
+    //             sourceConfiguration: {
+    //                 urlConfiguration: {
+    //                     seedUrls: [{
+    //                         url: 'https://petrowiki.spe.org/',
+    //                     }],
+    //                 },
+    //             },
+    //         }
+    //     },
+    //     knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBase.attrKnowledgeBaseId
+    // })
+
+    // // Define the SDK call for starting the sync
+    // const startDataSourceSyncCall: cr.AwsSdkCall = {
+    //     service: '@aws-sdk/client-bedrock-agent',
+    //     action: 'startIngestionJob',
+    //     parameters: {
+    //         dataSourceId: petroWikiDataSource.attrDataSourceId,
+    //         knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
+    //     },
+    //     physicalResourceId: cr.PhysicalResourceId.of('startDataSourceSync')
+    // };
+
+    // // Create Custom Resource to trigger the sync
+    // const dataSourceSyncTrigger = new cr.AwsCustomResource(scope, 'StartDataSourceSync', {
+    //     onCreate: startDataSourceSyncCall,
+    //     policy: cr.AwsCustomResourcePolicy.fromStatements([
+    //         new iam.PolicyStatement({
+    //             actions: ['bedrock:startIngestionJob'],
+    //             resources: [petroleumEngineeringKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn]
+    //         })
+    //     ])
+    // });
+
+    // // Add dependency to ensure data source is created before starting sync
+    // dataSourceSyncTrigger.node.addDependency(petroWikiDataSource);
 
     lambdaLlmAgentRole.addToPrincipalPolicy(new iam.PolicyStatement({
         actions: ["bedrock:StartIngestionJob"],
@@ -282,7 +374,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         targets: {
             s3Targets: [
                 {
-                    path: `s3://${props.s3Bucket.bucketName}/production-agent/additional-data/`,
+                    path: `s3://${props.s3Bucket.bucketName}/production-agent/structured-data-files/`,
                 },
             ],
         },
@@ -398,8 +490,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
     // prodTableKbIngestionJobTrigger.node.addDependency(productionAgentTableDefDataSource)
     prodTableKbIngestionJobTrigger.node.addDependency(prodDbConfigurator)
-
-
 
     //This function will get table definitions from any athena data source with the AgentsForEnergy tag, upload them to s3, and start a knoledge base ingestion job to present them to an agent 
     const recordTableDefAndStarkKBIngestionJob = new NodejsFunction(scope, 'RecordTableDefAndStartKbIngestionJob', {
@@ -549,7 +639,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         action: 'startExecution',
         parameters: {
             stateMachineArn: runCrawlerRecordTableDefintionStateMachine.stateMachineArn,
-            input: JSON.stringify({ 
+            input: JSON.stringify({
                 action: 'create',
             }),
         },
@@ -562,19 +652,47 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
             resources: [runCrawlerRecordTableDefintionStateMachine.stateMachineArn],
         }),
-
     });
 
     //Make sure the bucket deployment finishs before 
     crawlerTriggerCustomResource.node.addDependency(props.s3Deployment.deployedBucket)
 
+    // Create a Lambda function that will start the Step Function
+    const triggerCrawlerSfnFunction = new lambda.Function(scope, `TriggerCrawlerSfnFunction`, {
+        runtime: lambda.Runtime.NODEJS_LATEST,
+        handler: 'index.handler',
+        code: lambda.Code.fromInline(`
+            const { SFNClient, StartExecutionCommand } = require('@aws-sdk/client-sfn');
+
+            const stepfunctions = new SFNClient(); // Specify the region
+
+            exports.handler = async (event) => {
+                const params = {
+                    stateMachineArn: '${runCrawlerRecordTableDefintionStateMachine.stateMachineArn}',
+                    input: JSON.stringify(event)
+                };
+                
+                const command = new StartExecutionCommand(params);
+                await stepfunctions.send(command);
+            };
+            
+            `),
+    });
+
+    runCrawlerRecordTableDefintionStateMachine.grantStartExecution(triggerCrawlerSfnFunction)
+
+    wellFileDriveBucket.addEventNotification(
+        s3.EventType.OBJECT_CREATED, // Triggers on file upload
+        new s3n.LambdaDestination(triggerCrawlerSfnFunction),
+        {
+            prefix: 'production-agent/structured-data-files/', // Only trigger for files in this prefix
+        }
+    );
+
 
     return {
-        // queryImagesStateMachineArn: queryImagesStateMachine.stateMachineArn,
-        // imageMagickLayer: imageMagickLayer,
-        // ghostScriptLayer: ghostScriptLayer,
-        // getInfoFromPdfFunction: queryReportImageLambda,
         convertPdfToYamlFunction: convertPdfToYamlFunction,
+        triggerCrawlerSfnFunction: triggerCrawlerSfnFunction,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
         sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,

@@ -32,6 +32,19 @@ export const productionAgentFunction = defineFunction({
   runtime: 20
 });
 
+export const planAndExecuteAgentFunction = defineFunction({
+  name: "plan-and-execute-agent",
+  entry: '../functions/planAndExecuteAgent/index.ts',
+  timeoutSeconds: 900,
+  environment: {
+    // MODEL_ID: 'us.anthropic.claude-3-5-sonnet-20240620-v1:0'
+    // MODEL_ID: 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
+    MODEL_ID: 'us.anthropic.claude-3-sonnet-20240229-v1:0'
+    // MODEL_ID: 'us.anthropic.claude-3-haiku-20240307-v1:0'
+  },
+  runtime: 20
+});
+
 // export const addIamDirectiveFunction = defineFunction({
 //   name: "add-iam-directive-function",
 //   entry: '../functions/addIamDirectiveToAllAssets.ts',
@@ -61,7 +74,14 @@ const schema = a.schema({
         aiBotId: a.string(),
         aiBotAliasId: a.string(),
         aiBotVersion: a.string(),
-      })
+      }),
+      planGoal: a.string(),
+      planSteps: a.string().array(),
+      pastSteps: a.string().array(),
+      // planState: a.customType({
+      //   plan: a.json().array(),
+      //   pastSteps: a.json().array(),
+      // })
     })
     .authorization((allow) => [allow.owner(), allow.authenticated().to(['read'])]), //The allow.authenticated() allows other users to view chat sessions.
 
@@ -70,9 +90,10 @@ const schema = a.schema({
       chatSessionId: a.id(),
       session: a.belongsTo("ChatSession", "chatSessionId"),
       content: a.string().required(),
-      contentBlocks: a.json(),
+      // contentBlocks: a.json(),
       trace: a.string(),
       role: a.enum(["human", "ai", "tool"]),
+      chatSessionIdDashFieldName: a.string().default("none"), //This exists to let agents pull their messages in a multi agent environment
       owner: a.string(),
       createdAt: a.datetime(),
       tool_call_id: a.string(), //This is the langchain tool call id
@@ -80,7 +101,8 @@ const schema = a.schema({
       tool_calls: a.json()
     })
     .secondaryIndexes((index) => [
-      index("chatSessionId").sortKeys(["createdAt"])
+      index("chatSessionId").sortKeys(["createdAt"]),
+      index("chatSessionIdDashFieldName").sortKeys(["createdAt"]) //an agent in a multi agent enviornment can query its messages.
     ])
     .authorization((allow) => [allow.owner(), allow.authenticated()]),
 
@@ -131,11 +153,23 @@ const schema = a.schema({
   invokeProductionAgent: a
     .query()
     .arguments({
-      input: a.string().required(),
+      lastMessageText: a.string().required(),//input
       chatSessionId: a.string(),
+      usePreviousMessageContext: a.boolean(),
+      messageOwnerIdentity: a.string()// Use this to set the identiy of the owner of the messages
     })
     .returns(a.json())
     .handler(a.handler.function(productionAgentFunction))
+    .authorization((allow) => [allow.authenticated()]),
+
+  invokePlanAndExecuteAgent: a
+    .query()
+    .arguments({
+      lastMessageText: a.string().required(),//input
+      chatSessionId: a.string(),
+    })
+    .returns(a.json())
+    .handler(a.handler.function(planAndExecuteAgentFunction))
     .authorization((allow) => [allow.authenticated()]),
 
   // getInfoFromPdf: a
@@ -183,6 +217,7 @@ const schema = a.schema({
   allow.resource(getStructuredOutputFromLangchainFunction),
   allow.resource(productionAgentFunction),
   allow.resource(invokeBedrockAgentFunction),
+  allow.resource(planAndExecuteAgentFunction),
 ]);
 
 export type Schema = ClientSchema<typeof schema>;

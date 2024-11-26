@@ -25,37 +25,6 @@ const dataDefinition = JSON.stringify(data, null, 2)
 // console.log('data definition:\n', dataDefinition)
 const dataDefinitionHash = crypto.createHash('md5').update(dataDefinition).digest('hex')
 
-// function createDummy<T>(): T {
-//   function createDummyValue(type: any): any {
-//     // Handle primitive types
-//     if (type === String || type === 'String') return '';
-//     if (type === Number || type === 'Number') return 0;
-//     if (type === Boolean || type === 'Boolean') return false;
-//     if (type === Date || type === 'Date') return new Date();
-//     if (type === Array || Array.isArray(type)) return [];
-//     if (type === null) return null;
-//     if (type === undefined) return undefined;
-
-//     // Handle objects
-//     const obj: any = {};
-    
-//     // If type has properties, recursively create dummy values
-//     if (type && typeof type === 'object') {
-//       Object.keys(type).forEach(key => {
-//         obj[key] = createDummyValue(type[key]);
-//       });
-//     }
-
-//     return obj;
-//   }
-
-//   return createDummyValue({} as T) as T;
-// }
-// import { Schema } from '../data/resource'
-// const dummySchemaString = JSON.stringify(createDummy<Schema>(), null, 2)
-// console.log('Dummy Schema Object:\n', dummySchemaString)
-// const dummySchemaHash = crypto.createHash('md5').update(dummySchemaString).digest('hex')
-
 export interface AppConfiguratorProps {
   hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
   defaultProdDatabaseName: string,

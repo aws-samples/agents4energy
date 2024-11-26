@@ -2,7 +2,7 @@ import { validate } from 'jsonschema';
 import { Amplify } from 'aws-amplify';
 import { generateClient, Client } from 'aws-amplify/data';
 import * as APITypes from "../graphql/API";
-import { listChatMessageByChatSessionIdAndCreatedAt } from "../graphql/queries"
+import { listChatMessageByChatSessionIdAndCreatedAt, getChatSession } from "../graphql/queries"
 import { Schema } from '../../data/resource';
 
 import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage, MessageContentText, MessageContentImageUrl } from "@langchain/core/messages";
@@ -272,6 +272,16 @@ export class AmplifyClientWrapper {
         this.chatMessages = messages
         // }
 
+    }
+
+    public async getChatSession(props: { chatSessionId: string }) {
+        const chatSession = await this.amplifyClient.graphql({
+            query: getChatSession,
+            variables: {
+                id: props.chatSessionId,
+            }
+        })
+        return chatSession.data.getChatSession
     }
 
 }

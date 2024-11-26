@@ -2,14 +2,21 @@ import { Schema } from '../../data/resource';
 // import { env } from '$amplify/env/production-agent-function';
 
 import { ChatBedrockConverse } from "@langchain/aws";
-import { AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 // import { Pregel } from "@langchain/langgraph/pregel";
 
 import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
-import { calculatorTool, wellTableToolBuilder, getTableDefinitionsTool, executeSQLQueryTool, plotTableFromToolResponseTool } from './toolBox';
+import { 
+    calculatorTool, 
+    wellTableToolBuilder, 
+    getTableDefinitionsTool, 
+    executeSQLQueryTool, 
+    plotTableFromToolResponseTool, 
+    getWellFileInfoTool 
+} from './toolBox';
 
 async function retryOperation<T>(
     operation: () => Promise<T>,
@@ -42,10 +49,14 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
     // const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
 
+    
 
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
-    if (!('sub' in event.identity)) throw new Error("Event does not contain user");
+
+    const chatMessageOwnerIdentity = ('sub' in event.identity) ? event.identity.sub : event.arguments.messageOwnerIdentity
+
+    if (!chatMessageOwnerIdentity) throw new Error(`Event does not contain user. Event:\n${JSON.stringify(event)}`);
 
     const amplifyClientWrapper = new AmplifyClientWrapper({
         chatSessionId: event.arguments.chatSessionId,
@@ -55,29 +66,34 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     const agentTools = [
         calculatorTool,
         wellTableToolBuilder(amplifyClientWrapper),
-        // convertPdfToJsonTool,
+        getWellFileInfoTool,
         getTableDefinitionsTool,
         executeSQLQueryTool,
         plotTableFromToolResponseTool
     ];
 
     try {
-        console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
-        await amplifyClientWrapper.getChatMessageHistory({
-            latestHumanMessageText: event.arguments.input
-        })
 
+        // If the usePreviousMessageContent field is true or undefined, get the messages. If not set the latest message text as the only message.
+        if( !("usePreviousMessageContext" in event.arguments) || event.arguments.usePreviousMessageContext ) {
+            console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
+            await amplifyClientWrapper.getChatMessageHistory({
+                latestHumanMessageText: event.arguments.lastMessageText
+            })
+        } else {
+            amplifyClientWrapper.chatMessages = [
+                new HumanMessage({
+                    content: event.arguments.lastMessageText
+                })
+            ]
+        }
+        
         // console.log("mesages in langchain form: ", amplifyClientWrapper.chatMessages)
 
         const agentModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
             temperature: 0
         });
-
-        // const agent2 = createReactAgent({
-        //     llm: agentModel,
-        //     tools: agentTools,
-        // });
 
 
         //Add retry to the agent
@@ -123,7 +139,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 // console.log('Tool Output: ', streamChunk)
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
-                    owner: event.identity.sub,
+                    owner: chatMessageOwnerIdentity,
                     message: streamChunk
                 })
 
@@ -142,7 +158,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
-                    owner: event.identity.sub,
+                    owner: chatMessageOwnerIdentity,
                     message: streamChunkAIMessage
                 })
 
@@ -161,7 +177,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             const AIErrorMessage = new AIMessage({ content: error.message + `\n model id: ${process.env.MODEL_ID}` })
             await amplifyClientWrapper.publishMessage({
                 chatSessionId: event.arguments.chatSessionId,
-                owner: event.identity.sub,
+                owner: chatMessageOwnerIdentity,
                 message: AIErrorMessage
             })
             return error.message
