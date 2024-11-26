@@ -28,6 +28,7 @@ interface SideBarProps {
     children: ReactNode;
     anchor: "right" | "left";
     initiallyOpen?: boolean;
+    floatingButton?: boolean;
 }
 
 // const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
@@ -113,7 +114,7 @@ export const FloatingHamburger = styled(IconButton, {
     padding: theme.spacing(1),
   }));
 
-const AddSideBar: React.FC<SideBarProps> = ({ children, anchor, drawerContent, initiallyOpen = true }: SideBarProps) => {
+const AddSideBar: React.FC<SideBarProps> = ({ children, anchor, drawerContent, initiallyOpen = true, floatingButton = true }: SideBarProps) => {
     const [open, setOpen] = useState(initiallyOpen);
 
     const handleDrawerOpen = () => {
@@ -135,7 +136,7 @@ const AddSideBar: React.FC<SideBarProps> = ({ children, anchor, drawerContent, i
                 {children}
             </Main>
 
-            {!open && (
+            {!open && floatingButton && (
                 <FloatingHamburger
                     color="inherit"
                     aria-label="open drawer"

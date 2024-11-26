@@ -48,9 +48,9 @@ function areListsEqual<T>(list1: T[] | undefined, list2: T[] | undefined): boole
         list1.every((value, index) => value === list2[index]);
 }
 
-async function publishTokenStreamChunk(props: { tokenStreamChunk: any, amplifyClientWrapper: AmplifyClientWrapper }) {
+async function publishTokenStreamChunk(props: { tokenStreamChunk: AIMessageChunk, amplifyClientWrapper: AmplifyClientWrapper }) {
     // console.log("publishTokenStreamChunk: ", props.tokenStreamChunk)
-    const streamChunk = props.tokenStreamChunk as AIMessageChunk
+    const streamChunk = props.tokenStreamChunk// as AIMessageChunk
     // console.log("streamChunk: ", streamChunk)
     // const chunkContent = streamEvent.data.chunk.kwargs.content
     const chunkContent = getLangChainMessageTextContent(streamChunk)
@@ -85,85 +85,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         chatSessionId: event.arguments.chatSessionId,
         env: process.env
     })
-
-
-
-    async function invokeAndStreamOutput(props: {
-        langGraphAgent: any,//CompiledStateGraph<StateDefinition, Partial<StateDefinition>, "__start__" | "agent" | "tools", StateDefinition, StateDefinition, StateDefinition>,
-        inputs: any,
-        config?: RunnableConfig
-    }) {
-
-        // const { messages } = await props.langGraphAgent.invoke(props.inputs, props.config);
-        // const resultText = getLangChainMessageTextContent(messages.slice(-1)[0]) || ""
-        // return resultText
-
-        const waitForResponse = async (): Promise<{ lastMessage: AIMessage }> => { //AIMessage Record<string, any>
-            return new Promise(async (resolve) => {
-                const eventStream = props.langGraphAgent.streamEvents(
-                    props.inputs,
-                    { version: "v2" }
-                );
-
-                for await (const streamEvent of eventStream) {
-                    switch (streamEvent.event) {
-                        // case "on_chat_model_stream":
-                        //     // console.log("Going to publish message: ", streamEvent.data.chunk)
-                        //     const streamChunkText = getLangChainMessageTextContent(streamEvent.data.chunk as AIMessageChunk) || ""
-
-                        //     //Write the blurb in green
-                        //     process.stdout.write(`\x1b[32m${streamChunkText}\x1b[0m`)
-                        //     await publishTokenStreamChunk({
-                        //         tokenStreamChunk: streamEvent.data.chunk,
-                        //         amplifyClientWrapper: amplifyClientWrapper
-                        //     })
-                        //     // console.log('Published mesage: ', streamEvent.data.chunk)
-                        //     break
-                        // case "on_chain_end":
-                        //     console.log('resolving on_chain_end: ', streamEvent.data.output)
-                        //     resolve({ output: streamEvent.data.output})
-                        //     break
-                        case "on_chat_model_end":
-                            const streamChunk = streamEvent.data.output as AIMessageChunk
-                            // console.log('Message Output Chunk as AIMessageChunk: ', streamChunk)
-
-                            if (!streamChunk) throw new Error("No output chunk found")
-                            const streamChunkAIMessage = new AIMessage({
-                                content: streamChunk.content,
-                                tool_calls: streamChunk.tool_calls
-                            })
-
-                            //The replanner and responder nodes's final message will be a tool call with the name "extract". The other tools will have different names,
-                            // and we shoule expect a response from them
-                            if (
-                                streamChunkAIMessage.tool_calls &&
-                                streamChunkAIMessage.tool_calls.length > 0 &&
-                                streamChunkAIMessage.tool_calls[0].name === "extract"
-                            ) resolve({ lastMessage: streamChunkAIMessage })
-
-                            // if (
-                            //     !streamChunkAIMessage.tool_calls ||
-                            //     streamChunkAIMessage.tool_calls.length === 0
-                            // ) {
-                            //     await amplifyClientWrapper.publishMessage({
-                            //         chatSessionId: amplifyClientWrapper.chatSessionId,
-                            //         owner: ('sub' in event.identity!) ? event.identity.sub : "",
-                            //         message: streamChunkAIMessage
-                            //     })
-                            //     resolve({ lastMessage: streamChunkAIMessage })
-                            // }
-
-                            break
-                        // default:
-                        //     console.log("\n\nUnhandled Stream Event:\n", stringify(streamEvent))
-                    }
-                }
-
-            })
-        }
-
-        return await waitForResponse()
-    }
 
     try {
         console.log('Getting the current chat session info')
@@ -304,16 +225,16 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         const responderPrompt = ChatPromptTemplate.fromTemplate(
             `Respond to the user based on the origional objective and completed steps.
-                
-                Your objective was this:
-                {input}
+            
+            Your objective was this:
+            {input}
 
-                The next steps (if any) are this:
-                {plan}
-                
-                You have currently done the follow steps:
-                {pastSteps}
-                `,
+            The next steps (if any) are this:
+            {plan}
+            
+            You have currently done the follow steps:
+            {pastSteps}
+            `,
         );
 
 
@@ -332,10 +253,24 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
 
 
-
         ///////////////////////////////////////////////
         ///////// Create the Graph ////////////////////
         ///////////////////////////////////////////////
+        const customHandler = {
+            handleLLMNewToken: async (token: string, idx: any, runId: any, parentRunId: any, tags: any, fields: any) => {
+            //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
+            //   process.stdout.write(fields)
+                await publishTokenStreamChunk({
+                    tokenStreamChunk: new AIMessageChunk({ content: token.length > 0 ? token: "."}),
+                    amplifyClientWrapper: amplifyClientWrapper
+                })
+            },
+            handleChatModelStart: async (llm: any, inputMessages: any, runId: any) => {
+                console.log("Chat model start:", llm, inputMessages, runId);
+              },
+          };
+
+
         async function executeStep(
             state: typeof PlanExecuteState.State,
             config?: RunnableConfig,
@@ -388,6 +323,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         async function replanStep(
             state: typeof PlanExecuteState.State,
+            config: RunnableConfig,
         ): Promise<Partial<typeof PlanExecuteState.State>> {
 
             // console.log("Replanning based on the state: \n", stringify(state))
@@ -396,75 +332,76 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             if (state.plan && state.plan.length === 0 && !areListsEqual(inputs.pastSteps, state.pastSteps)) return {}
 
             //If this is the initial replan, and the user input a plan, set the user's response as the last step's response. The user was responding to this prompt.
-            const pastSteps = (inputs.pastSteps && areListsEqual(inputs.pastSteps, state.pastSteps)) ?
-                [
-                    ...state.pastSteps.slice(0, -1),
+            let pastSteps = state.pastSteps
+            let planSteps = state.plan
+            if (
+                state.plan &&
+                state.plan.length > 0 &&
+                state.plan[0].role === "human" &&
+                (
+                    !state.pastSteps || //If the first plan step is a human step, the past steps will be null
+                    areListsEqual(inputs.pastSteps, state.pastSteps)
+                )
+            ) {
+                pastSteps = [
+                    ...(state.pastSteps ?? []),
                     {
-                        ...state.pastSteps[state.pastSteps.length - 1],
-                        response: event.arguments.lastMessageText
+                        ...state.plan[0],
+                        result: event.arguments.lastMessageText
                     }
                 ]
-                :
-                state.pastSteps
 
+                planSteps = planSteps.slice(1)
 
-            const newPlanFromInvoke = await replanner.invoke({
-                objective: state.input,
-                plan: stringify(state.plan),
-                pastSteps: stringify(pastSteps)
-            });
-            console.log("New Plan from invoke: \n", stringify(newPlanFromInvoke))
-            return { plan: newPlanFromInvoke.steps as PlanStep[] }
+                console.log(`User responded to a step with the role human. New Past Steps: \n${stringify(pastSteps)} \n New plan steps:\n${planSteps}`)
+            }
 
-            // // return {plan: [
-            // //     {
-            // //         title: "Dummy Step",
-            // //         description: "none",
-            // //         role: 'ai'
-            // //     }
-            // // ] as PlanStep[]}
+            const newPlanFromInvoke = await replanner
+                .withConfig({
+                    callbacks: [customHandler],
+                    // callbacks: config.callbacks!,
+                    // runName: "replanner",
+                    tags: ["replanner"],
+                })
+                .invoke(
+                    {
+                        objective: state.input,
+                        plan: stringify(planSteps),
+                        pastSteps: stringify(pastSteps)
+                    },
+                    config
+                );
 
+            // Remove the result part if present from plan steps
+            planSteps = newPlanFromInvoke.steps.map((step: PlanStep) => {
+                const { result, ...planPart } = step
+                return planPart
+            })
 
-            // const replannerResponse = await invokeAndStreamOutput({
-            //     langGraphAgent: replanner,
-            //     inputs: {
-            //         objective: state.input,
-            //         plan: stringify(state.plan),
-            //         pastSteps: stringify(pastSteps)
-            //     }
-            // })
-
-            // console.log("replannerResponse: \n", replannerResponse)
-
-            // if (!replannerResponse) {
-            //     throw new Error(`No steps returned from replanner. \r replannerResponse: ${replannerResponse}`)
-            // }
-
-            // const newPlan = { plan: replannerResponse.lastMessage.tool_calls![0].args as PlanStep[]}
-
-            // console.log("New Plan: \n", stringify(newPlan))
-
-            // return { plan: replannerResponse.lastMessage.tool_calls![0].args as PlanStep[]};
-            // // return {}
-            // // return {
-            // //     plan: [
-            // //         {
-            // //             title: "Dummy Step",
-            // //             description: "none",
-            // //             role: 'ai'
-            // //         }
-            // //     ] as PlanStep[]
-            // // }
+            console.log("New Plan from invoke: \n", stringify(planSteps))
+            return {
+                plan: planSteps,
+                pastSteps: pastSteps
+            }
         }
 
         async function respondStep(
             state: typeof PlanExecuteState.State,
+            config: RunnableConfig,
         ): Promise<Partial<typeof PlanExecuteState.State>> {
-            const response = await responder.invoke({
-                input: state.input,
-                plan: stringify(state.plan),
-                pastSteps: stringify(state.pastSteps)
-            });
+            const response = await responder
+                // .withConfig({
+                //     callbacks: config.callbacks,
+                //     // runName: "responder",
+                //     tags: ["responder"],
+                // })
+                .invoke({
+                    input: state.input,
+                    plan: stringify(state.plan),
+                    pastSteps: stringify(state.pastSteps)
+                },
+                    config
+                );
 
             return { response: response.response };
         }
@@ -542,14 +479,23 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
                     switch (chainMessageType) {
                         case "plan":
+
+                            const updatePlanResonseInput: Schema["ChatSession"]["updateType"] = {
+                                id: event.arguments.chatSessionId,
+                                planSteps: ((chainStreamMessage.planner || chainStreamMessage.replan) as typeof PlanExecuteState.State)
+                                    .plan.map((step) => JSON.stringify(step, null, 2)),
+                            }
+
+                            //If the chatStreamMessage contains pastSteps, update the chat session with them.
+                            if (chainStreamMessage.replan.pastSteps) {
+                                updatePlanResonseInput.pastSteps = (chainStreamMessage.replan as typeof PlanExecuteState.State)
+                                    .pastSteps.map((step) => JSON.stringify(step, null, 2))
+                            }
+
                             const updatePlanResonse = await amplifyClientWrapper.amplifyClient.graphql({
                                 query: updateChatSession,
                                 variables: {
-                                    input: {
-                                        id: event.arguments.chatSessionId,
-                                        planSteps: ((chainStreamMessage.planner || chainStreamMessage.replan) as typeof PlanExecuteState.State)
-                                            .plan.map((step) => JSON.stringify(step, null, 2)),
-                                    }
+                                    input: updatePlanResonseInput
                                 }
                             })
 

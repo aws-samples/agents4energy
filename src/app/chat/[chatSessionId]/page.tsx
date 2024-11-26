@@ -437,10 +437,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     return (
-        // <Box>
         <AddSideBar
-            // initiallyOpen={(activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name)} // Only open the side bar if the plan and execute agent is open
             initiallyOpen={false}
+            floatingButton={(initialActiveChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name)}
             anchor="right"
             drawerContent={
                 <>

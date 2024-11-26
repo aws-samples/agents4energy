@@ -17,7 +17,9 @@ import { onCreateChatMessage } from '../graphql/subscriptions'
 
 const queryGQLScheama = z.object({
     queryField: z
-        .enum(["invokeBedrock", "invokeProductionAgent"])
+        .enum(["invokeBedrock", "invokeProductionAgent"]).describe(`
+            Use invokeProductionAgent to learn about a well's attributes, with data sources including well files, production volume databases, and general petroleum engineering knowledge.
+            `)
         .describe(`The type of operation to execute.`),
     invocationText: z.string().describe("The text to use to invoke the agent"),
 });
@@ -170,12 +172,13 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                 throw new Error(`Unknown query field: ${queryField}`);
         }
 
-
-
     },
     {
         name: "queryGQL",
-        description: "Can query a GraphQL API",
+        description: `
+        Can query a GraphQL API. 
+        Use queryField invokeProductionAgent to learn about a well's attributes, with data sources including well files, production volume databases, and general petroleum engineering knowledge.
+        `.replace(/^\s+/gm, ''),
         schema: queryGQLScheama,
     }
 );
