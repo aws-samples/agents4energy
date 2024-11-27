@@ -77,12 +77,6 @@ const TopNavBar = () => {
               Files
             </Typography>
           </Link>
-          
-          <Link color="inherit" href='/upload' sx={{ textDecoration: 'none' }}>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Upload
-            </Typography>
-          </Link>
 
           <Link color="inherit" href='/chat' sx={{ textDecoration: 'none' }}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>

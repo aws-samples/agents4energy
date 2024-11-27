@@ -632,6 +632,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             stateMachineArn: runCrawlerRecordTableDefintionStateMachine.stateMachineArn,
             input: JSON.stringify({
                 action: 'create',
+                s3DeploymentBucket: props.s3Deployment.deployedBucket.bucketName
             }),
         },
         physicalResourceId: cr.PhysicalResourceId.of('StepFunctionExecution'),
