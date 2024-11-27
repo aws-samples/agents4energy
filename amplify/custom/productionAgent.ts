@@ -133,13 +133,13 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // This is a way to prevent a circular dependency error when interacting with the well fiel drive bucket
 
     const pdfDlQueue = new sqs.Queue(scope, 'PdfToYamlDLQ', {
-        queueName: 'pdf-to-yaml-dlq',
+        // queueName: `pdf-to-yaml-dlq-${cdk.Stack.of(scope).stackId.slice(-3)}`,
         retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days
     });
 
     // Create the main queue for processing
     const pdfProcessingQueue = new sqs.Queue(scope, 'PdfToYamlQueue', {
-        queueName: 'pdf-to-yaml-processing-queue',
+        // queueName: `pdf-to-yaml-processing-queue-${cdk.Stack.of(scope).stackId.slice(-3)}`,
         visibilityTimeout: cdk.Duration.seconds(1000), // Should match or exceed lambda timeout
         deadLetterQueue: {
             queue: pdfDlQueue,
@@ -205,7 +205,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     );
 
     const athenaWorkgroup = new athena.CfnWorkGroup(scope, 'FedQueryWorkgroup', {
-        name: `${rootStack.stackName}-fed_query_workgroup`.slice(-64),
+        name: `${cdk.Stack.of(scope).stackName}-fed_query_workgroup`.slice(-64),
         description: 'Workgroup for querying federated data sources',
         recursiveDeleteOption: true,
         workGroupConfiguration: {
@@ -226,7 +226,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
     const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
 
-    const postgressConnectorLambdaFunctionName = `query-postgres-${rootStack.stackName.slice(0, 40)}`
+    const postgressConnectorLambdaFunctionName = `query-postgres-${cdk.Stack.of(scope).stackName.slice(-5)}`.toLowerCase().replace(/[^0-9a-z_-]/g, '')
     const prodDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
         location: {
             applicationId: `arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaPostgreSQLConnector`,
@@ -245,7 +245,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     //Create an athena datasource for postgres databases
     const athenaPostgresCatalog = new athena.CfnDataCatalog(scope, 'PostgresAthenaDataSource', {
-        name: `postgres_sample_${rootStack.stackName.slice(-3)}`,
+        name: `postgres_sample_${cdk.Stack.of(scope).stackName.slice(-5)}`.toLowerCase().replace(/[^0-9a-z]/g, ''),
         type: 'LAMBDA',
         description: 'Athena data source for postgres',
         parameters: {
@@ -287,7 +287,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     knowledgeBaseName: "petrowiki"
     // })
 
-    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, 'PetEngKB', {
+    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `PetEngKB${cdk.Stack.of(scope).stackName.slice(-4)}`, {
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         instruction: `You are a helpful question answering assistant. You answer
         user questions factually and honestly related to petroleum engineering data`,
@@ -298,7 +298,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         sourceUrls: ['https://petrowiki.spe.org/'],
         filters: {
             excludePatterns: ['https://petrowiki\.spe\.org/.+?/.+']//Exclude pages with additional path segments
-        }
+        },
+        dataDeletionPolicy: cdkLabsBedrock.DataDeletionPolicy.RETAIN,
     })
 
     new cr.AwsCustomResource(scope, 'StartIngestionPetroleumEngineeringDataSource', {
@@ -319,48 +320,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         ])
     })
 
-    // const petroWikiDataSource = new bedrock.CfnDataSource(scope, 'PetroWikiDataSource', {
-    //     name: "petroWiki",
-    //     dataSourceConfiguration: {
-    //         type: 'WEB',
-    //         webConfiguration: {
-    //             sourceConfiguration: {
-    //                 urlConfiguration: {
-    //                     seedUrls: [{
-    //                         url: 'https://petrowiki.spe.org/',
-    //                     }],
-    //                 },
-    //             },
-    //         }
-    //     },
-    //     knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBase.attrKnowledgeBaseId
-    // })
-
-    // // Define the SDK call for starting the sync
-    // const startDataSourceSyncCall: cr.AwsSdkCall = {
-    //     service: '@aws-sdk/client-bedrock-agent',
-    //     action: 'startIngestionJob',
-    //     parameters: {
-    //         dataSourceId: petroWikiDataSource.attrDataSourceId,
-    //         knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
-    //     },
-    //     physicalResourceId: cr.PhysicalResourceId.of('startDataSourceSync')
-    // };
-
-    // // Create Custom Resource to trigger the sync
-    // const dataSourceSyncTrigger = new cr.AwsCustomResource(scope, 'StartDataSourceSync', {
-    //     onCreate: startDataSourceSyncCall,
-    //     policy: cr.AwsCustomResourcePolicy.fromStatements([
-    //         new iam.PolicyStatement({
-    //             actions: ['bedrock:startIngestionJob'],
-    //             resources: [petroleumEngineeringKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn]
-    //         })
-    //     ])
-    // });
-
-    // // Add dependency to ensure data source is created before starting sync
-    // dataSourceSyncTrigger.node.addDependency(petroWikiDataSource);
-
     lambdaLlmAgentRole.addToPrincipalPolicy(new iam.PolicyStatement({
         actions: ["bedrock:StartIngestionJob"],
         resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn]
@@ -370,9 +329,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // Create a Glue Database
     const productionGlueDatabase = new glue.CfnDatabase(scope, 'ProdGlueDb', {
         catalogId: rootStack.account,
-        databaseName: `production_db_${rootStack.stackName.slice(-3)}`,
+        databaseName: `production_db_${cdk.Stack.of(scope).stackName.slice(-3)}`,
         databaseInput: {
-            name: `production_db_${rootStack.stackName.slice(-3)}`,
+            name: `production_db_${cdk.Stack.of(scope).stackName.slice(-3)}`,
             description: 'Database for storing additional information for the production agent'
         }
     });
@@ -538,7 +497,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             sourceMap: true,
         },
         timeout: cdk.Duration.minutes(15),
-        // memorySize: 3000,
         role: lambdaLlmAgentRole,
         environment: {
             ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
@@ -575,20 +533,20 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // // Add dependency to ensure database is created before crawler
     // crawler.addDependency(productionGlueDatabase);
 
-    // Create the EventBridge rule
-    const newGlueTableRule = new events.Rule(scope, 'GlueTableCreationRule', {
-        eventPattern: {
-            source: ['aws.glue'],
-            detailType: ['AWS API Call via CloudTrail'],
-            detail: {
-                eventSource: ['glue.amazonaws.com'],
-                eventName: ['CreateTable'],
-                requestParameters: {
-                    databaseName: [productionGlueDatabase.ref], // Replace with your Glue database name
-                },
-            },
-        },
-    });
+    // // Create the EventBridge rule
+    // const newGlueTableRule = new events.Rule(scope, 'GlueTableCreationRule', {
+    //     eventPattern: {
+    //         source: ['aws.glue'],
+    //         detailType: ['AWS API Call via CloudTrail'],
+    //         detail: {
+    //             eventSource: ['glue.amazonaws.com'],
+    //             eventName: ['CreateTable'],
+    //             requestParameters: {
+    //                 databaseName: [productionGlueDatabase.ref], // Replace with your Glue database name
+    //             },
+    //         },
+    //     },
+    // });
 
     // Now we'll create assets which update the table definition knoledge base when an athena data source is updated
     const athenaDataSourceRule = new events.Rule(scope, 'AthenaDataSourceRule', {
@@ -621,7 +579,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // Add targets for both the new athena data source rule, and the new glue table rule
     athenaDataSourceRule.addTarget(new eventsTargets.LambdaFunction(recordTableDefAndStarkKBIngestionJob));
-    newGlueTableRule.addTarget(new eventsTargets.LambdaFunction(recordTableDefAndStarkKBIngestionJob));
+    // newGlueTableRule.addTarget(new eventsTargets.LambdaFunction(recordTableDefAndStarkKBIngestionJob));
 
     // This step function will invoke the glue crawler, wait until in completes, and then call the recordTableDefAndStarkKBIngestionJob function to load the table defs into the kb
     // Create Step Function tasks

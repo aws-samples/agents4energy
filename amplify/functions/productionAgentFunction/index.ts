@@ -49,8 +49,6 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
     // const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
 
-    
-
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
 

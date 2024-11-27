@@ -144,8 +144,8 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
   })
 )
 
-const customStack = backend.createStack('productionAgentStack')
-const rootStack = cdk.Stack.of(customStack).nestedStackParent
+const networkingStack = backend.createStack('networkingStack')
+const rootStack = cdk.Stack.of(networkingStack).nestedStackParent
 if (!rootStack) throw new Error('Root stack not found')
 
 backend.addOutput({
@@ -155,11 +155,11 @@ backend.addOutput({
   },
 });
 
-// const vpc = new ec2.Vpc(customStack, 'VPC', {
+// const vpc = new ec2.Vpc(productionAgentStack, 'VPC', {
 //   ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
 // })
 
-const vpc = new ec2.Vpc(customStack, 'A4E-VPC', {
+const vpc = new ec2.Vpc(networkingStack, 'A4E-VPC', {
   ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
   maxAzs: 3,
   enableDnsHostnames: true,
@@ -188,13 +188,18 @@ function applyTagsToRootStack() {
   })
   cdk.Tags.of(rootStack).add('rootStackName', rootStack.stackName)
 }
-
 applyTagsToRootStack()
+
+
+///////////////////////////////////////////////////////////
+/////// Create the Production Agent Stack /////////////////
+///////////////////////////////////////////////////////////
+const productionAgentStack = backend.createStack('prodAgentStack')
 
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'well-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentStack, 'well-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   prune: false
@@ -211,7 +216,7 @@ const {
   athenaWorkgroup,
   athenaPostgresCatalog,
 
-} = productionAgentBuilder(customStack, {
+} = productionAgentBuilder(productionAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
   s3Bucket: backend.storage.resources.bucket,
@@ -219,7 +224,7 @@ const {
 })
 
 // Custom resource Lambda to introduce a delay between when the PDF to Yaml function finishes deploying, and when the objects are uploaded.
-const delayFunction = new lambda.Function(customStack, 'DelayFunction', {
+const delayFunction = new lambda.Function(productionAgentStack, 'DelayFunction', {
   runtime: lambda.Runtime.NODEJS_18_X,
   handler: 'index.handler',
   timeout: cdk.Duration.minutes(10),
@@ -232,10 +237,10 @@ const delayFunction = new lambda.Function(customStack, 'DelayFunction', {
     };
   `),
 });
-const delayProvider = new cr.Provider(customStack, 'DelayProvider', {
+const delayProvider = new cr.Provider(productionAgentStack, 'DelayProvider', {
   onEventHandler: delayFunction,
 });
-const delayResource = new cdk.CustomResource(customStack, 'DelayResource', {
+const delayResource = new cdk.CustomResource(productionAgentStack, 'DelayResource', {
   serviceToken: delayProvider.serviceToken,
 });
 delayResource.node.addDependency(convertPdfToYamlFunction)
@@ -273,27 +278,10 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   })
 )
 
-
-// backend.productionAgentFunction.resources.lambda.addToRolePolicy(
-//   new iam.PolicyStatement({
-//     actions: ["states:StartSyncExecution"],
-//     resources: [queryImagesStateMachineArn],
-//   })
-// )
-
-// //Create data sources and resolvers for the lambdas created in the production agent stack
-// const convertPdfToImageDS = backend.data.addLambdaDataSource(
-//   'convertPdfToImageDS',
-//   getInfoFromPdfFunction
-// )
-
-// convertPdfToImageDS.createResolver(
-//   'getInfoFromPdfResolver',
-//   {
-//     typeName: 'Query',
-//     fieldName: 'getInfoFromPdf'
-//   }
-// )
+///////////////////////////////////////////////////////////
+/////// Create the Configurator Stack /////////////////////
+///////////////////////////////////////////////////////////
+// This stack configures the GraphQL API and adds a hook to the conginto user pool to check email address domain before allowing sign up.
 
 // Create a stack with the resources to configure the app
 const configuratorStack = backend.createStack('configuratorStack')
@@ -301,7 +289,6 @@ const configuratorStack = backend.createStack('configuratorStack')
 new AppConfigurator(configuratorStack, 'appConfigurator', {
   hydrocarbonProductionDb: hydrocarbonProductionDb,
   defaultProdDatabaseName: defaultProdDatabaseName,
-  // sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
   athenaWorkgroup: athenaWorkgroup,
   athenaPostgresCatalog: athenaPostgresCatalog,
   s3Bucket: backend.storage.resources.bucket,

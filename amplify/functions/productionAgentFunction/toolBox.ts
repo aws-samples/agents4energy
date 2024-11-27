@@ -145,7 +145,7 @@ const executeSQLQuerySchema = z.object({
             SUM("water(bbls)") AS total_water_production
         FROM "AwsDataCatalog"."<database_name>"."<table_name>"
         WHERE "well api" = '<example_well_api>'
-            AND CAST("date" AS DATE) >= CAST('1900-01-01' AS DATE)
+            AND CAST("date" AS DATE) >= CAST('1990-01-01' AS DATE)
         GROUP BY DATE_TRUNC('day', CAST("date" AS DATE))
         ORDER BY day
         </exampleSqlQuery>
