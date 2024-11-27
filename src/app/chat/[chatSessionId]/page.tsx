@@ -74,6 +74,14 @@ type ListAgentIdsResponseType = {
     nextToken: string
 }
 
+const jsonParseHandleError = (jsonString: string) => {
+    try {
+        return JSON.parse(jsonString)
+    } catch {
+        console.warn(`Could not parse string: ${jsonString}`)
+    }
+}
+
 const invokeBedrockAgentParseBodyGetTextAndTrace = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
     console.log('Prompt: ', prompt)
     if (!chatSession.aiBotInfo?.aiBotAliasId) throw new Error('No Agent Alias ID found in invoke request')
@@ -117,11 +125,14 @@ const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targe
     })
     console.log("Structured Output Response: ", structuredResponse)
     if (structuredResponse.data) {
-        const messageIntentSummary = JSON.parse(structuredResponse.data).summary as string
-        await amplifyClient.models.ChatSession.update({
-            id: targetChatSession.id,
-            firstMessageSummary: messageIntentSummary
-        })
+        const messageIntent = jsonParseHandleError(structuredResponse.data)
+        if (messageIntent){
+            await amplifyClient.models.ChatSession.update({
+                id: targetChatSession.id,
+                firstMessageSummary: messageIntent.summary as string
+            })
+        }
+        
     } else console.log('No structured output found in response: ', structuredResponse)
 }
 
@@ -135,12 +146,18 @@ const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSe
 
 const getAgentAliasId = async (agentId: string) => {
     const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
-    console.log('get Agent Alias Id Response: ', response.data)
+    // console.log('get Agent Alias Id Response: ', response.data)
     if (!(response.data && response.data.body)) {
-        console.log('No response getting Agent Alias ID for Agent ID ', agentId)
+        console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
         return
     }
-    const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
+    // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
+    const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
+
+    if (!listAgnetAliasIdsResponseBody) {
+        console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
+        return
+    }
     //Get the most recently created AliasId
     const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
 
@@ -266,8 +283,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 })
                 console.log("Suggested Prompts Response: ", suggestedPromptsResponse)
                 if (suggestedPromptsResponse.data) {
-                    const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
-                    setSuggestedPromptes(newSuggestedPrompts)
+                    const newSuggestedPrompts = jsonParseHandleError(suggestedPromptsResponse.data)
+                    if (newSuggestedPrompts) setSuggestedPromptes(newSuggestedPrompts.suggestedPrompts as string[])
+                    // const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
                 } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
             }
             fetchAndSetSuggestedPrompts()
@@ -338,7 +356,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 console.log('No response from listing bedrock agents')
                 return
             }
-            const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
+            // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
+            const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
+            if (!listAgentsResponseBody) {
+                console.log('Could not parse response body from listing bedrock agents')
+                return
+            }
             console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
             setBedrockAgents(listAgentsResponseBody)
             // return listAgentsResponseBody
