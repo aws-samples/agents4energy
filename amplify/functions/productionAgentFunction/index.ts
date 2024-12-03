@@ -4,6 +4,7 @@ import { Schema } from '../../data/resource';
 import { ChatBedrockConverse } from "@langchain/aws";
 import { HumanMessage, AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { RetryPolicy } from "@langchain/langgraph"
 // import { Pregel } from "@langchain/langgraph/pregel";
 
 import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
@@ -15,30 +16,31 @@ import {
     getTableDefinitionsTool, 
     executeSQLQueryTool, 
     plotTableFromToolResponseTool, 
-    getWellFileInfoTool 
+    getWellFileInfoTool,
+    retrievePetroleumEngineeringKnowledgeTool
 } from './toolBox';
 
-async function retryOperation<T>(
-    operation: () => Promise<T>,
-    retries: number = 3,
-    delay: number = 1000 // delay in milliseconds
-): Promise<T> {
-    let attempt = 0;
-    while (attempt < retries) {
-        try {
-            return await operation();
-        } catch (error) {
-            attempt++;
-            if (attempt >= retries) {
-                throw error;
-            }
-            console.warn(`Retrying... Attempt ${attempt}/${retries}`);
-            await new Promise(res => setTimeout(res, delay));
-        }
-    }
-    // Fallback, should not be reached
-    throw new Error("Operation failed after maximum retries");
-}
+// async function retryOperation<T>(
+//     operation: () => Promise<T>,
+//     retries: number = 3,
+//     delay: number = 1000 // delay in milliseconds
+// ): Promise<T> {
+//     let attempt = 0;
+//     while (attempt < retries) {
+//         try {
+//             return await operation();
+//         } catch (error) {
+//             attempt++;
+//             if (attempt >= retries) {
+//                 throw error;
+//             }
+//             console.warn(`Retrying... Attempt ${attempt}/${retries}`);
+//             await new Promise(res => setTimeout(res, delay));
+//         }
+//     }
+//     // Fallback, should not be reached
+//     throw new Error("Operation failed after maximum retries");
+// }
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
 
@@ -64,10 +66,11 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     const agentTools = [
         calculatorTool,
         wellTableToolBuilder(amplifyClientWrapper),
-        getWellFileInfoTool,
+        // getWellFileInfoTool,
         getTableDefinitionsTool,
         executeSQLQueryTool,
-        plotTableFromToolResponseTool
+        plotTableFromToolResponseTool,
+        retrievePetroleumEngineeringKnowledgeTool
     ];
 
     try {
@@ -93,14 +96,13 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             temperature: 0
         });
 
-
-        //Add retry to the agent
-        const agent = await retryOperation(async () => createReactAgent({
+        const agent = createReactAgent({
             llm: agentModel,
             tools: agentTools,
-        }));
+        });
 
-        // agent.nodes['agent'] = langchainNodeWithRetry(agent.nodes['agent'], 3, 1000);
+        //Add retry to the agent
+        agent.nodes['agent'].retryPolicy = {maxAttempts: 3} as RetryPolicy
 
         const input = {
             messages: amplifyClientWrapper.chatMessages,

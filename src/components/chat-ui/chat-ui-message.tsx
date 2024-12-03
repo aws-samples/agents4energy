@@ -115,12 +115,17 @@ function transformListToObject<T extends Record<string, string | number>>(
   list: T[]
 ): { [K in keyof T]: T[K][] } {
   return Object.keys(list[0]).reduce((acc, key) => {
+    // if (list.some(item => !item || !(key in item))) throw new Error(`Key ${key} not found in all items`)
+    // if (list.some(item => !item || !(key in item))) return {}
     return {
       ...acc,
-      [key]: list.map(item => item[key as keyof T])
+      [key]: list.map(item => {
+        if (item && key in item) return item[key as keyof T]
+      })
     };
   }, {}) as { [K in keyof T]: T[K][] };
 }
+
 type RowDataInput = {
   [key: string]: (string | number)
 }[];
@@ -254,7 +259,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   .filter((columnName) => (!isNaN(Number(chartDataObject[columnName][0]))))
                   .map((columnName, index) => ({
                     data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
-                      x: (xAxisIsNumberNotDate)?  new Number(xValue) as number: new Date(xValue), // Convert to Date object if xValue is a string
+                      x: (xAxisIsNumberNotDate) ? new Number(xValue) as number : new Date(xValue), // Convert to Date object if xValue is a string
                       y: Number(chartDataObject[columnName][i])
                     })),
                     mode: 'lines+markers',
@@ -280,17 +285,18 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           return chartTrendNames[0]
         })
 
-
+        if (!data.datasets[0]) return //No data sets found in query
 
         // console.log('chart data:\n', data)
 
-        console.log("First X data Point: ", data.datasets[0].data[0].x)
-        console.log("First X data Point Is Date: ", data.datasets[0].data[0].x instanceof Date)
+
+        // console.log("First X data Point: ", data.datasets[0].data[0].x)
+        // console.log("First X data Point Is Date: ", data.datasets[0].data[0].x instanceof Date)
 
         const options: ChartOptions<'scatter'> = {
           // responsive: true,
           scales: {//If the first x data point is a number an not a date, use a number x axis
-            x: (data.datasets[0].data[0].x instanceof Date)? {
+            x: (data.datasets[0].data[0].x instanceof Date) ? {
               type: 'time' as const,
               time: {
                 unit: 'day' as const,
@@ -308,7 +314,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   locale: enUS,
                 },
               },
-            }: {//Here is the title if the x axis is numberic
+            } : {//Here is the title if the x axis is numberic
               title: {
                 display: true,
                 text: xAxisLabels.join('\n'),
@@ -451,16 +457,19 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             headerName: 'Document Links',
             flex: 1,
             minWidth: 150,
-            renderCell: (params) => (
-              <Box display='flex' flexDirection='column'>
-                <Link href={`/files/${params.value.slice(0, -5)}`} target="_blank" rel="noopener">
-                  pdf link
-                </Link>
-                <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
-                  yaml link
-                </Link>
-              </Box>
-            ),
+            renderCell: (params) => {
+              if (!params.value) return
+              return (
+                <Box display='flex' flexDirection='column'>
+                  <Link href={`/files/${params.value.slice(0, -5)}`} target="_blank" rel="noopener">
+                    pdf link
+                  </Link>
+                  <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
+                    yaml link
+                  </Link>
+                </Box>
+              )
+            },
 
           })
         }

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "dockerAuth": "aws ecr-public get-login-password | docker login --username AWS --password-stdin public.ecr.aws",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -55,6 +56,7 @@
     "@aws-sdk/credential-provider-node": "^3.670.0",
     "@cdklabs/generative-ai-cdk-constructs": "^0.1.278",
     "@types/gm": "^1.25.4",
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^20",
     "@types/plotly.js": "^2.33.5",
     "@types/react": "^18",
@@ -67,6 +69,7 @@
     "esbuild": "^0.24.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.14",
+    "jsdom": "^25.0.1",
     "plotly.js": "^2.35.2",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",

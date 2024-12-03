@@ -17,6 +17,28 @@ import { invokeBedrockWithStructuredOutput } from '../graphql/queries'
 
 const s3Client = new S3Client();
 
+async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: string }) {
+    const bedrockRuntimeClient = new BedrockAgentRuntimeClient();
+
+    const command = new RetrieveCommand({
+        knowledgeBaseId: props.knowledgeBaseId,
+        retrievalQuery: { text: props.query },
+        retrievalConfiguration: {
+            vectorSearchConfiguration: {
+                numberOfResults: 5 // Adjust based on your needs
+            }
+        }
+    });
+
+    try {
+        const response = await bedrockRuntimeClient.send(command);
+        return response.retrievalResults;
+    } catch (error) {
+        console.error('Error querying knowledge base:', error);
+        throw error;
+    }
+}
+
 //////////////////////////////////////////
 //////////// Calculator Tool /////////////
 //////////////////////////////////////////
@@ -51,7 +73,37 @@ export const calculatorTool = tool(
     }
 );
 
+///////////////////////////////////////////////////////////////
+////// Retrieve Petroleum Enginnering Knowledge Tool //////////
+///////////////////////////////////////////////////////////////
+const retrievePetroleumEngineeringKnowledgeSchema = z.object({
+    concepts: z.string().describe(`Which concepts would you like to know about?`),
+});
 
+//https://js.langchain.com/docs/integrations/retrievers/bedrock-knowledge-bases/
+export const retrievePetroleumEngineeringKnowledgeTool = tool(
+    async ({ concepts }) => {
+
+        const contextResponse = await queryKnowledgeBase({
+            knowledgeBaseId: env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID,
+            query: concepts
+        })
+
+        if (!contextResponse) throw new Error(`No relevant tables found. Query: ${concepts}`)
+        console.log("Pet Eng KB response:\n", JSON.stringify(contextResponse, null, 2))
+
+
+        return {
+            messageContentType: 'tool_json',
+            context: contextResponse
+        } as ToolMessageContentType
+    },
+    {
+        name: "retrievePetroleumEngineeringKnowledge",
+        description: "Can retrieve information on many aspects of oil and gas extraction.",
+        schema: retrievePetroleumEngineeringKnowledgeSchema,
+    }
+);
 
 //////////////////////////////////////////
 ////// Get table definiton tool //////////
@@ -62,28 +114,6 @@ const getTableDefinitionsSchema = z.object({
         Include key words and likely SQL query column names.
         `),
 });
-
-async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: string }) {
-    const bedrockRuntimeClient = new BedrockAgentRuntimeClient();
-
-    const command = new RetrieveCommand({
-        knowledgeBaseId: props.knowledgeBaseId,
-        retrievalQuery: { text: props.query },
-        retrievalConfiguration: {
-            vectorSearchConfiguration: {
-                numberOfResults: 5 // Adjust based on your needs
-            }
-        }
-    });
-
-    try {
-        const response = await bedrockRuntimeClient.send(command);
-        return response.retrievalResults;
-    } catch (error) {
-        console.error('Error querying knowledge base:', error);
-        throw error;
-    }
-}
 
 //https://js.langchain.com/docs/integrations/retrievers/bedrock-knowledge-bases/
 export const getTableDefinitionsTool = tool(
@@ -106,7 +136,7 @@ export const getTableDefinitionsTool = tool(
             score: result?.score
         }))
 
-        console.log('Table Definitions:\n', tableDefinitions)
+        // console.log('Table Definitions:\n', tableDefinitions)
 
         return {
             messageContentType: 'tool_json',
@@ -319,7 +349,31 @@ export const wellTableSchema = z.object({
             minimum: z.number().optional(),
             maximum: z.number().optional(),
         })//.optional()
-    })).describe("The column name and description for each column of the table. Choose the column best suited for a chart label as the first element."),
+    })).describe(`The column name and description for each column of the table. 
+        Choose the column best suited for a chart label as the first element.
+        <exampleTableColumns>
+        tableColumns:
+            - columnDescription: The date of the well event
+                columnDefinition:
+                format: yyyy-MM-dd
+                type: date
+                columnName: date
+            - columnDescription: The type of well event that occurred
+                columnDefinition:
+                type: string
+                enum:
+                    - Drilling
+                    - Completion
+                    - Workover
+                    - Plugging
+                    - Inspection
+                columnName: event
+            - columnDescription: A description of the well event
+                columnDefinition:
+                type: string
+                columnName: description
+        </exampleTableColumns>
+        `.replace(/^\s+/gm, '')),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
 });
 
@@ -389,43 +443,43 @@ function removeSpaceAndLowerCase(str: string): string {
 
 async function listS3Folders(
     props: {
-        bucketName: string, 
+        bucketName: string,
         prefix: string
     },
-  ): Promise<string[]> {
-    const {bucketName, prefix} = props
+): Promise<string[]> {
+    const { bucketName, prefix } = props
 
     const s3Client = new S3Client({});
-    
+
     // Add trailing slash if not present
     const normalizedPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
-    
+
     const input: ListObjectsV2CommandInput = {
-      Bucket: bucketName,
-      Delimiter: '/',
-      Prefix: normalizedPrefix,
+        Bucket: bucketName,
+        Delimiter: '/',
+        Prefix: normalizedPrefix,
     };
-  
+
     try {
-      const command = new ListObjectsV2Command(input);
-      const response = await s3Client.send(command);
+        const command = new ListObjectsV2Command(input);
+        const response = await s3Client.send(command);
 
-    //   console.log('list folders s3 response:\n',response)
-  
-      // Get common prefixes (folders)
-      const folders = response.CommonPrefixes?.map(prefix => prefix.Prefix!.slice(normalizedPrefix.length)) || [];
+        //   console.log('list folders s3 response:\n',response)
 
-    //   console.log('folders: ', folders)
-      
-      // Filter out the current prefix itself and just get the part of the prefix after the normalizedPrefix
-      return folders
-        .filter(folder => folder !== normalizedPrefix)
-  
+        // Get common prefixes (folders)
+        const folders = response.CommonPrefixes?.map(prefix => prefix.Prefix!.slice(normalizedPrefix.length)) || [];
+
+        //   console.log('folders: ', folders)
+
+        // Filter out the current prefix itself and just get the part of the prefix after the normalizedPrefix
+        return folders
+            .filter(folder => folder !== normalizedPrefix)
+
     } catch (error) {
-      console.error('Error listing S3 folders:', error);
-      throw error;
+        console.error('Error listing S3 folders:', error);
+        throw error;
     }
-  }
+}
 
 export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
     async ({ dataToInclude, tableColumns, wellApiNumber, dataToExclude }) => {
@@ -519,8 +573,8 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
         console.log('Well Files: ', wellFiles)
 
         if (wellFiles.length === 0) {
-            const oneLevelUpS3Prefix = s3Prefix.split('/').slice(0,-2).join('/')
-            
+            const oneLevelUpS3Prefix = s3Prefix.split('/').slice(0, -2).join('/')
+
             console.log('one level up s3 prefix: ', oneLevelUpS3Prefix)
             const s3Folders = await listS3Folders({
                 bucketName: process.env.DATA_BUCKET_NAME,
@@ -550,8 +604,9 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
 
                     const objectContent = await getObjectResponse.Body?.transformToString()
                     if (!objectContent) throw new Error(`No object content for s3 key: ${s3Key}`)
+                    if (objectContent.length < 25) return // If the file contents are empty, do not create a row for that file. The empty file has a length of 22
 
-                    const messageText = `ß
+                    const messageText = `
                     The user is asking you to extract information from a YAML object.
                     The YAML object contains information about a well.
                     <YamlObject>
@@ -612,7 +667,9 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
     },
     {
         name: "wellTableTool",
-        description: "This tool searches the well files to extract specified information about a well. Use this tool when asked to search the well files.",
+        description: `
+        This tool searches the well files to extract specified information about a well. 
+        Use this tool when asked to make a table and search the well files.`.replace(/^\s+/gm, ''),
         schema: wellTableSchema,
     }
 );

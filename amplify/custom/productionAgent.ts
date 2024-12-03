@@ -43,8 +43,8 @@ interface ProductionAgentProps {
 
 export function productionAgentBuilder(scope: Construct, props: ProductionAgentProps) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    // const rootDir = path.resolve(__dirname, '..');
 
+    const stackName = cdk.Stack.of(scope).stackName
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
 
@@ -123,7 +123,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         memorySize: 3000,
         role: lambdaLlmAgentRole,
         environment: {
-            'DATA_BUCKET_NAME': props.s3Bucket.bucketName,
+            DATA_BUCKET_NAME: props.s3Bucket.bucketName,
+            // MODEL_ID: 'us.anthropic.claude-3-5-sonnet-20240620-v1:0'
+            // MODEL_ID: 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
             'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
             // 'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
         },
@@ -133,13 +135,11 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // This is a way to prevent a circular dependency error when interacting with the well fiel drive bucket
 
     const pdfDlQueue = new sqs.Queue(scope, 'PdfToYamlDLQ', {
-        // queueName: `pdf-to-yaml-dlq-${cdk.Stack.of(scope).stackId.slice(-3)}`,
         retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days
     });
 
     // Create the main queue for processing
     const pdfProcessingQueue = new sqs.Queue(scope, 'PdfToYamlQueue', {
-        // queueName: `pdf-to-yaml-processing-queue-${cdk.Stack.of(scope).stackId.slice(-3)}`,
         visibilityTimeout: cdk.Duration.seconds(1000), // Should match or exceed lambda timeout
         deadLetterQueue: {
             queue: pdfDlQueue,
@@ -152,7 +152,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // Add SQS as trigger for Lambda
     convertPdfToYamlFunction.addEventSource(new lambdaEvent.SqsEventSource(pdfProcessingQueue, {
-        batchSize: 1, // Process one message at a time
+        batchSize: 1,
+        maxConcurrency: 2 //This prevents throttling when calling foundation models
     }));
 
     const wellFileDriveBucket = s3.Bucket.fromBucketName(scope, 'ExistingBucket', props.s3Bucket.bucketName);
@@ -205,7 +206,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     );
 
     const athenaWorkgroup = new athena.CfnWorkGroup(scope, 'FedQueryWorkgroup', {
-        name: `${cdk.Stack.of(scope).stackName}-fed_query_workgroup`.slice(-64),
+        name: `${stackName}-fed_query_workgroup`.slice(-64),
         description: 'Workgroup for querying federated data sources',
         recursiveDeleteOption: true,
         workGroupConfiguration: {
@@ -226,7 +227,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
     const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
 
-    const postgressConnectorLambdaFunctionName = `query-postgres-${cdk.Stack.of(scope).stackName.slice(-5)}`.toLowerCase().replace(/[^0-9a-z_-]/g, '')
+    const postgressConnectorLambdaFunctionName = `query-postgres-${stackName.slice(-4)}`.toLowerCase().replace(/[^0-9a-z_-]/g, '')
     const prodDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
         location: {
             applicationId: `arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaPostgreSQLConnector`,
@@ -245,7 +246,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     //Create an athena datasource for postgres databases
     const athenaPostgresCatalog = new athena.CfnDataCatalog(scope, 'PostgresAthenaDataSource', {
-        name: `postgres_sample_${cdk.Stack.of(scope).stackName.slice(-5)}`.toLowerCase().replace(/[^0-9a-z]/g, ''),
+        name: `postgres_sample_${stackName.slice(-4)}`.toLowerCase().replace(/[^0-9a-z]/g, ''),
         type: 'LAMBDA',
         description: 'Athena data source for postgres',
         parameters: {
@@ -287,11 +288,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     knowledgeBaseName: "petrowiki"
     // })
 
-    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `PetEngKB${cdk.Stack.of(scope).stackName.slice(-4)}`, {
+    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `PetroleumEngKB`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         instruction: `You are a helpful question answering assistant. You answer
         user questions factually and honestly related to petroleum engineering data`,
         description: 'Petroleum Engineering Knowledge Base',
+        
     });
 
     const petroleumEngineeringDataSource = petroleumEngineeringKnowledgeBase.addWebCrawlerDataSource({
@@ -300,6 +302,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             excludePatterns: ['https://petrowiki\.spe\.org/.+?/.+']//Exclude pages with additional path segments
         },
         dataDeletionPolicy: cdkLabsBedrock.DataDeletionPolicy.RETAIN,
+        chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.HIERARCHICAL_TITAN
     })
 
     new cr.AwsCustomResource(scope, 'StartIngestionPetroleumEngineeringDataSource', {
@@ -329,9 +332,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // Create a Glue Database
     const productionGlueDatabase = new glue.CfnDatabase(scope, 'ProdGlueDb', {
         catalogId: rootStack.account,
-        databaseName: `production_db_${cdk.Stack.of(scope).stackName.slice(-3)}`,
+        databaseName: `production_db_${stackName.slice(-4,-2)}`,
         databaseInput: {
-            name: `production_db_${cdk.Stack.of(scope).stackName.slice(-3)}`,
+            name: `production_db_${stackName.slice(-4,-2)}`,
             description: 'Database for storing additional information for the production agent'
         }
     });
@@ -359,9 +362,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // Create a Glue crawler
     const crawler = new glue.CfnCrawler(scope, 'GlueCrawler', {
-        // name: 'my-data-crawler',
         role: crawlerRole.roleArn,
-        // databaseName: 'default',
         databaseName: productionGlueDatabase.ref,
         targets: {
             s3Targets: [
@@ -378,7 +379,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     ////////////////////////////////////////////////////////////
     /////////////////// Configuration Assets ///////////////////
     ////////////////////////////////////////////////////////////
-
     const configureProdDbFunction = new NodejsFunction(scope, 'configureProdDbFunction', {
         runtime: lambda.Runtime.NODEJS_LATEST,
         entry: path.join(__dirname, '..', 'functions', 'configureProdDb', 'index.ts'),
@@ -689,6 +689,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
         sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
+        petroleumEngineeringKnowledgeBase: petroleumEngineeringKnowledgeBase,
         athenaWorkgroup: athenaWorkgroup,
         athenaPostgresCatalog: athenaPostgresCatalog
     };
