@@ -275,7 +275,8 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["bedrock:Retrieve"],
     resources: [
-      sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn
+      sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn,
+      petroleumEngineeringKnowledgeBase.knowledgeBaseArn
     ],
   })
 )

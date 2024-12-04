@@ -1,46 +1,33 @@
 import { Schema } from '../../data/resource';
-// import { env } from '$amplify/env/production-agent-function';
+import { env } from '$amplify/env/production-agent-function';
+import { stringify } from 'yaml'
 
 import { ChatBedrockConverse } from "@langchain/aws";
-import { HumanMessage, AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, ToolMessage, BaseMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { RetryPolicy } from "@langchain/langgraph"
-// import { Pregel } from "@langchain/langgraph/pregel";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { END, START, StateGraph, Annotation, CompiledStateGraph, StateDefinition } from "@langchain/langgraph";
+import { RunnableConfig } from "@langchain/core/runnables";
 
 import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
-import { 
-    calculatorTool, 
-    wellTableToolBuilder, 
-    getTableDefinitionsTool, 
-    executeSQLQueryTool, 
-    plotTableFromToolResponseTool, 
+import {
+    queryKnowledgeBase,
+    calculatorTool,
+    wellTableToolBuilder,
+    getTableDefinitionsTool,
+    executeSQLQueryTool,
+    plotTableFromToolResponseTool,
     getWellFileInfoTool,
-    retrievePetroleumEngineeringKnowledgeTool
+    // retrievePetroleumEngineeringKnowledgeTool,
 } from './toolBox';
 
-// async function retryOperation<T>(
-//     operation: () => Promise<T>,
-//     retries: number = 3,
-//     delay: number = 1000 // delay in milliseconds
-// ): Promise<T> {
-//     let attempt = 0;
-//     while (attempt < retries) {
-//         try {
-//             return await operation();
-//         } catch (error) {
-//             attempt++;
-//             if (attempt >= retries) {
-//                 throw error;
-//             }
-//             console.warn(`Retrying... Attempt ${attempt}/${retries}`);
-//             await new Promise(res => setTimeout(res, delay));
-//         }
-//     }
-//     // Fallback, should not be reached
-//     throw new Error("Operation failed after maximum retries");
-// }
+function insertBeforeLast<T>(arr: T[], element: T): T[] {
+    arr.splice(-1, 0, element);
+    return arr;
+}
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
 
@@ -70,13 +57,13 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
         getTableDefinitionsTool,
         executeSQLQueryTool,
         plotTableFromToolResponseTool,
-        retrievePetroleumEngineeringKnowledgeTool
+        // retrievePetroleumEngineeringKnowledgeTool
     ];
 
     try {
 
         // If the usePreviousMessageContent field is true or undefined, get the messages. If not set the latest message text as the only message.
-        if( !("usePreviousMessageContext" in event.arguments) || event.arguments.usePreviousMessageContext ) {
+        if (!("usePreviousMessageContext" in event.arguments) || event.arguments.usePreviousMessageContext) {
             console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
             await amplifyClientWrapper.getChatMessageHistory({
                 latestHumanMessageText: event.arguments.lastMessageText
@@ -88,7 +75,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 })
             ]
         }
-        
+
         // console.log("mesages in langchain form: ", amplifyClientWrapper.chatMessages)
 
         const agentModel = new ChatBedrockConverse({
@@ -102,15 +89,37 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
         });
 
         //Add retry to the agent
-        agent.nodes['agent'].retryPolicy = {maxAttempts: 3} as RetryPolicy
+        agent.nodes['agent'].retryPolicy = { maxAttempts: 3 } as RetryPolicy
 
-        const input = {
-            messages: amplifyClientWrapper.chatMessages,
-        }
+        // const agentWithRag = ragPrompt.pipe(agent);
 
         // https://js.langchain.com/v0.2/docs/how_to/chat_streaming/#stream-events
         // https://js.langchain.com/v0.2/docs/how_to/streaming/#using-stream-events
-        const stream = agent.streamEvents(input, { version: "v2" });
+        // const stream = agent.streamEvents(input, { version: "v2" });
+
+        const messages = amplifyClientWrapper.chatMessages
+
+        const ragContext = await queryKnowledgeBase({
+            knowledgeBaseId: env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID,
+            query: getLangChainMessageTextContent(messages[messages.length-1]) || ""
+        })
+
+        insertBeforeLast(messages,
+            new HumanMessage("What are a few relevant oil and gas concepts?")
+        )
+
+        insertBeforeLast(messages,
+            new AIMessage(ragContext?.map(retrievalResult => retrievalResult.content?.text).join('\n\n') || "")
+        )
+
+        console.log("Messages with rag:\n", stringify(messages))
+
+        const stream = agent.streamEvents(
+            {
+                messages: messages,
+            },
+            { version: "v2" }
+        )
 
         console.log('Listening for stream events')
         for await (const streamEvent of stream) {

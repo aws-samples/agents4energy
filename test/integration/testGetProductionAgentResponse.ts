@@ -56,17 +56,17 @@ export const main = async () => {
   const testArguments = {
     chatSessionId: testChatSession.data.createChatSession.id,
 
+    // lastMessageText: `
+    // What is the equation I should use for a decline curve analysis?
+    // `
+
     lastMessageText: `
-    Execute a SQL query and plot the result to get the oil production over the last 12 weeks. 
-    Get the table definition so you know what to include in the query.
-    Plot the result of this query.
+    For the well with API number 30-045-29202, estimate the Arps decline curve parameters.
     `
 
-    // input: `
-    // Execute a SQL query and plot the result to get the production over the last 12 weeks. 
-    // Get the table definition so you know what to include in the query.
+    // lastMessageText: `
+    // Plot the total monthly oil, gas, and water production since 1900 for the well with API number 30-045-29202
     // `
-    // "input": "What is 1+54?"
   }
 
   const event: AppSyncResolverEvent<Schema['invokeProductionAgent']['args']> = {

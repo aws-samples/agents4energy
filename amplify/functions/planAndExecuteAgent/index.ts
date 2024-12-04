@@ -293,22 +293,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             const { messages } = await agentExecutor.invoke(inputs, config);
             const resultText = getLangChainMessageTextContent(messages.slice(-1)[0]) || ""
 
-            // // console.log("Invoking agent executor")
-            // const agentExecutorResponse = await invokeAndStreamOutput({
-            //     langGraphAgent: agentExecutor,
-            //     inputs: inputs,
-            //     config: config
-            // })// as { output: {messages: AIMessage[]} }
-
-            // if (!agentExecutorResponse || !agentExecutorResponse.lastMessage) {
-            //     throw new Error(`No response from agent executor. AgentExecutorResponse:\n${stringify(agentExecutorResponse)}\n\n`)
-            // }
-
-            // console.log("Agent executor Response: \n", agentExecutorResponse)
-
-            // const resultText = getLangChainMessageTextContent(agentExecutorResponse.lastMessage) || ""
-            // // console.log('past Steps: ', state.pastSteps)
-
             return {
                 pastSteps: [
                     ...(state.pastSteps || []),

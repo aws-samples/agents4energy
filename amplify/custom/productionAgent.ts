@@ -1,6 +1,7 @@
 
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib'
+import { Stack, Fn, Aws, Token} from 'aws-cdk-lib';
 import {
     aws_bedrock as bedrock,
     aws_iam as iam,
@@ -24,7 +25,7 @@ import {
 import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
 
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
-import { CfnApplication } from 'aws-cdk-lib/aws-sam';
+import { CfnApplication, CfnFunction } from 'aws-cdk-lib/aws-sam';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -32,6 +33,8 @@ import { fileURLToPath } from 'url';
 import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
 
 import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
+
+import * as crypto from 'crypto';
 
 const defaultProdDatabaseName = 'proddb'
 
@@ -45,10 +48,16 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
     const stackName = cdk.Stack.of(scope).stackName
+    // const stackUUID = cdk.Names.uniqueId(scope).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3);
+    const stackUUIDLong = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '')
+    
+    const stackUUID = crypto.createHash('md5').update(stackUUIDLong).digest('hex').slice(-3)
+    
+    console.log("Production Stack UUID: ", stackUUID)
+
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
-
-
+    
     // Lambda function to apply a promp to a pdf file
     const lambdaLlmAgentRole = new iam.Role(scope, 'LambdaExecutionRole', {
         assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
@@ -81,8 +90,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             })
         }
     });
-
-
 
     // Import the ImageMagick Lambda Layer from the AWS SAM Application
     const imageMagickLayerStack = new CfnApplication(scope, 'ImageMagickLayer', {
@@ -180,7 +187,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // );
 
     //https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
-    const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb', { //TODO remove the 1
+    const hydrocarbonProductionDb = new rds.DatabaseCluster(scope, 'A4E-HydrocarbonProdDb', {
         engine: rds.DatabaseClusterEngine.auroraPostgres({
             version: rds.AuroraPostgresEngineVersion.VER_16_4,
         }),
@@ -227,7 +234,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // Create the Postgres JDBC connector for Amazon Athena Federated Queries
     const jdbcConnectionString = `postgres://jdbc:postgresql://${hydrocarbonProductionDb.clusterEndpoint.socketAddress}/${defaultProdDatabaseName}?MetadataRetrievalMethod=ProxyAPI&\${${hydrocarbonProductionDb.secret?.secretName}}`
 
-    const postgressConnectorLambdaFunctionName = `query-postgres-${stackName.slice(-4)}`.toLowerCase().replace(/[^0-9a-z_-]/g, '')
+    const postgressConnectorLambdaFunctionName = `query-postgres-${stackUUID}`
+
+    // console.log("postgressConnectorLambdaFunctionName: ", postgressConnectorLambdaFunctionName)
     const prodDbPostgresConnector = new CfnApplication(scope, 'ProdDbPostgresConnector', {
         location: {
             applicationId: `arn:aws:serverlessrepo:us-east-1:292517598671:applications/AthenaPostgreSQLConnector`,
@@ -246,11 +255,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     //Create an athena datasource for postgres databases
     const athenaPostgresCatalog = new athena.CfnDataCatalog(scope, 'PostgresAthenaDataSource', {
-        name: `postgres_sample_${stackName.slice(-4)}`.toLowerCase().replace(/[^0-9a-z]/g, ''),
+        name: `postgres_sample_${stackUUID}`.toLowerCase(),
         type: 'LAMBDA',
         description: 'Athena data source for postgres',
         parameters: {
             'function': `arn:aws:lambda:${rootStack.region}:${rootStack.account}:function:${postgressConnectorLambdaFunctionName}`
+            // 'function': `arn:aws:lambda:${rootStack.region}:${rootStack.account}:function:${jdbcConnectorConfig.functionName}`
         },
     });
 
@@ -293,7 +303,6 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         instruction: `You are a helpful question answering assistant. You answer
         user questions factually and honestly related to petroleum engineering data`,
         description: 'Petroleum Engineering Knowledge Base',
-        
     });
 
     const petroleumEngineeringDataSource = petroleumEngineeringKnowledgeBase.addWebCrawlerDataSource({
@@ -328,13 +337,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn]
     }))
 
-
     // Create a Glue Database
     const productionGlueDatabase = new glue.CfnDatabase(scope, 'ProdGlueDb', {
         catalogId: rootStack.account,
-        databaseName: `production_db_${stackName.slice(-4,-2)}`,
+        databaseName: `production_db_${stackUUID}`,
         databaseInput: {
-            name: `production_db_${stackName.slice(-4,-2)}`,
+            name: `production_db_${stackUUID}`,
             description: 'Database for storing additional information for the production agent'
         }
     });

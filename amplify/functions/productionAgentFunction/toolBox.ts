@@ -11,13 +11,12 @@ import { AmplifyClientWrapper, FieldDefinition } from '../utils/amplifyUtils'
 import { processWithConcurrency, startQueryExecution, waitForQueryToComplete, getQueryResults, transformResultSet } from '../utils/sdkUtils'
 
 import { ToolMessageContentType } from '../../../src/utils/types'
-import { onFetchObjects } from '../../../src/utils/amplify-utils'
 
 import { invokeBedrockWithStructuredOutput } from '../graphql/queries'
 
 const s3Client = new S3Client();
 
-async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: string }) {
+export async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: string }) {
     const bedrockRuntimeClient = new BedrockAgentRuntimeClient();
 
     const command = new RetrieveCommand({
@@ -45,7 +44,7 @@ async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: strin
 
 const calculatorSchema = z.object({
     operation: z
-        .enum(["add", "subtract", "multiply", "divide", "squareRoot"])
+        .enum(["add", "subtract", "multiply", "divide", "log"])
         .describe("The type of operation to execute."),
     number1: z.number().describe("The first number to operate on."),
     number2: z.number().describe("The second number to operate on."),
@@ -62,7 +61,9 @@ export const calculatorTool = tool(
             return `${number1 * number2}`;
         } else if (operation === "divide") {
             return `${number1 / number2}`;
-        } else {
+        } else if (operation === "log") {
+            return `${Math.log(number1)}`;
+        }else {
             throw new Error("Invalid operation.");
         }
     },
@@ -161,6 +162,7 @@ const executeSQLQuerySchema = z.object({
         Use "" arond all column names.
         To use date functions on a column with varchar type, cast the column to a date first.
         The DATE_SUB function is not available. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
+        <unavailableSqlFunctions> DATE_SUB ILIKE </unavailableSqlFunctions> 
         Here's an example of how to use the DATE_TRUNC function: DATE_TRUNC('month', CAST("date" AS DATE))
         In the WHERE or GROUP BY causes, do not use column aliases defined in the SELECT clause.
         Column aliases defined in the SELECT clause cannot be referenced in the WHERE or GROUP BY clauses because they are evaluated before the SELECT clause during query processing.
@@ -353,11 +355,6 @@ export const wellTableSchema = z.object({
         Choose the column best suited for a chart label as the first element.
         <exampleTableColumns>
         tableColumns:
-            - columnDescription: The date of the well event
-                columnDefinition:
-                format: yyyy-MM-dd
-                type: date
-                columnName: date
             - columnDescription: The type of well event that occurred
                 columnDefinition:
                 type: string
@@ -367,6 +364,7 @@ export const wellTableSchema = z.object({
                     - Workover
                     - Plugging
                     - Inspection
+                    - Other
                 columnName: event
             - columnDescription: A description of the well event
                 columnDefinition:
