@@ -694,6 +694,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         convertPdfToYamlFunction: convertPdfToYamlFunction,
         triggerCrawlerSfnFunction: triggerCrawlerSfnFunction,
         pdfProcessingQueue: pdfProcessingQueue,
+        wellFileDriveBucket: wellFileDriveBucket,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
         sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,

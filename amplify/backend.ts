@@ -210,6 +210,7 @@ const {
   convertPdfToYamlFunction,
   triggerCrawlerSfnFunction,
   pdfProcessingQueue,
+  wellFileDriveBucket,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
   sqlTableDefBedrockKnoledgeBase,
@@ -247,6 +248,7 @@ const delayResource = new cdk.CustomResource(productionAgentStack, 'DelayResourc
 delayResource.node.addDependency(convertPdfToYamlFunction)
 delayResource.node.addDependency(triggerCrawlerSfnFunction)
 delayResource.node.addDependency(pdfProcessingQueue)
+delayResource.node.addDependency(wellFileDriveBucket)
 
 uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the functions triggerCrawlerSfnFunction and convertPdfToYamlFunction are done deploying
 

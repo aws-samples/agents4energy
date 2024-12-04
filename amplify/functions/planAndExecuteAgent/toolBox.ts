@@ -18,8 +18,14 @@ import { onCreateChatMessage } from '../graphql/subscriptions'
 const queryGQLScheama = z.object({
     queryField: z
         .enum(["invokeBedrock", "invokeProductionAgent"]).describe(`
-            Use invokeProductionAgent to learn about a well's attributes, with data sources including well files, production volume databases, and general petroleum engineering knowledge.
-            `)
+            Use invokeProductionAgent for:
+                - Learning about a well's attributes, with data sources including well files, production volume databases.
+                - General petroleum engineering knowledge
+                - Diagnosing well problems
+                - Steps to repair a well
+                - Repair cost estimates
+                - Financial returns estimates
+            `.replace(/^\s+/gm, ''))
         .describe(`The type of operation to execute.`),
     invocationText: z.string().describe("The text to use to invoke the agent"),
 });
@@ -178,7 +184,7 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
         description: `
         Can query a GraphQL API. 
         Use queryField invokeProductionAgent to learn about a well's attributes, with data sources including well files, production volume databases, and general petroleum engineering knowledge.
-        `.replace(/^\s+/gm, ''),
+        `.replaceAll(/^\s+/gm, ''),
         schema: queryGQLScheama,
     }
 );
