@@ -301,11 +301,11 @@ export const plotTableFromToolResponseTool = tool(
 /////// Get Well File Info Tool //////////
 //////////////////////////////////////////
 
-const getWellFileInfoSchema = z.object({
+const getS3KeyConentsSchema = z.object({
     s3Key: z.string().describe("The S3 key of the well file to get information about.")
 });
 
-export const getWellFileInfoTool = tool(
+export const getS3KeyConentsTool = tool(
     async ({ s3Key }) => {
         const getObjectResponse = await s3Client.send(new GetObjectCommand({
             Bucket: process.env.DATA_BUCKET_NAME,
@@ -323,12 +323,19 @@ export const getWellFileInfoTool = tool(
             } as ToolMessageContentType
         }
 
-        return objectContent
+        // return objectContent
+        return {
+            messageContentType: 'tool_json',
+            objectContent: objectContent
+        } as ToolMessageContentType
     },
     {
-        name: "getWellFileInfoTool",
-        description: "Can return the contents of a file.",
-        schema: getWellFileInfoSchema,
+        name: "getS3ObjectContents",
+        description: `
+        Can return the contents of an individual S3 Key. 
+        Only use this tool to learn about a source file for a row from the wellTableTool. 
+        The wellTableTool should always be called before this tool.`.replace(/^\s+/gm, ''),
+        schema: getS3KeyConentsSchema,
     }
 );
 
@@ -353,6 +360,7 @@ export const wellTableSchema = z.object({
         })//.optional()
     })).describe(`The column name and description for each column of the table. 
         Choose the column best suited for a chart label as the first element.
+        Here's a yaml formatted example table column argument:
         <exampleTableColumns>
         tableColumns:
             - columnDescription: The type of well event that occurred
@@ -374,14 +382,6 @@ export const wellTableSchema = z.object({
         `.replace(/^\s+/gm, '')),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
 });
-
-// function pivotLists<T>(lists: T[][]): T[][] {
-//     if (lists.length === 0) return [];
-
-//     return lists[0].map((_, colIndex) =>
-//         lists.map(row => row[colIndex])
-//     );
-// }
 
 async function listFilesUnderPrefix(
     props: {
@@ -482,14 +482,10 @@ async function listS3Folders(
 export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
     async ({ dataToInclude, tableColumns, wellApiNumber, dataToExclude }) => {
         if (!process.env.DATA_BUCKET_NAME) throw new Error("DATA_BUCKET_NAME environment variable is not set")
-        // const sfnClient = new SFNClient({
-        //     region: process.env.AWS_REGION,
-        //     maxAttempts: 3,
-        // });
-        //If tableColumns contains a column with columnName date, remove it. The user may ask for one, and one will automatically be added later.
-        tableColumns = tableColumns.filter(column => column.columnName.toLowerCase() !== 'date')
-        // Here add in the default table columns date and excludeRow
 
+        //If tableColumns contains a column with columnName date, remove it. The user may ask for one, and one will automatically be added later.
+        tableColumns = tableColumns.filter(column => !(column.columnName.toLowerCase().includes('date')))
+        // Here add in the default table columns date and excludeRow 
         tableColumns.unshift({
             columnName: 'date',
             columnDescription: `The date of the event in YYYY-MM-DD format.`,
@@ -667,7 +663,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
         name: "wellTableTool",
         description: `
         This tool searches the well files to extract specified information about a well. 
-        Use this tool when asked to make a table and search the well files.`.replace(/^\s+/gm, ''),
+        Use this tool when asked to search the well files.`.replace(/^\s+/gm, ''),
         schema: wellTableSchema,
     }
 );

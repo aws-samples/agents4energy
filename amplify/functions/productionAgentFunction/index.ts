@@ -20,7 +20,7 @@ import {
     getTableDefinitionsTool,
     executeSQLQueryTool,
     plotTableFromToolResponseTool,
-    getWellFileInfoTool,
+    getS3KeyConentsTool,
     // retrievePetroleumEngineeringKnowledgeTool,
 } from './toolBox';
 
@@ -53,7 +53,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     const agentTools = [
         calculatorTool,
         wellTableToolBuilder(amplifyClientWrapper),
-        // getWellFileInfoTool,
+        getS3KeyConentsTool,
         getTableDefinitionsTool,
         executeSQLQueryTool,
         plotTableFromToolResponseTool,

@@ -48,13 +48,6 @@ const backend = defineBackend({
   preSignUp
 });
 
-// backend.addOutput({
-//   custom: {
-//     api_id: backend.data.resources.graphqlApi.apiId,
-//     root_stack_name: 
-//   },
-// });
-
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
   "bedrockRuntimeDS",
   `https://bedrock-runtime.${backend.auth.stack.region}.amazonaws.com`,
@@ -199,7 +192,7 @@ const productionAgentStack = backend.createStack('prodAgentStack')
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentStack, 'sample-well-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentStack, 'well-file-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   prune: false
@@ -232,8 +225,8 @@ const delayFunction = new lambda.Function(productionAgentStack, 'DelayFunction',
   timeout: cdk.Duration.minutes(10),
   code: lambda.Code.fromInline(`
     exports.handler = async () => {
-      console.log('Waiting for 60 seconds...');
-      await new Promise(resolve => setTimeout(resolve, 60000));
+      console.log('Waiting for 180 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 180000));
       console.log('Wait complete.');
       return { statusCode: 200 };
     };
@@ -250,7 +243,26 @@ delayResource.node.addDependency(triggerCrawlerSfnFunction)
 delayResource.node.addDependency(pdfProcessingQueue)
 delayResource.node.addDependency(wellFileDriveBucket)
 
-uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the functions triggerCrawlerSfnFunction and convertPdfToYamlFunction are done deploying
+uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the resources handling uploads are deployed
+
+// new cr.AwsCustomResource(productionAgentStack, 'GenerateS3CreateObjectEvents', {
+//   onCreate: {
+//       service: '@aws-sdk/client-s3',
+//       action: 'copy',
+//       parameters: {
+//           bucket: "",
+//           knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId
+//       },
+//       physicalResourceId: cr.PhysicalResourceId.of('StartIngestionPetroleumEngineeringDataSource'),
+//   },
+//   policy: cr.AwsCustomResourcePolicy.fromStatements([
+//       new iam.PolicyStatement({
+//           actions: ['bedrock:startIngestionJob'],
+//           resources: [petroleumEngineeringKnowledgeBase.knowledgeBaseArn]
+//       })
+//   ])
+// })
+
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)

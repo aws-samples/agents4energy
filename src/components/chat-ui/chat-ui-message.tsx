@@ -100,6 +100,14 @@ function isValidJSON(str: string): boolean {
   }
 }
 
+const jsonParseHandleError = (jsonString: string) => {
+  try {
+      return JSON.parse(jsonString)
+  } catch {
+      console.warn(`Could not parse string: ${jsonString}`)
+  }
+}
+
 // function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
 //   const minLength = Math.min(list1.length, list2.length);
 //   const result: { x: T, y: U }[] = [];
@@ -173,7 +181,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         }
 
         const toolResponseMessages = props.messages.filter(
-          (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
+          (message) => 
+            "tool_call_id" in message && 
+          message.tool_call_id && 
+          jsonParseHandleError(message.content as string) &&
+          JSON.parse(message.content as string).messageContentType === 'tool_table'
         )
 
         console.log('Tool Response Messages:\n', toolResponseMessages)

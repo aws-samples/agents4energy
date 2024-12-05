@@ -558,7 +558,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                         slotProps={{
                                             tooltip: {
                                                 sx: {
-                                                    maxWidth: 800,
+                                                    maxWidth: 2000,
                                                 },
                                             },
                                         }}

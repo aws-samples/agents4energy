@@ -19,15 +19,18 @@ const queryGQLScheama = z.object({
     queryField: z
         .enum(["invokeBedrock", "invokeProductionAgent"]).describe(`
             Use invokeProductionAgent for:
-                - Learning about a well's attributes, with data sources including well files, production volume databases.
                 - General petroleum engineering knowledge
+                - Gathering well data, with data sources including well files, production volume databases.
                 - Diagnosing well problems
                 - Steps to repair a well
                 - Repair cost estimates
                 - Financial returns estimates
-            `.replace(/^\s+/gm, ''))
-        .describe(`The type of operation to execute.`),
-    invocationText: z.string().describe("The text to use to invoke the agent"),
+            `.replace(/^\s+/gm, '')),
+    invocationText: z.string().describe(`
+        The text to use to invoke the agent. 
+        When using invokeProduction Agent:
+        - Be sure to specify the API number of the well of interest
+        `.replace(/^\s+/gm, '')),
 });
 
 export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClientWrapper, chatMessageOwnerIdentity: string }) => tool(
@@ -183,7 +186,13 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
         name: "queryGQL",
         description: `
         Can query a GraphQL API. 
-        Use queryField invokeProductionAgent to learn about a well's attributes, with data sources including well files, production volume databases, and general petroleum engineering knowledge.
+        Query invokeProductionAgent for:
+            - General petroleum engineering knowledge
+            - Gathering well data, with data sources including well files, production volume databases.
+            - Diagnosing well problems
+            - Steps to repair a well
+            - Repair cost estimates
+            - Financial returns estimates
         `.replaceAll(/^\s+/gm, ''),
         schema: queryGQLScheama,
     }

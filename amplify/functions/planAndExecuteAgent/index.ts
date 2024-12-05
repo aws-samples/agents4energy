@@ -10,6 +10,7 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { END, START, StateGraph, Annotation, CompiledStateGraph, StateDefinition } from "@langchain/langgraph";
 import { RunnableConfig } from "@langchain/core/runnables";
+import { RetryPolicy } from "@langchain/langgraph"
 
 import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk, updateChatSession } from '../graphql/mutations'
@@ -160,30 +161,33 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                     .describe("Different steps to follow. Sort in order of completion"),
             }),
         );
-        const planFunction = {
-            name: "plan",
-            description: "This tool is used to plan the steps to follow",
-            type: "object",
-            parameters: plan,
-        };
-
-        const planTool = {
-            type: "function",
-            function: planFunction,
-        };
-
-        const plannerPrompt = ChatPromptTemplate.fromTemplate(
-            `For the given objective, come up with a simple step by step plan. 
-            This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps.
-            The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
-
-            {objective}`,
-        );
 
         const planningModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
             temperature: 0
         }).withStructuredOutput(plan);
+
+        // const planFunction = {
+        //     name: "plan",
+        //     description: "This tool is used to plan the steps to follow",
+        //     type: "object",
+        //     parameters: plan,
+        // };
+
+        // const planTool = {
+        //     type: "function",
+        //     function: planFunction,
+        // };
+
+        // const plannerPrompt = ChatPromptTemplate.fromTemplate(
+        //     `For the given objective, come up with a simple step by step plan. 
+        //     This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps.
+        //     The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
+
+        //     {objective}`,
+        // );
+
+        
 
         // const planner = plannerPrompt.pipe(planningModel);
 
@@ -202,19 +206,19 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             `For the given objective, come up with a simple step by step plan. 
             This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps.
             The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
+            Favor assigning the role of ai to human if an available tool may be able to resolve the step.
             
             Your objective was this:
             {objective}
             
-            Your original plan was this:
+            Your original plan (if any) was this:
             {plan}
             
             You have currently done the follow steps:
             {pastSteps}
             
-            Update your plan accordingly. If no more steps are needed and you can return to the user, then respond with that and use the 'response' function.
-            Otherwise, fill out the plan.  
-            Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.`,
+            Update your plan accordingly.  
+            Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.`.replace(/^\s+/gm, ''),
         );
 
         const replanner = replannerPrompt.pipe(planningModel);
@@ -234,7 +238,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             
             You have currently done the follow steps:
             {pastSteps}
-            `,
+            `.replace(/^\s+/gm, ''),
         );
 
 
@@ -279,12 +283,17 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
             const inputs = {
                 messages: [new HumanMessage(`
+                    The user has the following objective
+                    <objective>
+                    ${state.input}
+                    </objective>
+
                     The following steps have been completed
                     <previousSteps>
                     ${stringify(state.pastSteps)}
                     </previousSteps>
                     
-                    Now execute this task:
+                    Now execute this task
                     <task>
                     ${stringify(task)}
                     </task>
@@ -355,6 +364,10 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                     },
                     config
                 );
+            
+            console.log("New Plan:\n", stringify(newPlanFromInvoke))
+
+            if (!newPlanFromInvoke.steps) throw new Error("No steps returned from replanner")
 
             // Remove the result part if present from plan steps
             planSteps = newPlanFromInvoke.steps.map((step: PlanStep) => {
@@ -362,7 +375,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 return planPart
             })
 
-            console.log("New Plan from invoke: \n", stringify(planSteps))
             return {
                 plan: planSteps,
                 pastSteps: pastSteps
@@ -400,9 +412,9 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             // return state.response ? "true" : "false";
         }
         const workflow = new StateGraph(PlanExecuteState)
-            .addNode("agent", executeStep)
-            .addNode("replan", replanStep)
-            .addNode("respond", respondStep)
+            .addNode("agent", executeStep, { retryPolicy: {maxAttempts: 2}})
+            .addNode("replan", replanStep, { retryPolicy: {maxAttempts: 2}})
+            .addNode("respond", respondStep, { retryPolicy: {maxAttempts: 2}})
             .addEdge(START, "replan")
             .addEdge("agent", "replan")
             .addConditionalEdges("replan", shouldEnd, {

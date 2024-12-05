@@ -84,7 +84,15 @@ const main = async () => {
 
     const csvContentString = csvContentWithDate.map(row => row.join(',')).join('\n')
     
-    const productionFilePath = path.join('.','tmp','produciton',`api=${wellApiNumber}`,'production.csv')
+    const productionFilePath = path.join(
+        '.',
+        'tmp',
+        'production-agent',
+        'structured-data-files',
+        'produciton',
+        `api=${wellApiNumber}`,
+        'production.csv'
+    )
 
     await saveStringToFile(csvContentString, productionFilePath)
     
