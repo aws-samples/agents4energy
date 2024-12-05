@@ -302,7 +302,7 @@ export const plotTableFromToolResponseTool = tool(
 //////////////////////////////////////////
 
 const getS3KeyConentsSchema = z.object({
-    s3Key: z.string().describe("The S3 key of the well file to get information about.")
+    s3Key: z.string().describe("The S3 key to get the contents of.")
 });
 
 export const getS3KeyConentsTool = tool(
@@ -360,24 +360,34 @@ export const wellTableSchema = z.object({
         })//.optional()
     })).describe(`The column name and description for each column of the table. 
         Choose the column best suited for a chart label as the first element.
-        Here's a yaml formatted example table column argument:
+        Here's a JSON formatted example table column argument:
         <exampleTableColumns>
-        tableColumns:
-            - columnDescription: The type of well event that occurred
-                columnDefinition:
-                type: string
-                enum:
-                    - Drilling
-                    - Completion
-                    - Workover
-                    - Plugging
-                    - Inspection
-                    - Other
-                columnName: event
-            - columnDescription: A description of the well event
-                columnDefinition:
-                type: string
-                columnName: description
+        {
+            "tableColumns": [
+                {
+                    "columnDescription": "The type of well event that occurred",
+                    "columnDefinition": {
+                        "type": "string",
+                        "enum": [
+                            "Drilling",
+                            "Completion",
+                            "Workover",
+                            "Plugging",
+                            "Inspection",
+                            "Other"
+                        ],
+                        "columnName": "event"
+                    }
+                },
+                {
+                    "columnDescription": "A description of the well event",
+                    "columnDefinition": {
+                        "type": "string",
+                        "columnName": "description"
+                    }
+                }
+            ]
+        }
         </exampleTableColumns>
         `.replace(/^\s+/gm, '')),
     wellApiNumber: z.string().describe('The API number of the well to find information about')
@@ -663,7 +673,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
         name: "wellTableTool",
         description: `
         This tool searches the well files to extract specified information about a well. 
-        Use this tool when asked to search the well files.`.replace(/^\s+/gm, ''),
+        Use this tool to retrieve knowledge from well files`.replace(/^\s+/gm, ''),
         schema: wellTableSchema,
     }
 );

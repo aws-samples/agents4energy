@@ -102,9 +102,9 @@ function isValidJSON(str: string): boolean {
 
 const jsonParseHandleError = (jsonString: string) => {
   try {
-      return JSON.parse(jsonString)
+    return JSON.parse(jsonString)
   } catch {
-      console.warn(`Could not parse string: ${jsonString}`)
+    console.warn(`Could not parse string: ${jsonString}`)
   }
 }
 
@@ -181,11 +181,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         }
 
         const toolResponseMessages = props.messages.filter(
-          (message) => 
-            "tool_call_id" in message && 
-          message.tool_call_id && 
-          jsonParseHandleError(message.content as string) &&
-          JSON.parse(message.content as string).messageContentType === 'tool_table'
+          (message) =>
+            "tool_call_id" in message &&
+            message.tool_call_id &&
+            jsonParseHandleError(message.content as string) &&
+            JSON.parse(message.content as string).messageContentType === 'tool_table'
         )
 
         console.log('Tool Response Messages:\n', toolResponseMessages)
@@ -749,12 +749,14 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                       props.message.content
                   }
                 </pre>/* Render as YAML */;
-              default: //Default will be to render markdown
-                return <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                >
-                  {props.message.content}
-                </ReactMarkdown>;
+              default: 
+                return <div className="prose !max-w-none w-full" >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                  >
+                    {props.message.content}
+                  </ReactMarkdown>
+                </div>;
             }
           })()}
 

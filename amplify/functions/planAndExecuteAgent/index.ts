@@ -164,7 +164,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         const planningModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
-            temperature: 0
+            temperature: 0,
         }).withStructuredOutput(plan);
 
         // const planFunction = {
@@ -201,7 +201,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////////////////////////////////////////////
 
 
-
         const replannerPrompt = ChatPromptTemplate.fromTemplate(
             `For the given objective, come up with a simple step by step plan. 
             This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps.
@@ -228,7 +227,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////////////////////////////////////////////
 
         const responderPrompt = ChatPromptTemplate.fromTemplate(
-            `Respond to the user based on the origional objective and completed steps.
+            `Respond to the user in markdown format based on the origional objective and completed steps.
             
             Your objective was this:
             {input}
@@ -244,7 +243,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         const response = zodToJsonSchema(
             z.object({
-                response: z.string().describe("Response to user."),
+                response: z.string().describe("Response to user in markdown format."),
             }),
         );
 
