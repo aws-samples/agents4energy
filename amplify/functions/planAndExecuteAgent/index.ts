@@ -16,6 +16,7 @@ import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/a
 import { publishResponseStreamChunk, updateChatSession } from '../graphql/mutations'
 
 import { queryGQLToolBuilder } from './toolBox'
+import { isValidJSON } from "../../../src/utils/amplify-utils";
 
 const PlanStepSchema = z.object({
     title: z.string(),
@@ -49,21 +50,24 @@ function areListsEqual<T>(list1: T[] | undefined, list2: T[] | undefined): boole
         list1.every((value, index) => value === list2[index]);
 }
 
-async function publishTokenStreamChunk(props: { tokenStreamChunk: AIMessageChunk, amplifyClientWrapper: AmplifyClientWrapper }) {
+async function publishTokenStreamChunk(props: { tokenStreamChunk: AIMessageChunk, tokenIndex: number, amplifyClientWrapper: AmplifyClientWrapper }) {
     // console.log("publishTokenStreamChunk: ", props.tokenStreamChunk)
     const streamChunk = props.tokenStreamChunk// as AIMessageChunk
     // console.log("streamChunk: ", streamChunk)
     // const chunkContent = streamEvent.data.chunk.kwargs.content
+    
     const chunkContent = getLangChainMessageTextContent(streamChunk)
-    // console.log("chunkContent: ", chunkContent)
+
+    process.stdout.write(chunkContent || "") //Write the chunk to the log
 
     if (chunkContent) {
         // console.log("chunkContent: ", chunkContent)
-        // process.stdout.write(chunkContent) //Write the chunk to the log
+        
         await props.amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
             query: publishResponseStreamChunk,
             variables: {
                 chatSessionId: props.amplifyClientWrapper.chatSessionId,
+                index: props.tokenIndex,
                 chunk: chunkContent
             }
         })
@@ -260,11 +264,12 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////// Create the Graph ////////////////////
         ///////////////////////////////////////////////
         const customHandler = {
-            handleLLMNewToken: async (token: string, idx: any, runId: any, parentRunId: any, tags: any, fields: any) => {
+            handleLLMNewToken: async (token: string, idx: {completion: number, prompt: number}, runId: any, parentRunId: any, tags: any, fields: any) => {
             //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
             //   process.stdout.write(fields)
                 await publishTokenStreamChunk({
-                    tokenStreamChunk: new AIMessageChunk({ content: token.length > 0 ? token: "."}),
+                    tokenStreamChunk: new AIMessageChunk({ content: token.length > 0 ? token : '.'.repeat(Math.floor(Math.random() * 5)) + '\n\n'}),//This is just meant to show something is happening.
+                    tokenIndex: -1,
                     amplifyClientWrapper: amplifyClientWrapper
                 })
             },
@@ -272,7 +277,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 console.log("Chat model start:", llm, inputMessages, runId);
               },
           };
-
 
         async function executeStep(
             state: typeof PlanExecuteState.State,
@@ -365,8 +369,19 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 );
             
             console.log("New Plan:\n", stringify(newPlanFromInvoke))
-
+            
             if (!newPlanFromInvoke.steps) throw new Error("No steps returned from replanner")
+            
+            if (typeof newPlanFromInvoke.steps === 'string' && isValidJSON(newPlanFromInvoke.steps)){
+                console.log("Steps are a string and valid JSON. Converting them to an object")
+                newPlanFromInvoke.steps = JSON.parse(newPlanFromInvoke.steps) as PlanStep[]
+            }
+
+            if (
+                !Array.isArray(newPlanFromInvoke.steps) ||
+                !newPlanFromInvoke.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
+            )
+            ) throw new Error(`Provided steps are not in the correct format.\nSteps: ${newPlanFromInvoke.steps}\n\n`)
 
             // Remove the result part if present from plan steps
             planSteps = newPlanFromInvoke.steps.map((step: PlanStep) => {
@@ -449,6 +464,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         console.log('Listening for stream events')
         // for await (const streamEvent of stream) {
+        let currentChunkIndex = 10000 // This is meant to help if multiple agents are streaming at the same time to the client.
         for await (const streamEvent of agentEventStream) {
             // console.log('event: ', streamEvent.event)
 
@@ -458,9 +474,10 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
                     //Write the blurb in black
                     process.stdout.write(`${streamChunkText}`)
-
+                    
                     await publishTokenStreamChunk({
                         tokenStreamChunk: streamEvent.data.chunk,
+                        tokenIndex: currentChunkIndex++,
                         amplifyClientWrapper: amplifyClientWrapper,
                     })
                     break
@@ -519,7 +536,8 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                             await amplifyClientWrapper.publishMessage({
                                 chatSessionId: event.arguments.chatSessionId,
                                 owner: event.identity.sub,
-                                message: responseAIMessage
+                                message: responseAIMessage,
+                                responseComplete: true
                             })
                             break
                         default:
@@ -542,7 +560,8 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             await amplifyClientWrapper.publishMessage({
                 chatSessionId: event.arguments.chatSessionId,
                 owner: event.identity.sub,
-                message: AIErrorMessage
+                message: AIErrorMessage,
+                responseComplete: true
             })
             return error.message
         }

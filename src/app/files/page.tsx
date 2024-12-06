@@ -17,7 +17,8 @@ import { remove } from 'aws-amplify/storage';
 import { withAuth } from '@/components/WithAuth';
 import { S3Asset, onFetchObjects } from "@/utils/amplify-utils";
 
-import { StorageManager } from '@aws-amplify/ui-react-storage';
+// import { StorageManager } from '@aws-amplify/ui-react-storage';
+import { FileUploader } from '@aws-amplify/ui-react-storage';
 
 import '@aws-amplify/ui-react/styles.css';
 
@@ -129,7 +130,7 @@ function Page() {
             placeholder="Optional: Name of folder"
           />
         </FormField>
-        <StorageManager
+        <FileUploader
           acceptedFileTypes={['*']}
           path={s3PathSegments.join("") + addSlashIfDefined(additionalS3PrefixSegment)}
           maxFileCount={1000}

@@ -192,7 +192,7 @@ const productionAgentStack = backend.createStack('prodAgentStack')
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentStack, 'well-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentStack, 'sample-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   prune: false

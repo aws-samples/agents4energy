@@ -102,7 +102,7 @@ export async function correctStructuredOutputResponse(
     return response
 }
 
-export type PublishMessageCommandInput = { chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage }
+export type PublishMessageCommandInput = { chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage, responseComplete?: boolean}
 
 type GeneratedClient = ReturnType<typeof generateClient<Schema>>;
 export class AmplifyClientWrapper {
@@ -166,7 +166,8 @@ export class AmplifyClientWrapper {
             owner: props.owner,
             tool_calls: "[]",
             tool_call_id: "",
-            tool_name: ""
+            tool_name: "",
+            responseComplete: props.responseComplete || false
         }
 
         if (props.message instanceof HumanMessage) {

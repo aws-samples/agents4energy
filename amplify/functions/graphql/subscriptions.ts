@@ -19,6 +19,7 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -85,6 +86,7 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -151,6 +153,7 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -210,6 +213,7 @@ export const recieveResponseStreamChunk = /* GraphQL */ `subscription RecieveRes
   recieveResponseStreamChunk(chatSessionId: $chatSessionId) {
     chatSessionId
     chunk
+    index
     __typename
   }
 }

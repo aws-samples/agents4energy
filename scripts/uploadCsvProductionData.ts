@@ -2,8 +2,8 @@ import { JSDOM } from 'jsdom';
 import * as path from 'path';
 import { writeFile, mkdir } from 'fs/promises';
 
-// const wellApiNumber = `30-015-27892`
-const wellApiNumber = `30-045-29202`
+const wellApiNumber = `30-015-27892`
+// const wellApiNumber = `30-045-29202`
 
 
 const productionUrl = `https://wwwapps.emnrd.nm.gov/OCD/OCDPermitting/Data/ProductionSummaryPrint.aspx?report=csv&api=${wellApiNumber}`
@@ -89,7 +89,7 @@ const main = async () => {
         'tmp',
         'production-agent',
         'structured-data-files',
-        'produciton',
+        'monthly_produciton',
         `api=${wellApiNumber}`,
         'production.csv'
     )

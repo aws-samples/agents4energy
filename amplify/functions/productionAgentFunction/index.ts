@@ -121,6 +121,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             { version: "v2" }
         )
 
+        let currentChunkIndex = 0
         console.log('Listening for stream events')
         for await (const streamEvent of stream) {
             // console.log(`${JSON.stringify(streamEvent, null, 2)}\n---`);
@@ -138,6 +139,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                         query: publishResponseStreamChunk,
                         variables: {
                             chatSessionId: event.arguments.chatSessionId,
+                            index: currentChunkIndex++,
                             chunk: chunkContent
                         }
                     })
@@ -168,7 +170,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
                     owner: chatMessageOwnerIdentity,
-                    message: streamChunkAIMessage
+                    message: streamChunkAIMessage,
+                    responseComplete: !(event.arguments.doNotSendResponseComplete || (streamChunk.tool_calls && streamChunk.tool_calls.length > 0))
                 })
 
             }

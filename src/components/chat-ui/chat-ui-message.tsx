@@ -16,7 +16,7 @@ import remarkGfm from "remark-gfm";
 import ReactMarkdown from "react-markdown";
 
 import { formatDate } from "@/utils/date-utils";
-import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
+import { amplifyClient, invokeBedrockModelParseBodyGetText, isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
 
 import styles from "@/styles/chat-ui.module.scss";
 import React, { useState, useEffect } from "react";
@@ -91,14 +91,14 @@ const getDataQualityCheckSchema = {
   required: ['dataChecks'],
 };
 
-function isValidJSON(str: string): boolean {
-  try {
-    JSON.parse(str);
-    return true;
-  } catch {
-    return false;
-  }
-}
+// function isValidJSON(str: string): boolean {
+//   try {
+//     JSON.parse(str);
+//     return true;
+//   } catch {
+//     return false;
+//   }
+// }
 
 const jsonParseHandleError = (jsonString: string) => {
   try {
@@ -107,17 +107,6 @@ const jsonParseHandleError = (jsonString: string) => {
     console.warn(`Could not parse string: ${jsonString}`)
   }
 }
-
-// function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
-//   const minLength = Math.min(list1.length, list2.length);
-//   const result: { x: T, y: U }[] = [];
-
-//   for (let i = 0; i < minLength; i++) {
-//     result.push({ x: list1[i], y: list2[i] });
-//   }
-
-//   return result;
-// }
 
 function transformListToObject<T extends Record<string, string | number>>(
   list: T[]
@@ -148,18 +137,6 @@ function generateColor(index: number): string {
   return `hsl(${hue}, 70%, 60%)`;
 }
 
-function getMessageCatigory(message: Message): messageContentType {
-  if (!message.tool_name) {
-    //This is an AI message
-    return 'ai'
-  } else if (!isValidJSON(message.content)) {
-    //This is a markdown tool message
-    return 'tool_markdown'
-  } else {
-    return (JSON.parse(message.content) as ToolMessageContentType).messageContentType
-  }
-}
-
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
   const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
@@ -180,7 +157,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           numberOfPreviousTablesToInclude: number
         }
 
-        const toolResponseMessages = props.messages.filter(
+        //Limit messages to those before the plot message
+        const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
+
+        const toolResponseMessages = previousMessages.filter(
           (message) =>
             "tool_call_id" in message &&
             message.tool_call_id &&

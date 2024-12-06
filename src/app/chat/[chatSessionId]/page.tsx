@@ -177,6 +177,7 @@ const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["type"]>>([]);
+    const [characterStream, setCharacterStream] = useState<{content: string, index: number}[]>([]);
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
     const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
@@ -229,11 +230,16 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         console.log("Messages: ", messages)
 
         //Reset the character stream when we get a new message
+        setCharacterStream(() => {
+            console.log("Resetting character stream")
+            return []
+        })
         setCharacterStreamMessage(() => ({
             content: "",
             role: "ai",
             createdAt: new Date().toISOString()
         }))
+        
 
         //Set the default prompts if this is the first message
         if (
@@ -248,8 +254,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         if (
             messages.length &&
             messages[messages.length - 1].role === "ai" &&
-            (!messages[messages.length - 1].tool_calls || messages[messages.length - 1].tool_calls === "[]")
-
+            (!messages[messages.length - 1].tool_calls || messages[messages.length - 1].tool_calls === "[]") &&
+            messages[messages.length - 1].responseComplete
         ) {
             console.log('Ready for human response')
             setIsLoading(false)
@@ -331,14 +337,46 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     useEffect(() => {
         if (initialActiveChatSession) {
             const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: initialActiveChatSession.id }).subscribe({
-                next: ({ chunk }) => {
+                next: (newChunk) => {
                     // console.log('Message Stream Chunk: ', chunk)
+                    setCharacterStream((prevStream) => {
+                        
+                        const chunkIndex = (typeof newChunk.index === 'undefined' || newChunk.index === null) ? (prevStream.length + 1): newChunk.index
 
-                    setCharacterStreamMessage((prevStreamMessage) => ({
-                        content: prevStreamMessage ? (prevStreamMessage.content || "") + chunk : chunk,
-                        role: "ai",
-                        createdAt: new Date().toISOString()
-                    }))
+                        // console.log("Initial Chunk Index: ", newChunk.index, " Final Chunk Index: ", chunkIndex," Content: ", newChunk.chunk, ' First Chunk: ', prevStream[0])
+
+                        const existingIndex = prevStream.findIndex(item => item.index === chunkIndex);
+                        const chunkIndexInPrevStream = prevStream.findIndex(item => item.index > chunkIndex);
+                        const newStream = prevStream
+                        
+                        const formatedNewChunk = {index: chunkIndex, content: newChunk.chunk}
+
+                        if (existingIndex !== -1) {
+                            // Replace chunk with the same index
+                            newStream[existingIndex] = formatedNewChunk
+                        } else if (chunkIndexInPrevStream === -1) {
+                            // If no larger index found, append to end
+                            newStream.push(formatedNewChunk);
+                        } else {
+                            // Insert at the found position
+                            newStream.splice(chunkIndexInPrevStream, 0, formatedNewChunk);
+                        }
+
+                        setCharacterStreamMessage({
+                            content: newStream.map(chunk => chunk.content).join(""),
+                            role: "ai",
+                            createdAt: new Date().toISOString()
+                        })
+
+                        return newStream
+                    })
+
+                
+                    // setCharacterStreamMessage((prevStreamMessage) => ({
+                    //     content: prevStreamMessage ? (prevStreamMessage.content || "") + chunk : chunk,
+                    //     role: "ai",
+                    //     createdAt: new Date().toISOString()
+                    // }))
                 }
             }
             )

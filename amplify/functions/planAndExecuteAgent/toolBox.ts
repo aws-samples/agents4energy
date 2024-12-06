@@ -11,6 +11,8 @@ import { OnCreateChatMessageSubscription, ChatMessage } from '../graphql/API'
 
 import { onCreateChatMessage } from '../graphql/subscriptions'
 
+import { getMessageCatigory } from '../../../src/utils/amplify-utils'
+
 /////////////////////////////////////////////////
 //////////// Query GraphQL API Tool /////////////
 /////////////////////////////////////////////////
@@ -59,7 +61,9 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                         chatSessionId: amplifyClientWrapper.chatSessionId,
                         lastMessageText: invocationText,
                         usePreviousMessageContext: false,
-                        messageOwnerIdentity: chatMessageOwnerIdentity
+                        messageOwnerIdentity: chatMessageOwnerIdentity,
+                        doNotSendResponseComplete: true
+                        // doNotSendResponseComplete: true
                     }
                 }).catch((error) => {
                     console.log('Invoke production agent (timeout is expected): ', error)
@@ -89,7 +93,9 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
 
                             if (mostRecentChatMessage &&
                                 mostRecentChatMessage.role === APITypes.ChatMessageRole.ai &&
-                                (!mostRecentChatMessage.tool_calls || mostRecentChatMessage.tool_calls === "[]")
+                                (getMessageCatigory(mostRecentChatMessage) === 'ai') && //This is a double check incase the tool returns an error, and the error message is picked up as an ai messsage.
+                                (!mostRecentChatMessage.tool_calls || mostRecentChatMessage.tool_calls === "[]") &&
+                                (!mostRecentChatMessage.tool_call_id || mostRecentChatMessage.tool_call_id==="")//Make sure the message is not a tool response message
                             ) {
                                 console.log("Production Agent has returned a response. Ending the check for new messages loop")
                                 clearInterval(interval)

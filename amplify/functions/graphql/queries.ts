@@ -16,6 +16,7 @@ export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -130,12 +131,14 @@ export const invokePlanAndExecuteAgent = /* GraphQL */ `query InvokePlanAndExecu
 >;
 export const invokeProductionAgent = /* GraphQL */ `query InvokeProductionAgent(
   $chatSessionId: String
+  $doNotSendResponseComplete: Boolean
   $lastMessageText: String!
   $messageOwnerIdentity: String
   $usePreviousMessageContext: Boolean
 ) {
   invokeProductionAgent(
     chatSessionId: $chatSessionId
+    doNotSendResponseComplete: $doNotSendResponseComplete
     lastMessageText: $lastMessageText
     messageOwnerIdentity: $messageOwnerIdentity
     usePreviousMessageContext: $usePreviousMessageContext
@@ -190,6 +193,7 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
       createdAt
       id
       owner
+      responseComplete
       role
       tool_call_id
       tool_calls
@@ -229,6 +233,7 @@ export const listChatMessageByChatSessionIdDashFieldNameAndCreatedAt = /* GraphQ
       createdAt
       id
       owner
+      responseComplete
       role
       tool_call_id
       tool_calls
@@ -258,6 +263,7 @@ export const listChatMessages = /* GraphQL */ `query ListChatMessages(
       createdAt
       id
       owner
+      responseComplete
       role
       tool_call_id
       tool_calls

@@ -10,6 +10,7 @@ export type ChatMessage = {
   createdAt?: string | null,
   id: string,
   owner?: string | null,
+  responseComplete?: boolean | null,
   role?: ChatMessageRole | null,
   session?: ChatSession | null,
   tool_call_id?: string | null,
@@ -86,6 +87,7 @@ export type ModelChatMessageFilterInput = {
   not?: ModelChatMessageFilterInput | null,
   or?: Array< ModelChatMessageFilterInput | null > | null,
   owner?: ModelStringInput | null,
+  responseComplete?: ModelBooleanInput | null,
   role?: ModelChatMessageRoleInput | null,
   tool_call_id?: ModelStringInput | null,
   tool_calls?: ModelStringInput | null,
@@ -150,6 +152,13 @@ export type ModelStringInput = {
   size?: ModelSizeInput | null,
 };
 
+export type ModelBooleanInput = {
+  attributeExists?: boolean | null,
+  attributeType?: ModelAttributeTypes | null,
+  eq?: boolean | null,
+  ne?: boolean | null,
+};
+
 export type ModelChatMessageRoleInput = {
   eq?: ChatMessageRole | null,
   ne?: ChatMessageRole | null,
@@ -190,6 +199,7 @@ export type ModelChatMessageConditionInput = {
   not?: ModelChatMessageConditionInput | null,
   or?: Array< ModelChatMessageConditionInput | null > | null,
   owner?: ModelStringInput | null,
+  responseComplete?: ModelBooleanInput | null,
   role?: ModelChatMessageRoleInput | null,
   tool_call_id?: ModelStringInput | null,
   tool_calls?: ModelStringInput | null,
@@ -205,6 +215,7 @@ export type CreateChatMessageInput = {
   createdAt?: string | null,
   id?: string | null,
   owner?: string | null,
+  responseComplete?: boolean | null,
   role?: ChatMessageRole | null,
   tool_call_id?: string | null,
   tool_calls?: string | null,
@@ -253,6 +264,7 @@ export type ResponseStreamChunk = {
   __typename: "ResponseStreamChunk",
   chatSessionId: string,
   chunk: string,
+  index?: number | null,
 };
 
 export type UpdateChatMessageInput = {
@@ -262,6 +274,7 @@ export type UpdateChatMessageInput = {
   createdAt?: string | null,
   id: string,
   owner?: string | null,
+  responseComplete?: boolean | null,
   role?: ChatMessageRole | null,
   tool_call_id?: string | null,
   tool_calls?: string | null,
@@ -287,6 +300,7 @@ export type ModelSubscriptionChatMessageFilterInput = {
   id?: ModelSubscriptionIDInput | null,
   or?: Array< ModelSubscriptionChatMessageFilterInput | null > | null,
   owner?: ModelStringInput | null,
+  responseComplete?: ModelSubscriptionBooleanInput | null,
   role?: ModelSubscriptionStringInput | null,
   tool_call_id?: ModelSubscriptionStringInput | null,
   tool_calls?: ModelSubscriptionStringInput | null,
@@ -325,6 +339,11 @@ export type ModelSubscriptionStringInput = {
   notIn?: Array< string | null > | null,
 };
 
+export type ModelSubscriptionBooleanInput = {
+  eq?: boolean | null,
+  ne?: boolean | null,
+};
+
 export type ModelSubscriptionChatSessionFilterInput = {
   and?: Array< ModelSubscriptionChatSessionFilterInput | null > | null,
   createdAt?: ModelSubscriptionStringInput | null,
@@ -351,6 +370,7 @@ export type GetChatMessageQuery = {
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -448,6 +468,7 @@ export type InvokePlanAndExecuteAgentQuery = {
 
 export type InvokeProductionAgentQueryVariables = {
   chatSessionId?: string | null,
+  doNotSendResponseComplete?: boolean | null,
   lastMessageText: string,
   messageOwnerIdentity?: string | null,
   usePreviousMessageContext?: boolean | null,
@@ -500,6 +521,7 @@ export type ListChatMessageByChatSessionIdAndCreatedAtQuery = {
       createdAt?: string | null,
       id: string,
       owner?: string | null,
+      responseComplete?: boolean | null,
       role?: ChatMessageRole | null,
       tool_call_id?: string | null,
       tool_calls?: string | null,
@@ -531,6 +553,7 @@ export type ListChatMessageByChatSessionIdDashFieldNameAndCreatedAtQuery = {
       createdAt?: string | null,
       id: string,
       owner?: string | null,
+      responseComplete?: boolean | null,
       role?: ChatMessageRole | null,
       tool_call_id?: string | null,
       tool_calls?: string | null,
@@ -559,6 +582,7 @@ export type ListChatMessagesQuery = {
       createdAt?: string | null,
       id: string,
       owner?: string | null,
+      responseComplete?: boolean | null,
       role?: ChatMessageRole | null,
       tool_call_id?: string | null,
       tool_calls?: string | null,
@@ -608,6 +632,7 @@ export type CreateChatMessageMutation = {
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -672,6 +697,7 @@ export type DeleteChatMessageMutation = {
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -725,6 +751,7 @@ export type DeleteChatSessionMutation = {
 export type PublishResponseStreamChunkMutationVariables = {
   chatSessionId: string,
   chunk: string,
+  index?: number | null,
 };
 
 export type PublishResponseStreamChunkMutation = {
@@ -732,6 +759,7 @@ export type PublishResponseStreamChunkMutation = {
     __typename: "ResponseStreamChunk",
     chatSessionId: string,
     chunk: string,
+    index?: number | null,
   } | null,
 };
 
@@ -749,6 +777,7 @@ export type UpdateChatMessageMutation = {
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -813,6 +842,7 @@ export type OnCreateChatMessageSubscription = {
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -877,6 +907,7 @@ export type OnDeleteChatMessageSubscription = {
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -941,6 +972,7 @@ export type OnUpdateChatMessageSubscription = {
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -1000,5 +1032,6 @@ export type RecieveResponseStreamChunkSubscription = {
     __typename: "ResponseStreamChunk",
     chatSessionId: string,
     chunk: string,
+    index?: number | null,
   } | null,
 };
