@@ -103,18 +103,6 @@ bedrockAgentDataSource.grantPrincipal.addToPrincipalPolicy(
   })
 );
 
-// bedrockAgentRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
-//   new iam.PolicyStatement({
-//     resources: [
-//       `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:agent-alias/*`,
-//     ],
-//     actions: [
-//       "bedrock:InvokeAgent",
-//     ],
-
-//   })
-// );
-
 backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     resources: [
@@ -147,10 +135,6 @@ backend.addOutput({
     root_stack_name: rootStack.stackName
   },
 });
-
-// const vpc = new ec2.Vpc(productionAgentStack, 'VPC', {
-//   ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
-// })
 
 const vpc = new ec2.Vpc(networkingStack, 'A4E-VPC', {
   ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
@@ -215,18 +199,18 @@ const {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
   s3Bucket: backend.storage.resources.bucket,
-  // appSyncApi: backend.data.resources.graphqlApi
 })
 
 // Custom resource Lambda to introduce a delay between when the PDF to Yaml function finishes deploying, and when the objects are uploaded.
 const delayFunction = new lambda.Function(productionAgentStack, 'DelayFunction', {
   runtime: lambda.Runtime.NODEJS_18_X,
   handler: 'index.handler',
-  timeout: cdk.Duration.minutes(10),
+  timeout: cdk.Duration.minutes(15),
   code: lambda.Code.fromInline(`
     exports.handler = async () => {
-      console.log('Waiting for 180 seconds...');
-      await new Promise(resolve => setTimeout(resolve, 180000));
+      const secondsToWait = 600
+      console.log('Waiting for ',secondsToWait,' seconds...');
+      await new Promise(resolve => setTimeout(resolve, secondsToWait*1000));
       console.log('Wait complete.');
       return { statusCode: 200 };
     };

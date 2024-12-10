@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 
 import { formatDate } from "@/utils/date-utils";
 import DropdownMenu from '@/components/DropDownMenu';
-import AddSideBar from '@/components/SideBar';
+import SideBar from '@/components/SideBar';
 
 import { defaultAgents } from '@/utils/config'
 import { Message } from '@/utils/types'
@@ -126,13 +126,13 @@ const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targe
     console.log("Structured Output Response: ", structuredResponse)
     if (structuredResponse.data) {
         const messageIntent = jsonParseHandleError(structuredResponse.data)
-        if (messageIntent){
+        if (messageIntent) {
             await amplifyClient.models.ChatSession.update({
                 id: targetChatSession.id,
                 firstMessageSummary: messageIntent.summary as string
             })
         }
-        
+
     } else console.log('No structured output found in response: ', structuredResponse)
 }
 
@@ -177,7 +177,10 @@ const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["type"]>>([]);
-    const [characterStream, setCharacterStream] = useState<{content: string, index: number}[]>([]);
+    const [, setCharacterStream] = useState<{ content: string, index: number }[]>([{
+        content: "\n\n\n",
+        index: -1
+    }]);
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
     const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
@@ -232,14 +235,17 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         //Reset the character stream when we get a new message
         setCharacterStream(() => {
             console.log("Resetting character stream")
-            return []
+            return [{
+                content: "\n\n\n",
+                index: -1
+            }]
         })
         setCharacterStreamMessage(() => ({
             content: "",
             role: "ai",
             createdAt: new Date().toISOString()
         }))
-        
+
 
         //Set the default prompts if this is the first message
         if (
@@ -340,16 +346,16 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 next: (newChunk) => {
                     // console.log('Message Stream Chunk: ', chunk)
                     setCharacterStream((prevStream) => {
-                        
-                        const chunkIndex = (typeof newChunk.index === 'undefined' || newChunk.index === null) ? (prevStream.length + 1): newChunk.index
+
+                        const chunkIndex = (typeof newChunk.index === 'undefined' || newChunk.index === null) ? (prevStream.length + 1) : newChunk.index
 
                         // console.log("Initial Chunk Index: ", newChunk.index, " Final Chunk Index: ", chunkIndex," Content: ", newChunk.chunk, ' First Chunk: ', prevStream[0])
 
                         const existingIndex = prevStream.findIndex(item => item.index === chunkIndex);
                         const chunkIndexInPrevStream = prevStream.findIndex(item => item.index > chunkIndex);
                         const newStream = prevStream
-                        
-                        const formatedNewChunk = {index: chunkIndex, content: newChunk.chunk}
+
+                        const formatedNewChunk = { index: chunkIndex, content: newChunk.chunk }
 
                         if (existingIndex !== -1) {
                             // Replace chunk with the same index
@@ -371,7 +377,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                         return newStream
                     })
 
-                
+
                     // setCharacterStreamMessage((prevStreamMessage) => ({
                     //     content: prevStreamMessage ? (prevStreamMessage.content || "") + chunk : chunk,
                     //     role: "ai",
@@ -498,8 +504,75 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     return (
-        <>
-        <AddSideBar
+        <Box sx={{ display: 'flex', padding: 2 }}>
+            <SideBar
+                anchor='left'
+            >
+                <Box sx={{ overflow: 'auto' }}>
+                    <DropdownMenu buttonText='New Chat Session'>
+                        {
+                            [
+                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
+                                ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
+                            ]
+                                .map((agent) => (
+                                    <MenuItem
+                                        key={agent.agentName}
+                                        onClick={async () => {
+                                            const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
+                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
+                                        }}
+                                    >
+                                        <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
+                                    </MenuItem>
+                                ))
+                        }
+                    </DropdownMenu>
+
+
+                    <Typography sx={{ textAlign: 'center' }}>My Chat Sessions:</Typography>
+                    {chatSessions
+                        .slice()
+                        .sort((a, b) => {
+                            if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
+                            return a.createdAt < b.createdAt ? 1 : -1
+                        })
+                        .map((session) => (
+
+                            <Card key={session.id} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
+                                <CardContent>
+                                    <Typography variant="h6" component="div" noWrap>
+                                        {session.firstMessageSummary?.slice(0, 50)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {formatDate(session.createdAt)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                        AI: {session.aiBotInfo?.aiBotName || 'Unknown'}
+                                    </Typography>
+                                </CardContent>
+                                <CardActions>
+                                    <Button
+                                        size="small"
+                                        onClick={() => router.push(`/chat/${session.id}`)}
+                                    >
+                                        Open Chat
+                                    </Button>
+                                    <IconButton
+                                        aria-label="delete"
+                                        onClick={() => deleteChatSession(session)}
+                                        sx={{ marginLeft: 'auto' }}
+                                    >
+                                        <DeleteIcon />
+                                    </IconButton>
+                                </CardActions>
+                            </Card>
+                        ))
+                    }
+                </Box>
+            </SideBar>
+
+            {/* <AddSideBar
             anchor="left"
             drawerContent={
                 <>
@@ -657,62 +730,150 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     </>
 
                 }
-            >
-                {params ? //Show the chat UI if there is an active chat session
-                    // <div 
-                    // // style={{ marginLeft: '210px', padding: '20px' }}
-                    // >
-                    <Box
-                    // sx={{ alignItems: 'center', gap: 2 }}
-                    >
-                        {/* <Toolbar /> */}
+            > */}
+            {params ? //Show the chat UI if there is an active chat session
+                // <div 
+                // // style={{ marginLeft: '210px', padding: '20px' }}
+                // >
+                <Box
+                // sx={{ alignItems: 'center', gap: 2 }}
+                >
+                    {/* <Toolbar /> */}
 
-                        <Box>
-                            <Typography variant="h4" gutterBottom>
-                                Chat with {initialActiveChatSession?.aiBotInfo?.aiBotName}
-                            </Typography>
-                        </Box>
-                        <Box>
-
-                            <DynamicChatUI
-                                onSendMessage={addUserChatMessage}
-                                messages={[
-                                    ...messages,
-                                    ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
-                                ]}
-                                running={isLoading}
-                            />
-
-
-                        </Box>
-                        <Box sx={{ mt: 5 }}>
-                            {
-                                !isLoading && (suggestedPrompts.length || !messages.length) ? (
-                                    <Typography variant="body2">
-                                        Suggested Follow Ups:
-                                    </Typography>
-                                ) : (
-                                    null
-                                    // <CircularProgress />
-                                )
-                            }
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            {!isLoading && suggestedPrompts.map((prompt) => (
-                                <div key={prompt}>
-                                    <Button onClick={() => addUserChatMessage(prompt)} >
-                                        {prompt}
-                                    </Button>
-                                </div>
-                            ))
-                            }
-                        </Box>
+                    <Box>
+                        <Typography variant="h4" gutterBottom>
+                            Chat with {initialActiveChatSession?.aiBotInfo?.aiBotName}
+                        </Typography>
                     </Box>
-                    // </div>
-                    : null}
-            </AddSideBar>
-        </AddSideBar>
-        </>
+                    <Box>
+
+                        <DynamicChatUI
+                            onSendMessage={addUserChatMessage}
+                            messages={[
+                                ...messages,
+                                ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                            ]}
+                            running={isLoading}
+                        />
+
+
+                    </Box>
+                    <Box sx={{ mt: 5 }}>
+                        {
+                            !isLoading && (suggestedPrompts.length || !messages.length) ? (
+                                <Typography variant="body2">
+                                    Suggested Follow Ups:
+                                </Typography>
+                            ) : (
+                                null
+                                // <CircularProgress />
+                            )
+                        }
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {!isLoading && suggestedPrompts.map((prompt) => (
+                            <div key={prompt}>
+                                <Button onClick={() => addUserChatMessage(prompt)} >
+                                    {prompt}
+                                </Button>
+                            </div>
+                        ))
+                        }
+                    </Box>
+                </Box>
+                // </div>
+                : null}
+            {
+                (initialActiveChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name) ?
+                    <SideBar
+                        anchor='right'
+                    >
+                        <>
+                            <Typography variant="h5" sx={{ textAlign: 'center' }}>Plan and execute steps:</Typography>
+                            {LiveUpdateActiveChatSession?.pastSteps?.map((step) => {
+                                try {
+                                    const stepContent = JSON.parse(step as string)
+                                    return (
+                                        <Tooltip
+                                            key={step as string}
+                                            title={<pre
+                                                style={{ //Wrap long lines
+                                                    whiteSpace: 'pre-wrap',
+                                                    wordWrap: 'break-word',
+                                                    overflowWrap: 'break-word',
+                                                }}
+                                            >
+                                                {stringify(stepContent)}
+                                            </pre>}
+                                            arrow
+                                            placement="left"
+                                            slotProps={{
+                                                tooltip: {
+                                                    sx: {
+                                                        maxWidth: 2000,
+                                                    },
+                                                },
+                                            }}
+                                        >
+                                            <Card key={step as string} sx={{ marginBottom: 2, backgroundColor: '#e3f2fd', flexShrink: 0 }}>
+                                                <CardContent>
+                                                    <Typography variant="h6" component="div">
+                                                        {stepContent.title}
+                                                    </Typography>
+                                                </CardContent>
+                                            </Card>
+                                        </Tooltip>
+                                    )
+                                } catch {
+                                    return <p>{step}</p>
+                                }
+                            })}
+                            {LiveUpdateActiveChatSession?.planSteps?.map((step) => {
+                                try {
+                                    const { result, ...stepContent } = JSON.parse(step as string)// Remove the result if it exists from the plan steps
+                                    console.info(result)//TODO: remove this
+                                    return (
+                                        <Tooltip
+                                            key={step as string}
+                                            title={<pre
+                                                style={{ //Wrap long lines
+                                                    whiteSpace: 'pre-wrap',
+                                                    wordWrap: 'break-word',
+                                                    overflowWrap: 'break-word',
+                                                }}
+                                            >
+                                                {stringify(stepContent)}
+                                            </pre>}
+                                            arrow
+                                            placement="left"
+                                            slotProps={{
+                                                tooltip: {
+                                                    sx: {
+                                                        maxWidth: 800,
+                                                    },
+                                                },
+                                            }}
+                                        >
+                                            <Card key={step as string} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
+                                                <CardContent>
+                                                    <Typography variant="h6" component="div">
+                                                        {stepContent.title}
+                                                    </Typography>
+                                                </CardContent>
+                                            </Card>
+                                        </Tooltip>
+
+                                    )
+                                } catch {
+                                    return <p>{step}</p>
+                                }
+                            })}
+                        </>
+                    </SideBar>
+                    : null
+            }
+
+        </Box>
 
     );
 };

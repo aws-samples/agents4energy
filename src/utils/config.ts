@@ -22,10 +22,9 @@ export const defaultAgents: { [key: string]: defaultAgent } = {
     PlanAndExecuteAgent: {
         name: "Plan And Execute",
         samplePrompts: [
-            
             `The well with API number 30-045-29202 recently fell in production to 10 MCFD with indication of a hole in tubing at 1000'. 
             Search the well files and make a table of operational events. 
-            Based on that make a procedure to repair the well, estimate the cost of the repair, plot the historic production rates and forecast the financial returns. 
+            Based on that make a procedure to repair the well, estimate the cost of the repair, plot the historic production rates with operational events, and forecast the financial returns. 
             Use the ai role for all of the steps.
             `.replace(/^\s+/gm, ''),
             `What is the hometown of the 2015 Australian open winner?`,

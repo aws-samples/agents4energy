@@ -6,16 +6,18 @@ import { ChatBedrockConverse } from "@langchain/aws";
 import { HumanMessage, AIMessage, ToolMessage, BaseMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { RetryPolicy } from "@langchain/langgraph"
-import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { END, START, StateGraph, Annotation, CompiledStateGraph, StateDefinition } from "@langchain/langgraph";
-import { RunnableConfig } from "@langchain/core/runnables";
+// import { ChatPromptTemplate } from "@langchain/core/prompts";
+// import { END, START, StateGraph, Annotation, CompiledStateGraph, StateDefinition } from "@langchain/langgraph";
+// import { RunnableConfig } from "@langchain/core/runnables";
 
 import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
+import { Calculator } from "@langchain/community/tools/calculator";
+
 import {
     queryKnowledgeBase,
-    calculatorTool,
+    // calculatorTool,
     wellTableToolBuilder,
     getTableDefinitionsTool,
     executeSQLQueryTool,
@@ -51,7 +53,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     })
 
     const agentTools = [
-        calculatorTool,
+        // calculatorTool,
+        new Calculator,
         wellTableToolBuilder(amplifyClientWrapper),
         getS3KeyConentsTool,
         getTableDefinitionsTool,
@@ -64,7 +67,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
         // If the usePreviousMessageContent field is true or undefined, get the messages. If not set the latest message text as the only message.
         if (!("usePreviousMessageContext" in event.arguments) || event.arguments.usePreviousMessageContext) {
-            console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
+            // console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
             await amplifyClientWrapper.getChatMessageHistory({
                 latestHumanMessageText: event.arguments.lastMessageText
             })
@@ -99,6 +102,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
         const messages = amplifyClientWrapper.chatMessages
 
+        console.log("Invoking Production Agent. Latest Message:\n", stringify(messages[messages.length -1].content))
+
         const ragContext = await queryKnowledgeBase({
             knowledgeBaseId: env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID,
             query: getLangChainMessageTextContent(messages[messages.length-1]) || ""
@@ -112,7 +117,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             new AIMessage(ragContext?.map(retrievalResult => retrievalResult.content?.text).join('\n\n') || "")
         )
 
-        console.log("Messages with rag:\n", stringify(messages))
+        // console.log("Messages with rag:\n", stringify(messages))
 
         const stream = agent.streamEvents(
             {
@@ -130,11 +135,11 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 // console.log('Message Chunk: ', streamEvent.data.chunk)
 
                 const streamChunk = streamEvent.data.chunk as AIMessageChunk
-
                 // const chunkContent = streamEvent.data.chunk.kwargs.content
                 const chunkContent = getLangChainMessageTextContent(streamChunk)
                 // console.log("chunkContent: ", chunkContent)
                 if (chunkContent) {
+                    process.stdout.write(chunkContent || "") //Write the chunk to the log
                     await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
                         query: publishResponseStreamChunk,
                         variables: {

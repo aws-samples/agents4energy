@@ -15,6 +15,8 @@ import { RetryPolicy } from "@langchain/langgraph"
 import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk, updateChatSession } from '../graphql/mutations'
 
+import { Calculator } from "@langchain/community/tools/calculator";
+
 import { queryGQLToolBuilder } from './toolBox'
 import { isValidJSON } from "../../../src/utils/amplify-utils";
 
@@ -55,14 +57,14 @@ async function publishTokenStreamChunk(props: { tokenStreamChunk: AIMessageChunk
     const streamChunk = props.tokenStreamChunk// as AIMessageChunk
     // console.log("streamChunk: ", streamChunk)
     // const chunkContent = streamEvent.data.chunk.kwargs.content
-    
+
     const chunkContent = getLangChainMessageTextContent(streamChunk)
 
     process.stdout.write(chunkContent || "") //Write the chunk to the log
 
     if (chunkContent) {
         // console.log("chunkContent: ", chunkContent)
-        
+
         await props.amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
             query: publishResponseStreamChunk,
             variables: {
@@ -92,7 +94,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
     })
 
     try {
-        console.log('Getting the current chat session info')
+        // console.log('Getting the current chat session info')
         const chatSession = await amplifyClientWrapper.getChatSession({ chatSessionId: event.arguments.chatSessionId })
         if (!chatSession) throw new Error(`Chat session ${event.arguments.chatSessionId} not found`)
 
@@ -102,41 +104,36 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             // latestHumanMessageText: event.arguments.input
         })
 
-
-        // console.log("mesages in langchain form: ", amplifyClientWrapper.chatMessages)
-        if (!chatSession.pastSteps) {
-            //This is the inital message to the planning agent
-            const executeAgentChatSessionUpdate = await amplifyClientWrapper.amplifyClient.graphql({
-                query: updateChatSession,
-                variables: {
-                    input: {
-                        id: event.arguments.chatSessionId,
-                        planGoal: event.arguments.lastMessageText
-                    }
+        // Update the chat session with the user's intention
+        await amplifyClientWrapper.amplifyClient.graphql({
+            query: updateChatSession,
+            variables: {
+                input: {
+                    id: event.arguments.chatSessionId,
+                    planGoal: event.arguments.lastMessageText
                 }
-            })
-        }
+            }
+        })
 
 
         // Define inputs to the agent
         const inputs = {
-            // input: event.arguments.lastMessageText,
-            input: chatSession?.planGoal || event.arguments.lastMessageText, //If the planGoal exists, this is a follow up message and so we preserve the intial goal
+            input: event.arguments.lastMessageText,
             plan: chatSession?.planSteps?.map(step => JSON.parse(step || "") as PlanStep),
             pastSteps: chatSession?.pastSteps?.map(step => JSON.parse(step || "") as PlanStep),
         }
 
-        ///////////////////////////////////////////////
-        ///////// Executor Agent Step /////////////////
-        ///////////////////////////////////////////////
-
         // Select the model to use for the executor agent
-        const executorAgentModel = new ChatBedrockConverse({
+        const agentModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
             temperature: 0
         });
 
+        ///////////////////////////////////////////////
+        ///////// Executor Agent Step /////////////////
+        ///////////////////////////////////////////////
         const agentExecutorTools = [
+            new Calculator,
             queryGQLToolBuilder({
                 amplifyClientWrapper: amplifyClientWrapper,
                 chatMessageOwnerIdentity: event.identity.sub
@@ -145,7 +142,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         //Create the executor agent
         const agentExecutor = createReactAgent({
-            llm: executorAgentModel,
+            llm: agentModel,
             tools: agentExecutorTools,
         });
 
@@ -166,39 +163,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             }),
         );
 
-        const planningModel = new ChatBedrockConverse({
-            model: process.env.MODEL_ID,
-            temperature: 0,
-        }).withStructuredOutput(plan);
-
-        // const planFunction = {
-        //     name: "plan",
-        //     description: "This tool is used to plan the steps to follow",
-        //     type: "object",
-        //     parameters: plan,
-        // };
-
-        // const planTool = {
-        //     type: "function",
-        //     function: planFunction,
-        // };
-
-        // const plannerPrompt = ChatPromptTemplate.fromTemplate(
-        //     `For the given objective, come up with a simple step by step plan. 
-        //     This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps.
-        //     The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
-
-        //     {objective}`,
-        // );
-
-        
-
-        // const planner = plannerPrompt.pipe(planningModel);
-
-        // const dummyPlannerResponse = await planner.invoke({
-        //     objective: "what is the hometown of the current Australia open winner?",
-        // });
-        // console.log("Dummy Planner Response:\n", dummyPlannerResponse)
+        const planningModel = agentModel.withStructuredOutput(plan);
 
         ///////////////////////////////////////////////
         ///////// Re-Planning Step ////////////////////
@@ -251,10 +216,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             }),
         );
 
-        const responderModel = new ChatBedrockConverse({
-            model: process.env.MODEL_ID,
-            temperature: 0
-        }).withStructuredOutput(response);
+        const responderModel = agentModel.withStructuredOutput(response);
 
         const responder = responderPrompt.pipe(responderModel)
 
@@ -264,19 +226,19 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////// Create the Graph ////////////////////
         ///////////////////////////////////////////////
         const customHandler = {
-            handleLLMNewToken: async (token: string, idx: {completion: number, prompt: number}, runId: any, parentRunId: any, tags: any, fields: any) => {
-            //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
-            //   process.stdout.write(fields)
+            handleLLMNewToken: async (token: string, idx: { completion: number, prompt: number }, runId: any, parentRunId: any, tags: any, fields: any) => {
+                //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
+                //   process.stdout.write(fields)
                 await publishTokenStreamChunk({
-                    tokenStreamChunk: new AIMessageChunk({ content: token.length > 0 ? token : '.'.repeat(Math.floor(Math.random() * 5)) + '\n\n'}),//This is just meant to show something is happening.
-                    tokenIndex: -1,
+                    tokenStreamChunk: new AIMessageChunk({ content: token.length > 0 ? token : '.'.repeat(Math.ceil(Math.random() * 5)) }),//This is just meant to show something is happening.
+                    tokenIndex: -2,
                     amplifyClientWrapper: amplifyClientWrapper
                 })
             },
             handleChatModelStart: async (llm: any, inputMessages: any, runId: any) => {
                 console.log("Chat model start:", llm, inputMessages, runId);
-              },
-          };
+            },
+        };
 
         async function executeStep(
             state: typeof PlanExecuteState.State,
@@ -304,6 +266,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             };
             const { messages } = await agentExecutor.invoke(inputs, config);
             const resultText = getLangChainMessageTextContent(messages.slice(-1)[0]) || ""
+            console.log("Execute Step Complete. Result Text:\n", resultText)
 
             return {
                 pastSteps: [
@@ -367,12 +330,12 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                     },
                     config
                 );
-            
+
             console.log("New Plan:\n", stringify(newPlanFromInvoke))
-            
+
             if (!newPlanFromInvoke.steps) throw new Error("No steps returned from replanner")
-            
-            if (typeof newPlanFromInvoke.steps === 'string' && isValidJSON(newPlanFromInvoke.steps)){
+
+            if (typeof newPlanFromInvoke.steps === 'string' && isValidJSON(newPlanFromInvoke.steps)) {
                 console.log("Steps are a string and valid JSON. Converting them to an object")
                 newPlanFromInvoke.steps = JSON.parse(newPlanFromInvoke.steps) as PlanStep[]
             }
@@ -380,7 +343,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             if (
                 !Array.isArray(newPlanFromInvoke.steps) ||
                 !newPlanFromInvoke.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
-            )
+                )
             ) throw new Error(`Provided steps are not in the correct format.\nSteps: ${newPlanFromInvoke.steps}\n\n`)
 
             // Remove the result part if present from plan steps
@@ -400,11 +363,10 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             config: RunnableConfig,
         ): Promise<Partial<typeof PlanExecuteState.State>> {
             const response = await responder
-                // .withConfig({
-                //     callbacks: config.callbacks,
-                //     // runName: "responder",
-                //     tags: ["responder"],
-                // })
+                .withConfig({
+                    callbacks: [customHandler],
+                    tags: ["responder"],
+                })
                 .invoke({
                     input: state.input,
                     plan: stringify(state.plan),
@@ -418,7 +380,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         function shouldEnd(state: typeof PlanExecuteState.State) {
             // If human input is requested, or there are no more steps, return true
-            console.log("Deciding to end based on the state: \n", stringify(state))
+            // console.log("Deciding to end based on the state: \n", stringify(state))
             if (!state.plan) return "false"
             if (state.plan.length === 0) return "true"
             if (state.plan[0].role === "human") return "true"
@@ -426,9 +388,9 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             // return state.response ? "true" : "false";
         }
         const workflow = new StateGraph(PlanExecuteState)
-            .addNode("agent", executeStep, { retryPolicy: {maxAttempts: 2}})
-            .addNode("replan", replanStep, { retryPolicy: {maxAttempts: 2}})
-            .addNode("respond", respondStep, { retryPolicy: {maxAttempts: 2}})
+            .addNode("agent", executeStep, { retryPolicy: { maxAttempts: 2 } })
+            .addNode("replan", replanStep, { retryPolicy: { maxAttempts: 2 } })
+            .addNode("respond", respondStep, { retryPolicy: { maxAttempts: 2 } })
             .addEdge(START, "replan")
             .addEdge("agent", "replan")
             .addConditionalEdges("replan", shouldEnd, {
@@ -474,7 +436,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
                     //Write the blurb in black
                     process.stdout.write(`${streamChunkText}`)
-                    
+
                     await publishTokenStreamChunk({
                         tokenStreamChunk: streamEvent.data.chunk,
                         tokenIndex: currentChunkIndex++,
@@ -511,7 +473,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                                 }
                             })
 
-                            console.log("Update Plan Response:\n", stringify(updatePlanResonse))
+                            // console.log(`Update Plan Response:\n`, stringify(updatePlanResonse))
                             break
                         case "agent":
                             const executeAgentChatSessionUpdate = await amplifyClientWrapper.amplifyClient.graphql({
@@ -526,12 +488,12 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                             })
                             break
                         case "respond":
-                            console.log('Response Event: ', chainStreamMessage)
+                            // console.log('Response Event: ', chainStreamMessage)
                             const responseAIMessage = new AIMessage({
                                 content: chainStreamMessage.respond.response,
                             })
 
-                            console.log('Publishing AI Message: ', responseAIMessage, '. Content: ', responseAIMessage.content)
+                            // console.log('Publishing AI Message: ', responseAIMessage, '. Content: ', responseAIMessage.content)
 
                             await amplifyClientWrapper.publishMessage({
                                 chatSessionId: event.arguments.chatSessionId,

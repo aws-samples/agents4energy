@@ -1,13 +1,13 @@
 import { validate } from 'jsonschema';
+import { stringify } from 'yaml';
+
 import { Amplify } from 'aws-amplify';
-import { generateClient, Client } from 'aws-amplify/data';
+import { generateClient } from 'aws-amplify/data';
 import * as APITypes from "../graphql/API";
 import { listChatMessageByChatSessionIdAndCreatedAt, getChatSession } from "../graphql/queries"
 import { Schema } from '../../data/resource';
 
-import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage, MessageContentText, MessageContentImageUrl } from "@langchain/core/messages";
-
-// import { getInfoFromPdf, listBedrockAgents } from '../graphql/queries'
+import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
 
 // Create a GraphQL query for messages in the chat session
 type GeneratedMutation<InputType, OutputType> = string & {
@@ -29,7 +29,7 @@ createChatMessage(condition: $condition, input: $input) {
   tool_calls
   tool_name
   updatedAt
-  trace
+  responseComplete
   __typename
 }
 }
@@ -85,7 +85,7 @@ export async function correctStructuredOutputResponse(
 ) {
     for (let attempt = 0; attempt < 3; attempt++) {
         const validationReslut = validate(response.parsed, targetJsonSchema);
-        console.log(`Data validation result (${attempt}): `, validationReslut.valid);
+        // console.log(`Data validation result (${attempt}): `, validationReslut.valid);
         if (validationReslut.valid) break
 
         console.log("Data validation error:", validationReslut.errors.join('\n'));
@@ -114,7 +114,7 @@ export class AmplifyClientWrapper {
     constructor(props:{env: any, chatSessionId?: string}) {
         this.chatMessages = [];
         this.chatSessionId = props.chatSessionId || "";
-        console.log('AMPLIFY_DATA_GRAPHQL_ENDPOINT from env: ', props.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
+        // console.log('AMPLIFY_DATA_GRAPHQL_ENDPOINT from env: ', props.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
         //   this.env = env;
         Amplify.configure(
             {
@@ -143,8 +143,6 @@ export class AmplifyClientWrapper {
                 },
             }
         );
-
-
         this.amplifyClient = generateClient<Schema>()
     }
 
@@ -183,9 +181,9 @@ export class AmplifyClientWrapper {
             }
         }
 
-        console.log('Publishing mesage with input: ', input)
+        // console.log('Publishing mesage with input: ', input)
 
-        await this.amplifyClient.graphql({
+        const publishMessageResponse = await this.amplifyClient.graphql({
             query: createChatMessage,
             variables: {
                 input: input,
@@ -194,6 +192,8 @@ export class AmplifyClientWrapper {
             .catch((err: any) => {
                 console.error('GraphQL Error: ', err);
             });
+        
+        console.log('Publish message response: \n', stringify(publishMessageResponse))
     }
 
     // If you use the amplifyClient: Client type, you get the error below
@@ -268,7 +268,7 @@ export class AmplifyClientWrapper {
             console.log('Last message in query is a human message')
         }
 
-        console.log("mesages in langchain form: ", messages)
+        // console.log("mesages in langchain form: ", messages)
         // return messages
         this.chatMessages = messages
         // }

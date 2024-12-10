@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { stringify } from "yaml";
 
 import { tool } from "@langchain/core/tools";
 
@@ -65,13 +66,13 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                         doNotSendResponseComplete: true
                         // doNotSendResponseComplete: true
                     }
-                }).catch((error) => {
+                }).catch((error) => { //Catch the error so that the system doesn't think something is wrong
                     console.log('Invoke production agent (timeout is expected): ', error)
                 })
                 
 
                 //TODO: Replace this with a subscription
-                const waitForResponse = async (): Promise<ChatMessage>  => {
+                const waitForResponse = async (): Promise<ChatMessage[]>  => {
                     return new Promise((resolve) => {
                         // Every few seconds check if the most recent chat message has the correct type
                         const interval = setInterval(async () => {
@@ -80,16 +81,12 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                                 variables:
                                 {
                                     chatSessionId: amplifyClientWrapper.chatSessionId,
-                                    limit: 1,
+                                    limit: 3,
                                     sortDirection: APITypes.ModelSortDirection.DESC
                                 },
                             })
 
                             const mostRecentChatMessage = testChatMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items[0]
-
-                            if (mostRecentChatMessage) {
-                                console.log("\nMost recent chat message:\n", mostRecentChatMessage)
-                            }
 
                             if (mostRecentChatMessage &&
                                 mostRecentChatMessage.role === APITypes.ChatMessageRole.ai &&
@@ -97,19 +94,24 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                                 (!mostRecentChatMessage.tool_calls || mostRecentChatMessage.tool_calls === "[]") &&
                                 (!mostRecentChatMessage.tool_call_id || mostRecentChatMessage.tool_call_id==="")//Make sure the message is not a tool response message
                             ) {
-                                console.log("Production Agent has returned a response. Ending the check for new messages loop")
+                                console.log("Production Agent has returned a response. Ending the check for new messages loop\nMost recent chat message:\n", 
+                                    stringify(mostRecentChatMessage)
+                                )
                                 clearInterval(interval)
-                                resolve(mostRecentChatMessage)
+                                // resolve(mostRecentChatMessage)
+                                resolve(testChatMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items)
                             }
                         }, 2000)
                     })
                 }
 
-                const completionChatMessage = await waitForResponse()
+                const completionChatMessages = await waitForResponse()
 
-                console.log('Production Agent Response: ', completionChatMessage.content)
+                const responseString = completionChatMessages.map(item => item.content).join(`\n${'#'.repeat(10)}\n`)
 
-                return completionChatMessage.content
+                // console.log('Production Agent Response: ', responseString)
+
+                return responseString
 
             ////https://aws.amazon.com/blogs/mobile/announcing-server-side-filters-for-real-time-graphql-subscriptions-with-aws-amplify/
             // const testSub = amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client

@@ -158,7 +158,7 @@ export const handler: Schema["invokeBedrockWithStructuredOutput"]["functionHandl
 
     const chatModelWithStructuredOutput = new ChatBedrockConverse({
         model: process.env.MODEL_ID,
-        // temperature: 0
+        temperature: 0
     }).withStructuredOutput(
         outputStructure, {
         includeRaw: true,

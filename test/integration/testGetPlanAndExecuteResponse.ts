@@ -58,14 +58,14 @@ export const main = async () => {
   const testArguments = {
     chatSessionId: testChatSession.data.createChatSession.id,
 
-    lastMessageText: `
-    What is the hometown of the 2015 Australian open winner?
-    `
-
-    // input: `
-    // Execute a SQL query and plot the result to get the production over the last 12 weeks. 
-    // Get the table definition so you know what to include in the query.
+    // lastMessageText: `
+    // What is the hometown of the 2015 Australian open winner?
     // `
+
+    lastMessageText: `
+    Execute a SQL query and plot the result to get the production over the last 12 weeks.
+    Ust the ai role for all steps.
+    `
     // "input": "What is 1+54?"
   }
 

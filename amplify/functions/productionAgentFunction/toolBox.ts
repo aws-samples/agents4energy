@@ -91,8 +91,7 @@ export const retrievePetroleumEngineeringKnowledgeTool = tool(
         })
 
         if (!contextResponse) throw new Error(`No relevant tables found. Query: ${concepts}`)
-        console.log("Pet Eng KB response:\n", JSON.stringify(contextResponse, null, 2))
-
+        // console.log("Pet Eng KB response:\n", JSON.stringify(contextResponse, null, 2))
 
         return {
             messageContentType: 'tool_json',
@@ -119,7 +118,7 @@ const getTableDefinitionsSchema = z.object({
 //https://js.langchain.com/docs/integrations/retrievers/bedrock-knowledge-bases/
 export const getTableDefinitionsTool = tool(
     async ({ tableFeatures }) => {
-        console.log('Getting relevant tables for table features:\n', tableFeatures)
+        // console.log('Getting relevant tables for table features:\n', tableFeatures)
 
         const relevantTables = await queryKnowledgeBase({
             knowledgeBaseId: env.AWS_KNOWLEDGE_BASE_ID,
@@ -128,7 +127,7 @@ export const getTableDefinitionsTool = tool(
         )
 
         if (!relevantTables) throw new Error("No relevant tables found")
-        console.log("Text2Sql KB response:\n", JSON.stringify(relevantTables, null, 2))
+        // console.log("Text2Sql KB response:\n", JSON.stringify(relevantTables, null, 2))
 
 
         const tableDefinitions = relevantTables.map((result) =>
@@ -208,7 +207,7 @@ function doesFromLineContainOneDot(sqlQuery: string): boolean {
 
 export const executeSQLQueryTool = tool(
     async ({ query }) => {
-        console.log('Executing SQL Query:\n', query, '\nUsing workgroup: ', env.ATHENA_WORKGROUP_NAME)
+        // console.log('Executing SQL Query:\n', query, '\nUsing workgroup: ', env.ATHENA_WORKGROUP_NAME)
         try {
 
             // See if the string date_sub is in the query sting
@@ -239,7 +238,7 @@ export const executeSQLQueryTool = tool(
             });
             await waitForQueryToComplete(queryExecutionId, env.ATHENA_WORKGROUP_NAME);
             const results = await getQueryResults(queryExecutionId);
-            console.log('Athena Query Result:\n', results);
+            // console.log('Athena Query Result:\n', results);
 
             if (!results.ResultSet?.Rows) throw new Error("No results returned from Athena")
 
@@ -260,7 +259,11 @@ export const executeSQLQueryTool = tool(
     },
     {
         name: "executeSQLQuery",
-        description: "Always call the getTableDefinitionsTool before calling this tool. This tool can execute a Trino SQL query and returns the results as a table.",
+        description: `
+        Use this tool to retireve structured data, like production rate numbers.
+        Always call the getTableDefinitionsTool before calling this tool. 
+        This tool can execute a Trino SQL query and returns the results as a table.
+        `.replace(/^\s+/gm, ''),
         schema: executeSQLQuerySchema,
     }
 );
@@ -472,12 +475,12 @@ async function listS3Folders(
         const command = new ListObjectsV2Command(input);
         const response = await s3Client.send(command);
 
-        //   console.log('list folders s3 response:\n',response)
+        // console.log('list folders s3 response:\n',response)
 
         // Get common prefixes (folders)
         const folders = response.CommonPrefixes?.map(prefix => prefix.Prefix!.slice(normalizedPrefix.length)) || [];
 
-        //   console.log('folders: ', folders)
+        // console.log('folders: ', folders)
 
         // Filter out the current prefix itself and just get the part of the prefix after the normalizedPrefix
         return folders
@@ -536,7 +539,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
             }
         })
 
-        console.log('Input Table Columns: ', tableColumns)
+        // console.log('Input Table Columns: ', tableColumns)
 
         // const correctedColumnNameMap = tableColumns.map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
         const correctedColumnNameMap = Object.fromEntries(
@@ -562,7 +565,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
             required: Object.keys(fieldDefinitions),
         };
 
-        console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))
+        // console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))
 
         let columnNames = tableColumns.map(column => column.columnName)
         //Add in the source and relevanceScore columns
@@ -574,7 +577,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
             prefix: s3Prefix,
             suffix: '.yaml'
         })
-        console.log('Well Files: ', wellFiles)
+        // console.log('Well Files: ', wellFiles)
 
         if (wellFiles.length === 0) {
             const oneLevelUpS3Prefix = s3Prefix.split('/').slice(0, -2).join('/')
@@ -662,7 +665,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
         //Sort the data rows by date (first column)
         dataRows.sort((a, b) => a?.date.localeCompare(b?.date));
 
-        console.log('data Rows: ', dataRows)
+        // console.log('data Rows: ', dataRows)
 
         return {
             messageContentType: 'tool_table',
@@ -673,7 +676,8 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
         name: "wellTableTool",
         description: `
         This tool searches the well files to extract specified information about a well. 
-        Use this tool to retrieve knowledge from well files`.replace(/^\s+/gm, ''),
+        Use this tool to retrieve knowledge from well files. Typically well files will not contain production rate numbers.
+        `.replace(/^\s+/gm, ''),
         schema: wellTableSchema,
     }
 );
