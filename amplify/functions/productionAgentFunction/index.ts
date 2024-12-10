@@ -6,24 +6,19 @@ import { ChatBedrockConverse } from "@langchain/aws";
 import { HumanMessage, AIMessage, ToolMessage, BaseMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { RetryPolicy } from "@langchain/langgraph"
-// import { ChatPromptTemplate } from "@langchain/core/prompts";
-// import { END, START, StateGraph, Annotation, CompiledStateGraph, StateDefinition } from "@langchain/langgraph";
-// import { RunnableConfig } from "@langchain/core/runnables";
 
-import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
+import { AmplifyClientWrapper, getLangChainMessageTextContent, stringifyLimitStringLength } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk } from '../graphql/mutations'
 
 import { Calculator } from "@langchain/community/tools/calculator";
 
 import {
     queryKnowledgeBase,
-    // calculatorTool,
     wellTableToolBuilder,
     getTableDefinitionsTool,
     executeSQLQueryTool,
     plotTableFromToolResponseTool,
     getS3KeyConentsTool,
-    // retrievePetroleumEngineeringKnowledgeTool,
 } from './toolBox';
 
 function insertBeforeLast<T>(arr: T[], element: T): T[] {
@@ -53,14 +48,12 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     })
 
     const agentTools = [
-        // calculatorTool,
         new Calculator,
         wellTableToolBuilder(amplifyClientWrapper),
         getS3KeyConentsTool,
         getTableDefinitionsTool,
         executeSQLQueryTool,
         plotTableFromToolResponseTool,
-        // retrievePetroleumEngineeringKnowledgeTool
     ];
 
     try {
@@ -117,7 +110,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             new AIMessage(ragContext?.map(retrievalResult => retrievalResult.content?.text).join('\n\n') || "")
         )
 
-        // console.log("Messages with rag:\n", stringify(messages))
+        console.log("Messages with rag:\n", stringifyLimitStringLength(messages))
 
         const stream = agent.streamEvents(
             {

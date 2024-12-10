@@ -57,6 +57,14 @@ export function getLangChainMessageTextContent(message: HumanMessage | AIMessage
     return messageTextContent
 
 }
+export function stringifyLimitStringLength(obj: any, maxLength: number = 200) {
+    return stringify(obj, (key, value) => {
+        if (typeof value === 'string' && value.length > maxLength) {
+            return value.substring(0, maxLength) + '...';
+        }
+        return value;
+    }, 2);
+}
 
 export interface FieldDefinition {
     type: string;
@@ -193,7 +201,7 @@ export class AmplifyClientWrapper {
                 console.error('GraphQL Error: ', err);
             });
         
-        console.log('Publish message response: \n', stringify(publishMessageResponse))
+        console.log('Publish message response: \n', stringifyLimitStringLength(publishMessageResponse))
     }
 
     // If you use the amplifyClient: Client type, you get the error below

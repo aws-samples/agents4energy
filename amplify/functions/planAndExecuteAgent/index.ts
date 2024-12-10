@@ -5,7 +5,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { Schema } from '../../data/resource';
 
 import { ChatBedrockConverse } from "@langchain/aws";
-import { BaseMessage, AIMessage, ToolMessage, AIMessageChunk, HumanMessage, isAIMessageChunk } from "@langchain/core/messages";
+import { BaseMessage, AIMessage, ToolMessage, AIMessageChunk, HumanMessage, isAIMessageChunk, BaseMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { END, START, StateGraph, Annotation, CompiledStateGraph, StateDefinition } from "@langchain/langgraph";
@@ -60,7 +60,7 @@ async function publishTokenStreamChunk(props: { tokenStreamChunk: AIMessageChunk
 
     const chunkContent = getLangChainMessageTextContent(streamChunk)
 
-    process.stdout.write(chunkContent || "") //Write the chunk to the log
+    // process.stdout.write(`\x1b[32m${chunkContent}\x1b[0m`); //Write the chunk to the log with green text
 
     if (chunkContent) {
         // console.log("chunkContent: ", chunkContent)
@@ -228,9 +228,13 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         const customHandler = {
             handleLLMNewToken: async (token: string, idx: { completion: number, prompt: number }, runId: any, parentRunId: any, tags: any, fields: any) => {
                 //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
-                //   process.stdout.write(fields)
+
+                const tokenStreamChunk = new AIMessageChunk({ content: token.length > 0 ? token : '.'.repeat(Math.ceil(Math.random() * 5)) })
+
+                process.stdout.write(`\x1b[32m${getLangChainMessageTextContent(tokenStreamChunk)}\x1b[0m`); //Write the chunk to the log with green text
+
                 await publishTokenStreamChunk({
-                    tokenStreamChunk: new AIMessageChunk({ content: token.length > 0 ? token : '.'.repeat(Math.ceil(Math.random() * 5)) }),//This is just meant to show something is happening.
+                    tokenStreamChunk: tokenStreamChunk,//This is just meant to show something is happening.
                     tokenIndex: -2,
                     amplifyClientWrapper: amplifyClientWrapper
                 })
@@ -434,8 +438,8 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 case "on_chat_model_stream":
                     const streamChunkText = getLangChainMessageTextContent(streamEvent.data.chunk as AIMessageChunk) || ""
 
-                    //Write the blurb in black
-                    process.stdout.write(`${streamChunkText}`)
+                    //Write the blurb in blue
+                    process.stdout.write(`\x1b[34m${streamChunkText}\x1b[0m`);
 
                     await publishTokenStreamChunk({
                         tokenStreamChunk: streamEvent.data.chunk,
@@ -453,7 +457,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
                     switch (chainMessageType) {
                         case "plan":
-
                             const updatePlanResonseInput: Schema["ChatSession"]["updateType"] = {
                                 id: event.arguments.chatSessionId,
                                 planSteps: ((chainStreamMessage.planner || chainStreamMessage.replan) as typeof PlanExecuteState.State)
@@ -506,7 +509,20 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                             console.log('Unknown message type:\n', stringify(chainStreamMessage))
                             break
                     }
-
+                    break
+                // case "on_tool_end":
+                case "on_chat_model_end":
+                    const streamChunk = streamEvent.data.output as ToolMessage | AIMessageChunk
+                    const textContent = getLangChainMessageTextContent(streamChunk)
+                    if (textContent && textContent.length > 20){
+                        await amplifyClientWrapper.publishMessage({
+                            chatSessionId: event.arguments.chatSessionId,
+                            owner: event.identity.sub,
+                            message: streamChunk
+                        })
+                    }
+                    break
+                    
             }
         }
 
