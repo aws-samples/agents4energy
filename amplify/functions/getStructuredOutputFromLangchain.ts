@@ -8,6 +8,7 @@ import * as APITypes from "./graphql/API";
 
 import { ChatBedrockConverse } from "@langchain/aws";
 import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
+import { stringifyLimitStringLength } from './utils/amplifyUtils'
 
 import { validate } from 'jsonschema';
 
@@ -122,7 +123,7 @@ async function getSortedMessages(chatSessionId: string, latestHumanMessageText: 
         )
     } 
 
-    console.log("mesages in langchain form: ", messages)
+    // console.log("mesages in langchain form:\n", stringifyLimitStringLength(messages))
 
     return messages
 }

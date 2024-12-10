@@ -49,10 +49,11 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     const stackName = cdk.Stack.of(scope).stackName
     // const stackUUID = cdk.Names.uniqueId(scope).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3);
-    const stackUUIDLong = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '')
+    const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
     
-    const stackUUID = crypto.createHash('md5').update(stackUUIDLong).digest('hex').slice(-3)
+    // const stackUUID = crypto.createHash('md5').update(stackUUIDLong).digest('hex').slice(-3)
     
+    // console.log("Produciton Stack UUID Long: ", stackUUIDLong)
     console.log("Production Stack UUID: ", stackUUID)
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent

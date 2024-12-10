@@ -37,6 +37,8 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     const metadataField = 'metadata'
     const vectorDimensions = 1024
 
+    const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
+
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
 
@@ -201,7 +203,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     })
 
     this.knowledgeBase = new bedrock.CfnKnowledgeBase(this, "KnowledgeBase", {
-      name: `${id.slice(0,10)}-${cdk.Stack.of(scope).stackName.slice(-4)}`.replace(/[^0-9a-zA-Z_-]/g, ''),//Sanatize the name
+      name: `${id.slice(0,60)}-${stackUUID}`,
       roleArn: knoledgeBaseRole.roleArn,
       description: 'This knowledge base stores sql table definitions',
       knowledgeBaseConfiguration: {
