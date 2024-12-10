@@ -102,12 +102,14 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             query: getLangChainMessageTextContent(messages[messages.length-1]) || ""
         })
 
+        console.log("Rag context:\n", stringifyLimitStringLength(ragContext))
+
         insertBeforeLast(messages,
             new HumanMessage("What are a few relevant oil and gas concepts?")
         )
 
-        insertBeforeLast(messages,
-            new AIMessage(ragContext?.map(retrievalResult => retrievalResult.content?.text).join('\n\n') || "")
+        insertBeforeLast(messages, // If there is no result from the knowledge base, use a dummy result
+            new AIMessage(ragContext?.map(retrievalResult => retrievalResult.content?.text).join('\n\n') || "Safety is the top priority.")
         )
 
         console.log("Messages with rag:\n", stringifyLimitStringLength(messages))
