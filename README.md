@@ -9,7 +9,7 @@
 To begin developing in this repo, perform the following steps.
 1. Clone the repo
 1. Run `npm install` to install the required packages.
-1. Run `npm run dockerAuth` to authenticate with the AWS docker repo. This lets you pull lambda build images.
+1. Run `npm run ecrAuth` to authenticate with the AWS ECR repo. This lets you pull lambda build images.
 1. Run `npx ampx sandbox` to create your personal standbox enviroment for development.
 1. In a different ternimal run `npm run dev` to start a develpment server for the front end. You can reach this server by navigating to `localhost:3000` in an internet browser.
 1. Now when you make code changes, they will be deployed to both the front and back end.

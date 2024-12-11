@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dockerAuth": "aws ecr-public get-login-password | docker login --username AWS --password-stdin public.ecr.aws",
+    "ecrAuth": "aws ecr-public get-login-password | docker login --username AWS --password-stdin public.ecr.aws",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

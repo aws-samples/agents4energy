@@ -676,7 +676,9 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
         name: "wellTableTool",
         description: `
         This tool searches the well files to extract specified information about a well. 
-        Use this tool to retrieve knowledge from well files. Typically well files will not contain production rate numbers.
+        Use this tool to retrieve knowledge from well files.
+        Do not use this tool to query production rate numbers.
+        This tool can not query structured data sources.
         `.replace(/^\s+/gm, ''),
         schema: wellTableSchema,
     }

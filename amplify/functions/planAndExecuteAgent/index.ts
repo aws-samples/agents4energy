@@ -12,7 +12,7 @@ import { END, START, StateGraph, Annotation, CompiledStateGraph, StateDefinition
 import { RunnableConfig } from "@langchain/core/runnables";
 import { RetryPolicy } from "@langchain/langgraph"
 
-import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
+import { AmplifyClientWrapper, getLangChainMessageTextContent, stringifyLimitStringLength } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk, updateChatSession } from '../graphql/mutations'
 
 import { Calculator } from "@langchain/community/tools/calculator";
@@ -240,7 +240,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 })
             },
             handleChatModelStart: async (llm: any, inputMessages: any, runId: any) => {
-                console.log("Chat model start:", llm, inputMessages, runId);
+                console.log("Chat model start:\n", stringifyLimitStringLength(inputMessages));
             },
         };
 
@@ -448,7 +448,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                     })
                     break
                 case "on_chain_stream":
-                    console.log('on_chain_stream: \n', stringify(streamEvent))
+                    console.log('on_chain_stream: \n', stringifyLimitStringLength(streamEvent))
                     const chainStreamMessage = streamEvent.data.chunk
                     const chainMessageType = ("planner" in chainStreamMessage || "replan" in chainStreamMessage) ? "plan" :
                         ("agent" in chainStreamMessage) ? "agent" :
@@ -506,7 +506,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                             })
                             break
                         default:
-                            console.log('Unknown message type:\n', stringify(chainStreamMessage))
+                            console.log('Unknown message type:\n', stringifyLimitStringLength(chainStreamMessage))
                             break
                     }
                     break
