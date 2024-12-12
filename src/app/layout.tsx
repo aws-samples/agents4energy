@@ -20,7 +20,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "A4E",
+  title: "Agents4Energy",
   description: "Use AI to improve energy operations",
 };
 

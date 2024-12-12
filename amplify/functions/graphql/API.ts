@@ -4,6 +4,7 @@
 
 export type ChatMessage = {
   __typename: "ChatMessage",
+  chainOfThought?: boolean | null,
   chatSessionId?: string | null,
   chatSessionIdDashFieldName?: string | null,
   content: string,
@@ -79,6 +80,7 @@ export type ModelStringKeyConditionInput = {
 
 export type ModelChatMessageFilterInput = {
   and?: Array< ModelChatMessageFilterInput | null > | null,
+  chainOfThought?: ModelBooleanInput | null,
   chatSessionId?: ModelIDInput | null,
   chatSessionIdDashFieldName?: ModelStringInput | null,
   content?: ModelStringInput | null,
@@ -96,20 +98,11 @@ export type ModelChatMessageFilterInput = {
   updatedAt?: ModelStringInput | null,
 };
 
-export type ModelIDInput = {
+export type ModelBooleanInput = {
   attributeExists?: boolean | null,
   attributeType?: ModelAttributeTypes | null,
-  beginsWith?: string | null,
-  between?: Array< string | null > | null,
-  contains?: string | null,
-  eq?: string | null,
-  ge?: string | null,
-  gt?: string | null,
-  le?: string | null,
-  lt?: string | null,
-  ne?: string | null,
-  notContains?: string | null,
-  size?: ModelSizeInput | null,
+  eq?: boolean | null,
+  ne?: boolean | null,
 };
 
 export enum ModelAttributeTypes {
@@ -125,6 +118,22 @@ export enum ModelAttributeTypes {
   stringSet = "stringSet",
 }
 
+
+export type ModelIDInput = {
+  attributeExists?: boolean | null,
+  attributeType?: ModelAttributeTypes | null,
+  beginsWith?: string | null,
+  between?: Array< string | null > | null,
+  contains?: string | null,
+  eq?: string | null,
+  ge?: string | null,
+  gt?: string | null,
+  le?: string | null,
+  lt?: string | null,
+  ne?: string | null,
+  notContains?: string | null,
+  size?: ModelSizeInput | null,
+};
 
 export type ModelSizeInput = {
   between?: Array< number | null > | null,
@@ -150,13 +159,6 @@ export type ModelStringInput = {
   ne?: string | null,
   notContains?: string | null,
   size?: ModelSizeInput | null,
-};
-
-export type ModelBooleanInput = {
-  attributeExists?: boolean | null,
-  attributeType?: ModelAttributeTypes | null,
-  eq?: boolean | null,
-  ne?: boolean | null,
 };
 
 export type ModelChatMessageRoleInput = {
@@ -192,6 +194,7 @@ export type ModelChatSessionConnection = {
 
 export type ModelChatMessageConditionInput = {
   and?: Array< ModelChatMessageConditionInput | null > | null,
+  chainOfThought?: ModelBooleanInput | null,
   chatSessionId?: ModelIDInput | null,
   chatSessionIdDashFieldName?: ModelStringInput | null,
   content?: ModelStringInput | null,
@@ -209,6 +212,7 @@ export type ModelChatMessageConditionInput = {
 };
 
 export type CreateChatMessageInput = {
+  chainOfThought?: boolean | null,
   chatSessionId?: string | null,
   chatSessionIdDashFieldName?: string | null,
   content: string,
@@ -268,6 +272,7 @@ export type ResponseStreamChunk = {
 };
 
 export type UpdateChatMessageInput = {
+  chainOfThought?: boolean | null,
   chatSessionId?: string | null,
   chatSessionIdDashFieldName?: string | null,
   content?: string | null,
@@ -293,6 +298,7 @@ export type UpdateChatSessionInput = {
 
 export type ModelSubscriptionChatMessageFilterInput = {
   and?: Array< ModelSubscriptionChatMessageFilterInput | null > | null,
+  chainOfThought?: ModelSubscriptionBooleanInput | null,
   chatSessionId?: ModelSubscriptionIDInput | null,
   chatSessionIdDashFieldName?: ModelSubscriptionStringInput | null,
   content?: ModelSubscriptionStringInput | null,
@@ -307,6 +313,11 @@ export type ModelSubscriptionChatMessageFilterInput = {
   tool_name?: ModelSubscriptionStringInput | null,
   trace?: ModelSubscriptionStringInput | null,
   updatedAt?: ModelSubscriptionStringInput | null,
+};
+
+export type ModelSubscriptionBooleanInput = {
+  eq?: boolean | null,
+  ne?: boolean | null,
 };
 
 export type ModelSubscriptionIDInput = {
@@ -339,11 +350,6 @@ export type ModelSubscriptionStringInput = {
   notIn?: Array< string | null > | null,
 };
 
-export type ModelSubscriptionBooleanInput = {
-  eq?: boolean | null,
-  ne?: boolean | null,
-};
-
 export type ModelSubscriptionChatSessionFilterInput = {
   and?: Array< ModelSubscriptionChatSessionFilterInput | null > | null,
   createdAt?: ModelSubscriptionStringInput | null,
@@ -364,6 +370,7 @@ export type GetChatMessageQueryVariables = {
 export type GetChatMessageQuery = {
   getChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
@@ -515,6 +522,7 @@ export type ListChatMessageByChatSessionIdAndCreatedAtQuery = {
     __typename: "ModelChatMessageConnection",
     items:  Array< {
       __typename: "ChatMessage",
+      chainOfThought?: boolean | null,
       chatSessionId?: string | null,
       chatSessionIdDashFieldName?: string | null,
       content: string,
@@ -547,6 +555,7 @@ export type ListChatMessageByChatSessionIdDashFieldNameAndCreatedAtQuery = {
     __typename: "ModelChatMessageConnection",
     items:  Array< {
       __typename: "ChatMessage",
+      chainOfThought?: boolean | null,
       chatSessionId?: string | null,
       chatSessionIdDashFieldName?: string | null,
       content: string,
@@ -576,6 +585,7 @@ export type ListChatMessagesQuery = {
     __typename: "ModelChatMessageConnection",
     items:  Array< {
       __typename: "ChatMessage",
+      chainOfThought?: boolean | null,
       chatSessionId?: string | null,
       chatSessionIdDashFieldName?: string | null,
       content: string,
@@ -626,6 +636,7 @@ export type CreateChatMessageMutationVariables = {
 export type CreateChatMessageMutation = {
   createChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
@@ -691,6 +702,7 @@ export type DeleteChatMessageMutationVariables = {
 export type DeleteChatMessageMutation = {
   deleteChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
@@ -771,6 +783,7 @@ export type UpdateChatMessageMutationVariables = {
 export type UpdateChatMessageMutation = {
   updateChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
@@ -836,6 +849,7 @@ export type OnCreateChatMessageSubscriptionVariables = {
 export type OnCreateChatMessageSubscription = {
   onCreateChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
@@ -901,6 +915,7 @@ export type OnDeleteChatMessageSubscriptionVariables = {
 export type OnDeleteChatMessageSubscription = {
   onDeleteChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
@@ -966,6 +981,7 @@ export type OnUpdateChatMessageSubscriptionVariables = {
 export type OnUpdateChatMessageSubscription = {
   onUpdateChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,

@@ -10,6 +10,7 @@ type GeneratedQuery<InputType, OutputType> = string & {
 
 export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
   getChatMessage(id: $id) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
@@ -187,6 +188,7 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
     sortDirection: $sortDirection
   ) {
     items {
+      chainOfThought
       chatSessionId
       chatSessionIdDashFieldName
       content
@@ -227,6 +229,7 @@ export const listChatMessageByChatSessionIdDashFieldNameAndCreatedAt = /* GraphQ
     sortDirection: $sortDirection
   ) {
     items {
+      chainOfThought
       chatSessionId
       chatSessionIdDashFieldName
       content
@@ -257,6 +260,7 @@ export const listChatMessages = /* GraphQL */ `query ListChatMessages(
 ) {
   listChatMessages(filter: $filter, limit: $limit, nextToken: $nextToken) {
     items {
+      chainOfThought
       chatSessionId
       chatSessionIdDashFieldName
       content

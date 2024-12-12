@@ -38,41 +38,41 @@ export async function queryKnowledgeBase(props: { knowledgeBaseId: string, query
     }
 }
 
-//////////////////////////////////////////
-//////////// Calculator Tool /////////////
-//////////////////////////////////////////
+// //////////////////////////////////////////
+// //////////// Calculator Tool /////////////
+// //////////////////////////////////////////
 
-const calculatorSchema = z.object({
-    operation: z
-        .enum(["add", "subtract", "multiply", "divide", "log"])
-        .describe("The type of operation to execute."),
-    number1: z.number().describe("The first number to operate on."),
-    number2: z.number().describe("The second number to operate on."),
-});
+// const calculatorSchema = z.object({
+//     operation: z
+//         .enum(["add", "subtract", "multiply", "divide", "log"])
+//         .describe("The type of operation to execute."),
+//     number1: z.number().describe("The first number to operate on."),
+//     number2: z.number().describe("The second number to operate on."),
+// });
 
-export const calculatorTool = tool(
-    async ({ operation, number1, number2 }) => {
-        // Functions must return strings
-        if (operation === "add") {
-            return `${number1 + number2}`;
-        } else if (operation === "subtract") {
-            return `${number1 - number2}`;
-        } else if (operation === "multiply") {
-            return `${number1 * number2}`;
-        } else if (operation === "divide") {
-            return `${number1 / number2}`;
-        } else if (operation === "log") {
-            return `${Math.log(number1)}`;
-        }else {
-            throw new Error("Invalid operation.");
-        }
-    },
-    {
-        name: "calculator",
-        description: "Can perform mathematical operations.",
-        schema: calculatorSchema,
-    }
-);
+// export const calculatorTool = tool(
+//     async ({ operation, number1, number2 }) => {
+//         // Functions must return strings
+//         if (operation === "add") {
+//             return `${number1 + number2}`;
+//         } else if (operation === "subtract") {
+//             return `${number1 - number2}`;
+//         } else if (operation === "multiply") {
+//             return `${number1 * number2}`;
+//         } else if (operation === "divide") {
+//             return `${number1 / number2}`;
+//         } else if (operation === "log") {
+//             return `${Math.log(number1)}`;
+//         } else {
+//             throw new Error("Invalid operation.");
+//         }
+//     },
+//     {
+//         name: "calculator",
+//         description: "Can perform mathematical operations.",
+//         schema: calculatorSchema,
+//     }
+// );
 
 ///////////////////////////////////////////////////////////////
 ////// Retrieve Petroleum Enginnering Knowledge Tool //////////
@@ -494,126 +494,128 @@ async function listS3Folders(
 
 export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
     async ({ dataToInclude, tableColumns, wellApiNumber, dataToExclude }) => {
-        if (!process.env.DATA_BUCKET_NAME) throw new Error("DATA_BUCKET_NAME environment variable is not set")
+        console.log("Well Table Tool Invoked")
+        try {
+            if (!process.env.DATA_BUCKET_NAME) throw new Error("DATA_BUCKET_NAME environment variable is not set")
 
-        //If tableColumns contains a column with columnName date, remove it. The user may ask for one, and one will automatically be added later.
-        tableColumns = tableColumns.filter(column => !(column.columnName.toLowerCase().includes('date')))
-        // Here add in the default table columns date and excludeRow 
-        tableColumns.unshift({
-            columnName: 'date',
-            columnDescription: `The date of the event in YYYY-MM-DD format.`,
-            columnDefinition: {
-                type: 'string',
-                format: 'date',
-                pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
-            }
-        })
+            //If tableColumns contains a column with columnName date, remove it. The user may ask for one, and one will automatically be added later.
+            tableColumns = tableColumns.filter(column => !(column.columnName.toLowerCase().includes('date')))
+            // Here add in the default table columns date and excludeRow 
+            tableColumns.unshift({
+                columnName: 'date',
+                columnDescription: `The date of the event in YYYY-MM-DD format.`,
+                columnDefinition: {
+                    type: 'string',
+                    format: 'date',
+                    pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
+                }
+            })
 
-        tableColumns.unshift({
-            columnName: 'includeScore',
-            columnDescription: `
+            tableColumns.unshift({
+                columnName: 'includeScore',
+                columnDescription: `
             If the JSON object contains information related to [${dataToExclude}], give a score of 1.
             If not, give a score of 10 if JSON object contains information related to [${dataToInclude}].
             Most scores should be around 5. Reserve 10 for exceptional cases.
             `,
-            columnDefinition: {
-                type: 'integer',
-                minimum: 0,
-                maximum: 10
+                columnDefinition: {
+                    type: 'integer',
+                    minimum: 0,
+                    maximum: 10
+                }
+            })
+
+            tableColumns.unshift({
+                columnName: 'includeScoreExplanation',
+                columnDescription: `Why did you choose that score?`,
+                columnDefinition: {
+                    type: 'string',
+                }
+            })
+
+            tableColumns.unshift({
+                columnName: 'relevantPartOfJsonObject',
+                columnDescription: `Which part of the object caused you to give that score?`,
+                columnDefinition: {
+                    type: 'string',
+                }
+            })
+
+            // console.log('Input Table Columns: ', tableColumns)
+
+            // const correctedColumnNameMap = tableColumns.map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
+            const correctedColumnNameMap = Object.fromEntries(
+                tableColumns
+                    .filter(column => column.columnName !== removeSpaceAndLowerCase(column.columnName))
+                    .map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
+            );
+
+            const fieldDefinitions: Record<string, FieldDefinition> = {};
+            for (const column of tableColumns) {
+                const correctedColumnName = removeSpaceAndLowerCase(column.columnName)
+
+                fieldDefinitions[correctedColumnName] = {
+                    ...(column.columnDefinition ? column.columnDefinition : { type: 'string' }),
+                    description: column.columnDescription
+                };
             }
-        })
-
-        tableColumns.unshift({
-            columnName: 'includeScoreExplanation',
-            columnDescription: `Why did you choose that score?`,
-            columnDefinition: {
-                type: 'string',
-            }
-        })
-
-        tableColumns.unshift({
-            columnName: 'relevantPartOfJsonObject',
-            columnDescription: `Which part of the object caused you to give that score?`,
-            columnDefinition: {
-                type: 'string',
-            }
-        })
-
-        // console.log('Input Table Columns: ', tableColumns)
-
-        // const correctedColumnNameMap = tableColumns.map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
-        const correctedColumnNameMap = Object.fromEntries(
-            tableColumns
-                .filter(column => column.columnName !== removeSpaceAndLowerCase(column.columnName))
-                .map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
-        );
-
-        const fieldDefinitions: Record<string, FieldDefinition> = {};
-        for (const column of tableColumns) {
-            const correctedColumnName = removeSpaceAndLowerCase(column.columnName)
-
-            fieldDefinitions[correctedColumnName] = {
-                ...(column.columnDefinition ? column.columnDefinition : { type: 'string' }),
-                description: column.columnDescription
+            const jsonSchema = {
+                title: "getKeyInformationFromImages",
+                description: "Fill out these arguments based on the image data",
+                type: "object",
+                properties: fieldDefinitions,
+                required: Object.keys(fieldDefinitions),
             };
-        }
-        const jsonSchema = {
-            title: "getKeyInformationFromImages",
-            description: "Fill out these arguments based on the image data",
-            type: "object",
-            properties: fieldDefinitions,
-            required: Object.keys(fieldDefinitions),
-        };
 
-        // console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))
+            // console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))
 
-        let columnNames = tableColumns.map(column => column.columnName)
-        //Add in the source and relevanceScore columns
-        columnNames.push('s3Key')
+            let columnNames = tableColumns.map(column => column.columnName)
+            //Add in the source and relevanceScore columns
+            columnNames.push('s3Key')
 
-        const s3Prefix = `production-agent/well-files/field=SanJuanEast/api=${wellApiNumber}/`;
-        const wellFiles = await listFilesUnderPrefix({
-            bucketName: process.env.DATA_BUCKET_NAME,
-            prefix: s3Prefix,
-            suffix: '.yaml'
-        })
-        // console.log('Well Files: ', wellFiles)
-
-        if (wellFiles.length === 0) {
-            const oneLevelUpS3Prefix = s3Prefix.split('/').slice(0, -2).join('/')
-
-            console.log('one level up s3 prefix: ', oneLevelUpS3Prefix)
-            const s3Folders = await listS3Folders({
+            const s3Prefix = `production-agent/well-files/field=SanJuanEast/api=${wellApiNumber}/`;
+            const wellFiles = await listFilesUnderPrefix({
                 bucketName: process.env.DATA_BUCKET_NAME,
-                prefix: oneLevelUpS3Prefix
-            })//await onFetchObjects(oneLevelUpS3Prefix)
-            // const s3Folders = s3ObjectsOneLevelHigher.filter(s3Asset => s3Asset.IsFolder).map(s3Asset => s3Asset.Key)
+                prefix: s3Prefix,
+                suffix: '.yaml'
+            })
+            // console.log('Well Files: ', wellFiles)
 
-            return {
-                messageContentType: 'tool_json',
-                error: `
+            if (wellFiles.length === 0) {
+                const oneLevelUpS3Prefix = s3Prefix.split('/').slice(0, -2).join('/')
+
+                console.log('one level up s3 prefix: ', oneLevelUpS3Prefix)
+                const s3Folders = await listS3Folders({
+                    bucketName: process.env.DATA_BUCKET_NAME,
+                    prefix: oneLevelUpS3Prefix
+                })//await onFetchObjects(oneLevelUpS3Prefix)
+                // const s3Folders = s3ObjectsOneLevelHigher.filter(s3Asset => s3Asset.IsFolder).map(s3Asset => s3Asset.Key)
+
+                return {
+                    messageContentType: 'tool_json',
+                    error: `
                 No files found for well API number: ${wellApiNumber}
                 Available well APIs:\n${s3Folders.join('\n')}
                 `
-            } as ToolMessageContentType
-        }
+                } as ToolMessageContentType
+            }
 
-        const dataRows = await processWithConcurrency({
-            items: wellFiles,
-            concurrency: 20,
-            fn: async (s3Key) => {
-                try {
+            const dataRows = await processWithConcurrency({
+                items: wellFiles,
+                concurrency: 5,
+                fn: async (s3Key) => {
+                    try {
 
-                    const getObjectResponse = await s3Client.send(new GetObjectCommand({
-                        Bucket: process.env.DATA_BUCKET_NAME,
-                        Key: s3Key
-                    }))
+                        const getObjectResponse = await s3Client.send(new GetObjectCommand({
+                            Bucket: process.env.DATA_BUCKET_NAME,
+                            Key: s3Key
+                        }))
 
-                    const objectContent = await getObjectResponse.Body?.transformToString()
-                    if (!objectContent) throw new Error(`No object content for s3 key: ${s3Key}`)
-                    if (objectContent.length < 25) return // If the file contents are empty, do not create a row for that file. The empty file has a length of 22
+                        const objectContent = await getObjectResponse.Body?.transformToString()
+                        if (!objectContent) throw new Error(`No object content for s3 key: ${s3Key}`)
+                        if (objectContent.length < 25) return // If the file contents are empty, do not create a row for that file. The empty file has a length of 22
 
-                    const messageText = `
+                        const messageText = `
                     The user is asking you to extract information from a YAML object.
                     The YAML object contains information about a well.
                     <YamlObject>
@@ -621,56 +623,71 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
                     </YamlObject>
                     `
 
-                    const fileDataResponse = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-                        query: invokeBedrockWithStructuredOutput,
-                        variables: {
-                            chatSessionId: 'dummy',
-                            lastMessageText: messageText,
-                            outputStructure: JSON.stringify(jsonSchema)
-                        }
-                    })
+                        const fileDataResponse = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
+                            query: invokeBedrockWithStructuredOutput,
+                            variables: {
+                                chatSessionId: 'dummy',
+                                lastMessageText: messageText,
+                                outputStructure: JSON.stringify(jsonSchema)
+                            }
+                        })
 
-                    // If the GQL query returns an error, return the error to the agent
-                    if (fileDataResponse.errors) {
+                        // If the GQL query returns an error, return the error to the agent
+                        if (fileDataResponse.errors) throw new Error(fileDataResponse.errors.map((error) => error.message).join('\n\n'))
+                        // if (fileDataResponse.errors) {
+                        //     throw new Error("")
+                        //     return {
+                        //         messageContentType: 'tool_json',
+                        //         error: fileDataResponse.errors.map((error) => error.message).join('\n\n')
+                        //     } as ToolMessageContentType
+                        // }
+
+                        const fileData = JSON.parse(fileDataResponse.data.invokeBedrockWithStructuredOutput || "")
+
+                        //Replace the keys in file Data with those from correctedColumnNameMap
+                        Object.keys(fileData).forEach(key => {
+                            if (key in correctedColumnNameMap) {
+                                const correctedKey = correctedColumnNameMap[key]
+                                fileData[correctedKey] = fileData[key]
+                                delete fileData[key]
+                            }
+                        })
+
                         return {
-                            messageContentType: 'tool_json',
-                            error: fileDataResponse.errors.map((error) => error.message).join('\n\n')
-                        } as ToolMessageContentType
-                    }
-
-                    const fileData = JSON.parse(fileDataResponse.data.invokeBedrockWithStructuredOutput || "")
-
-                    //Replace the keys in file Data with those from correctedColumnNameMap
-                    Object.keys(fileData).forEach(key => {
-                        if (key in correctedColumnNameMap) {
-                            const correctedKey = correctedColumnNameMap[key]
-                            fileData[correctedKey] = fileData[key]
-                            delete fileData[key]
+                            ...fileData,
+                            s3Key: s3Key
                         }
-                    })
-
-                    return {
-                        ...fileData,
-                        s3Key: s3Key
+                    } catch (error) {
+                        console.error('Error:', error);
+                        throw new Error(`Error: ${JSON.stringify(error)}`)
+                        // return {
+                        //     messageContentType: 'tool_json',
+                        //     error: `Error: ${error}`
+                        // } as ToolMessageContentType
                     }
-                } catch (error) {
-                    console.error('Error:', error);
                 }
-            }
-        })
+            })
 
 
-        // console.log('data Rows: ', dataRows)
+            // console.log('data Rows: ', dataRows)
 
-        //Sort the data rows by date (first column)
-        dataRows.sort((a, b) => a?.date.localeCompare(b?.date));
+            //Sort the data rows by date (first column)
+            dataRows.sort((a, b) => a?.date.localeCompare(b?.date));
 
-        // console.log('data Rows: ', dataRows)
+            // console.log('data Rows: ', dataRows)
 
-        return {
-            messageContentType: 'tool_table',
-            queryResponseData: dataRows
-        } as ToolMessageContentType
+            return {
+                messageContentType: 'tool_table',
+                queryResponseData: dataRows
+            } as ToolMessageContentType
+        }
+        catch (error) {
+            console.error('Error in WellTableTool invocation:', error);
+            return {
+                messageContentType: 'tool_json',
+                error: `Error: ${error}`
+            } as ToolMessageContentType
+        }
     },
     {
         name: "wellTableTool",

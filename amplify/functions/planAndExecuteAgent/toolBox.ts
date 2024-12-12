@@ -3,11 +3,12 @@ import { stringify } from "yaml";
 
 import { tool } from "@langchain/core/tools";
 
-import { AmplifyClientWrapper } from '../utils/amplifyUtils'
+import { AmplifyClientWrapper, createChatMessage } from '../utils/amplifyUtils'
 import { ToolMessageContentType } from '../../../src/utils/types'
 
 import * as APITypes from "../graphql/API";
 import { invokeBedrock, invokeProductionAgent, listChatMessageByChatSessionIdAndCreatedAt } from '../graphql/queries'
+// import { createChatMessage } from '../graphql/mutations'
 import { OnCreateChatMessageSubscription, ChatMessage } from '../graphql/API'
 
 import { onCreateChatMessage } from '../graphql/subscriptions'
@@ -56,23 +57,38 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                 return invokeBedrockResponse.data.invokeBedrock
             case "invokeProductionAgent":
                 console.log("Invoking production agent with text: ", invocationText)
+
+
+                await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
+                    query: createChatMessage,
+                    variables: {
+                        input: {
+                            chatSessionId: amplifyClientWrapper.chatSessionId,
+                            chatSessionIdDashFieldName: `${amplifyClientWrapper.chatSessionId}-${amplifyClientWrapper.fieldName}`,
+                            content: invocationText,
+                            role: APITypes.ChatMessageRole.human,
+                            owner: chatMessageOwnerIdentity,
+                            chainOfThought: true
+                        }
+                    }
+                })
+
                 amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
                     query: invokeProductionAgent,
                     variables: {
                         chatSessionId: amplifyClientWrapper.chatSessionId,
                         lastMessageText: invocationText,
-                        usePreviousMessageContext: false,
+                        // usePreviousMessageContext: false,
                         messageOwnerIdentity: chatMessageOwnerIdentity,
                         doNotSendResponseComplete: true
-                        // doNotSendResponseComplete: true
                     }
                 }).catch((error) => { //Catch the error so that the system doesn't think something is wrong
                     console.log('Invoke production agent (timeout is expected): ', error)
                 })
-                
+
 
                 //TODO: Replace this with a subscription
-                const waitForResponse = async (): Promise<ChatMessage[]>  => {
+                const waitForResponse = async (): Promise<ChatMessage[]> => {
                     return new Promise((resolve) => {
                         // Every few seconds check if the most recent chat message has the correct type
                         const interval = setInterval(async () => {
@@ -92,9 +108,9 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                                 mostRecentChatMessage.role === APITypes.ChatMessageRole.ai &&
                                 (getMessageCatigory(mostRecentChatMessage) === 'ai') && //This is a double check incase the tool returns an error, and the error message is picked up as an ai messsage.
                                 (!mostRecentChatMessage.tool_calls || mostRecentChatMessage.tool_calls === "[]") &&
-                                (!mostRecentChatMessage.tool_call_id || mostRecentChatMessage.tool_call_id==="")//Make sure the message is not a tool response message
+                                (!mostRecentChatMessage.tool_call_id || mostRecentChatMessage.tool_call_id === "")//Make sure the message is not a tool response message
                             ) {
-                                console.log("Production Agent has returned a response. Ending the check for new messages loop\nMost recent chat message:\n", 
+                                console.log("Production Agent has returned a response. Ending the check for new messages loop\nMost recent chat message:\n",
                                     stringify(mostRecentChatMessage)
                                 )
                                 clearInterval(interval)

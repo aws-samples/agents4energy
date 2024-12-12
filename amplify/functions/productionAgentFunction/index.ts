@@ -8,7 +8,7 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { RetryPolicy } from "@langchain/langgraph"
 
 import { AmplifyClientWrapper, getLangChainMessageTextContent, stringifyLimitStringLength } from '../utils/amplifyUtils'
-import { publishResponseStreamChunk } from '../graphql/mutations'
+import { publishResponseStreamChunk, updateChatMessage } from '../graphql/mutations'
 
 import { Calculator } from "@langchain/community/tools/calculator";
 
@@ -38,12 +38,15 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
 
+    const fieldName = "invokeProductionAgent" //event.info.fieldName
+
     const chatMessageOwnerIdentity = ('sub' in event.identity) ? event.identity.sub : event.arguments.messageOwnerIdentity
 
     if (!chatMessageOwnerIdentity) throw new Error(`Event does not contain user. Event:\n${JSON.stringify(event)}`);
 
     const amplifyClientWrapper = new AmplifyClientWrapper({
         chatSessionId: event.arguments.chatSessionId,
+        fieldName: fieldName,
         env: process.env
     })
 
@@ -59,11 +62,33 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
     try {
 
         // If the usePreviousMessageContent field is true or undefined, get the messages. If not set the latest message text as the only message.
-        if (!("usePreviousMessageContext" in event.arguments) || event.arguments.usePreviousMessageContext) {
-            // console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
+        if (
+            !("usePreviousMessageContext" in event.arguments) || 
+            event.arguments.usePreviousMessageContext === undefined || 
+            event.arguments.usePreviousMessageContext === null || 
+            event.arguments.usePreviousMessageContext
+        ) {
+            console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
             await amplifyClientWrapper.getChatMessageHistory({
                 latestHumanMessageText: event.arguments.lastMessageText
             })
+            // console.log("messages in langchain form: ", stringifyLimitStringLength(amplifyClientWrapper.chatMessages))
+
+            // const lastMessageId = amplifyClientWrapper.chatMessages[amplifyClientWrapper.chatMessages.length - 1].id
+
+            // if (lastMessageId) {
+            //     //Add the latest human message to the chain of thought
+            //     amplifyClientWrapper.amplifyClient.graphql({
+            //         query: updateChatMessage,
+            //         variables: {
+            //             input: {
+            //                 id: lastMessageId,
+            //                 chainOfThought: true
+            //             }
+            //         }
+            //     })
+            // }
+
         } else {
             amplifyClientWrapper.chatMessages = [
                 new HumanMessage({
@@ -95,11 +120,11 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
         const messages = amplifyClientWrapper.chatMessages
 
-        console.log("Invoking Production Agent. Latest Message:\n", stringify(messages[messages.length -1].content))
+        console.log("Invoking Production Agent. Latest Message:\n", stringify(messages[messages.length - 1].content))
 
         const ragContext = await queryKnowledgeBase({
             knowledgeBaseId: env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID,
-            query: getLangChainMessageTextContent(messages[messages.length-1]) || ""
+            query: getLangChainMessageTextContent(messages[messages.length - 1]) || ""
         })
 
         console.log("Rag context:\n", stringifyLimitStringLength(ragContext))
@@ -150,8 +175,10 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 // console.log('Tool Output: ', streamChunk)
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
+                    fieldName: fieldName,
                     owner: chatMessageOwnerIdentity,
-                    message: streamChunk
+                    message: streamChunk,
+                    chainOfThought: true
                 })
 
             } else if (streamEvent.event === "on_chat_model_end") { //When there is a full response from the chat model
@@ -169,6 +196,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
+                    fieldName: fieldName,
+                    chainOfThought: true,
                     owner: chatMessageOwnerIdentity,
                     message: streamChunkAIMessage,
                     responseComplete: !(event.arguments.doNotSendResponseComplete || (streamChunk.tool_calls && streamChunk.tool_calls.length > 0))
@@ -189,6 +218,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             const AIErrorMessage = new AIMessage({ content: error.message + `\n model id: ${process.env.MODEL_ID}` })
             await amplifyClientWrapper.publishMessage({
                 chatSessionId: event.arguments.chatSessionId,
+                fieldName: fieldName,
+                chainOfThought: true,
                 owner: chatMessageOwnerIdentity,
                 message: AIErrorMessage
             })

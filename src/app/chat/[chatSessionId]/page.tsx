@@ -429,7 +429,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
     }
 
-    function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string }) {
+    function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string, chainOfThought?: boolean }) {
         const targetChatSessionId = initialActiveChatSession?.id;
 
         if (targetChatSessionId) {
@@ -437,7 +437,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 content: props.body,
                 trace: props.trace,
                 role: props.role,
-                chatSessionId: targetChatSessionId
+                chatSessionId: targetChatSessionId,
+                chainOfThought: props.chainOfThought
             })
         }
     }
@@ -448,7 +449,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             if (!initialActiveChatSession) throw new Error("No active chat session")
             setChatSessionFirstMessageSummary(body, initialActiveChatSession)
         }
-        await addChatMessage({ body: body, role: "human" })
+        // await addChatMessage({ body: body, role: "human" })
         sendMessageToChatBot(body);
     }
 
@@ -461,15 +462,18 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         } else {
             switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
                 case defaultAgents.FoundationModel.name:
+                    await addChatMessage({ body: prompt, role: "human" })
                     console.log("invoking the foundation model")
                     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
                     if (!responseText) throw new Error("No response from agent");
                     addChatMessage({ body: responseText, role: "ai" })
                     break
                 case defaultAgents.ProductionAgent.name:
+                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true})
                     await invokeProductionAgent(prompt, initialActiveChatSession)
                     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
+                    await addChatMessage({ body: prompt, role: "human" })
                     const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: initialActiveChatSession.id })
                     console.log('Plan and execute response: ', planAndExecuteResponse)
                     break;
@@ -736,7 +740,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 // // style={{ marginLeft: '210px', padding: '20px' }}
                 // >
                 <Box
-                // sx={{ alignItems: 'center', gap: 2 }}
+                sx={{ alignItems: 'center', gap: 2, width: "100%" }}
                 >
                     {/* <Toolbar /> */}
 

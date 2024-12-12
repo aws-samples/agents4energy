@@ -4,7 +4,7 @@ import { stringify } from 'yaml';
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
 import * as APITypes from "../graphql/API";
-import { listChatMessageByChatSessionIdAndCreatedAt, getChatSession } from "../graphql/queries"
+import { listChatMessageByChatSessionIdAndCreatedAt, listChatMessageByChatSessionIdDashFieldNameAndCreatedAt, getChatSession } from "../graphql/queries"
 import { Schema } from '../../data/resource';
 
 import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
@@ -21,6 +21,8 @@ $input: CreateChatMessageInput!
 createChatMessage(condition: $condition, input: $input) {
   role
   chatSessionId
+  chatSessionIdDashFieldName
+  chainOfThought
   content
   createdAt
   id
@@ -110,7 +112,14 @@ export async function correctStructuredOutputResponse(
     return response
 }
 
-export type PublishMessageCommandInput = { chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage, responseComplete?: boolean}
+export type PublishMessageCommandInput = { 
+    chatSessionId: string, 
+    fieldName?: string, 
+    owner: string, 
+    message: HumanMessage | AIMessage | ToolMessage, 
+    responseComplete?: boolean,
+    chainOfThought?: boolean
+}
 
 type GeneratedClient = ReturnType<typeof generateClient<Schema>>;
 export class AmplifyClientWrapper {
@@ -118,10 +127,12 @@ export class AmplifyClientWrapper {
     public amplifyClient: GeneratedClient;
     public chatMessages: BaseMessage[];
     public chatSessionId: string
+    public fieldName?: string
 
-    constructor(props:{env: any, chatSessionId?: string}) {
+    constructor(props:{env: any, chatSessionId?: string, fieldName?: string}) {
         this.chatMessages = [];
         this.chatSessionId = props.chatSessionId || "";
+        this.fieldName = props.fieldName || "";
         // console.log('AMPLIFY_DATA_GRAPHQL_ENDPOINT from env: ', props.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
         //   this.env = env;
         Amplify.configure(
@@ -167,7 +178,9 @@ export class AmplifyClientWrapper {
 
         let input: APITypes.CreateChatMessageInput = {
             chatSessionId: props.chatSessionId,
+            chatSessionIdDashFieldName: `${props.chatSessionId}-${props.fieldName}`,
             content: messageTextContent || "AI Message:\n",
+            chainOfThought: props.chainOfThought || false,
             // contentBlocks: JSON.stringify(props.message.content), //The images are too big for DDB error:  ValidationException: The model returned the following errors: Input is too long for requested model.
             owner: props.owner,
             tool_calls: "[]",
@@ -219,13 +232,32 @@ export class AmplifyClientWrapper {
             variables: {
                 limit: 20,
                 chatSessionId: this.chatSessionId,
-                sortDirection: APITypes.ModelSortDirection.DESC
+                sortDirection: APITypes.ModelSortDirection.DESC,
+                filter: {
+                    chainOfThought: {
+                        eq: true
+                    }
+                }
             }
         })
 
+        // // Get the chat messages from the chat session for the agent
+        // const chatSessionMessages = await this.amplifyClient.graphql({ //listChatMessageByChatSessionIdAndCreatedAt
+        //     query: listChatMessageByChatSessionIdDashFieldNameAndCreatedAt,
+        //     variables: {
+        //         limit: 20,
+        //         chatSessionIdDashFieldName: `${this.chatSessionId}-${this.fieldName}`,
+        //         sortDirection: APITypes.ModelSortDirection.DESC
+        //     }
+        // })
+
+        console.log(`Retrieved ${chatSessionMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items.length} messages`)
+        // console.log('ChatSessionMessageQueryResponse: ', stringifyLimitStringLength(chatSessionMessages))
         // console.log('messages from gql query: ', chatSessionMessages)
 
+        // const sortedMessages = chatSessionMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items.reverse()
         const sortedMessages = chatSessionMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items.reverse()
+        
 
         // Remove all of the messages before the first message with the role of human
         const firstHumanMessageIndex = sortedMessages.findIndex((message) => message.role === 'human');
@@ -235,6 +267,7 @@ export class AmplifyClientWrapper {
         const messages: BaseMessage[] = sortedMessagesStartingWithHumanMessage.map((message) => {
             if (message.role === 'human') {
                 return new HumanMessage({
+                    id: message.id,
                     content: message.content,
                 })
             } else if (message.role === 'ai') {

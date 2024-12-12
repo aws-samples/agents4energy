@@ -94,6 +94,7 @@ const schema = a.schema({
       trace: a.string(),
       role: a.enum(["human", "ai", "tool"]),
       chatSessionIdDashFieldName: a.string().default("none"), //This exists to let agents pull their messages in a multi agent environment
+      chainOfThought: a.boolean().default(false),
       owner: a.string(),
       createdAt: a.datetime(),
       tool_call_id: a.string(), //This is the langchain tool call id

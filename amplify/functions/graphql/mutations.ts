@@ -13,6 +13,7 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
   $input: CreateChatMessageInput!
 ) {
   createChatMessage(condition: $condition, input: $input) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
@@ -80,6 +81,7 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
   $input: DeleteChatMessageInput!
 ) {
   deleteChatMessage(condition: $condition, input: $input) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
@@ -167,6 +169,7 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
   $input: UpdateChatMessageInput!
 ) {
   updateChatMessage(condition: $condition, input: $input) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content

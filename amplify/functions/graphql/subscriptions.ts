@@ -13,6 +13,7 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
   $owner: String
 ) {
   onCreateChatMessage(filter: $filter, owner: $owner) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
@@ -80,6 +81,7 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
   $owner: String
 ) {
   onDeleteChatMessage(filter: $filter, owner: $owner) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
@@ -147,6 +149,7 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
   $owner: String
 ) {
   onUpdateChatMessage(filter: $filter, owner: $owner) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
