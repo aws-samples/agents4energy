@@ -13,12 +13,14 @@ export const createChatMessage = /* GraphQL */ `mutation CreateChatMessage(
   $input: CreateChatMessageInput!
 ) {
   createChatMessage(condition: $condition, input: $input) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -79,12 +81,14 @@ export const deleteChatMessage = /* GraphQL */ `mutation DeleteChatMessage(
   $input: DeleteChatMessageInput!
 ) {
   deleteChatMessage(condition: $condition, input: $input) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -140,10 +144,19 @@ export const deleteChatSession = /* GraphQL */ `mutation DeleteChatSession(
   APITypes.DeleteChatSessionMutationVariables,
   APITypes.DeleteChatSessionMutation
 >;
-export const publishResponseStreamChunk = /* GraphQL */ `mutation PublishResponseStreamChunk($chatSessionId: String!, $chunk: String!) {
-  publishResponseStreamChunk(chatSessionId: $chatSessionId, chunk: $chunk) {
+export const publishResponseStreamChunk = /* GraphQL */ `mutation PublishResponseStreamChunk(
+  $chatSessionId: String!
+  $chunk: String!
+  $index: Int
+) {
+  publishResponseStreamChunk(
+    chatSessionId: $chatSessionId
+    chunk: $chunk
+    index: $index
+  ) {
     chatSessionId
     chunk
+    index
     __typename
   }
 }
@@ -156,12 +169,14 @@ export const updateChatMessage = /* GraphQL */ `mutation UpdateChatMessage(
   $input: UpdateChatMessageInput!
 ) {
   updateChatMessage(condition: $condition, input: $input) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt

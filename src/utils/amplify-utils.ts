@@ -1,5 +1,6 @@
 import { generateClient } from "aws-amplify/data";
 import { list, ListPaginateWithPathInput } from 'aws-amplify/storage';
+import { Message, ToolMessageContentType, messageContentType } from './types'
 
 import { type Schema } from "../../amplify/data/resource";
 
@@ -82,3 +83,24 @@ export const onFetchObjects = async (pathPrefix: string): Promise<readonly S3Ass
         return Promise.resolve([]); // Return an empty array in case of an error
     }
 }
+
+export function isValidJSON(str: string): boolean {
+    try {
+      JSON.parse(str);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+export function getMessageCatigory(message: Message): messageContentType {
+    if (!message.tool_name) {
+      //This is an AI message
+      return 'ai'
+    } else if (!isValidJSON(message.content)) {
+      //This is a markdown tool message
+      return 'tool_markdown'
+    } else {
+      return (JSON.parse(message.content) as ToolMessageContentType).messageContentType
+    }
+  }

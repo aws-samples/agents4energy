@@ -48,13 +48,6 @@ const backend = defineBackend({
   preSignUp
 });
 
-// backend.addOutput({
-//   custom: {
-//     api_id: backend.data.resources.graphqlApi.apiId,
-//     root_stack_name: 
-//   },
-// });
-
 const bedrockRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
   "bedrockRuntimeDS",
   `https://bedrock-runtime.${backend.auth.stack.region}.amazonaws.com`,
@@ -110,18 +103,6 @@ bedrockAgentDataSource.grantPrincipal.addToPrincipalPolicy(
   })
 );
 
-// bedrockAgentRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
-//   new iam.PolicyStatement({
-//     resources: [
-//       `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:agent-alias/*`,
-//     ],
-//     actions: [
-//       "bedrock:InvokeAgent",
-//     ],
-
-//   })
-// );
-
 backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     resources: [
@@ -144,8 +125,8 @@ backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolic
   })
 )
 
-const customStack = backend.createStack('productionAgentStack')
-const rootStack = cdk.Stack.of(customStack).nestedStackParent
+const networkingStack = backend.createStack('networkingStack')
+const rootStack = cdk.Stack.of(networkingStack).nestedStackParent
 if (!rootStack) throw new Error('Root stack not found')
 
 backend.addOutput({
@@ -155,11 +136,7 @@ backend.addOutput({
   },
 });
 
-// const vpc = new ec2.Vpc(customStack, 'VPC', {
-//   ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
-// })
-
-const vpc = new ec2.Vpc(customStack, 'A4E-VPC', {
+const vpc = new ec2.Vpc(networkingStack, 'A4E-VPC', {
   ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
   maxAzs: 3,
   enableDnsHostnames: true,
@@ -188,13 +165,18 @@ function applyTagsToRootStack() {
   })
   cdk.Tags.of(rootStack).add('rootStackName', rootStack.stackName)
 }
-
 applyTagsToRootStack()
+
+
+///////////////////////////////////////////////////////////
+/////// Create the Production Agent Stack /////////////////
+///////////////////////////////////////////////////////////
+const productionAgentStack = backend.createStack('prodAgentStack')
 
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
-const uploadToS3Deployment = new s3Deployment.BucketDeployment(customStack, 'sample-well-file-deployment', {
+const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentStack, 'sample-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
   prune: false
@@ -205,47 +187,70 @@ const {
   convertPdfToYamlFunction,
   triggerCrawlerSfnFunction,
   pdfProcessingQueue,
+  wellFileDriveBucket,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
   sqlTableDefBedrockKnoledgeBase,
+  petroleumEngineeringKnowledgeBase,
   athenaWorkgroup,
   athenaPostgresCatalog,
 
-} = productionAgentBuilder(customStack, {
+} = productionAgentBuilder(productionAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
   s3Bucket: backend.storage.resources.bucket,
-  // appSyncApi: backend.data.resources.graphqlApi
 })
 
 // Custom resource Lambda to introduce a delay between when the PDF to Yaml function finishes deploying, and when the objects are uploaded.
-const delayFunction = new lambda.Function(customStack, 'DelayFunction', {
+const delayFunction = new lambda.Function(productionAgentStack, 'DelayFunction', {
   runtime: lambda.Runtime.NODEJS_18_X,
   handler: 'index.handler',
-  timeout: cdk.Duration.minutes(10),
+  timeout: cdk.Duration.minutes(15),
   code: lambda.Code.fromInline(`
     exports.handler = async () => {
-      console.log('Waiting for 60 seconds...');
-      await new Promise(resolve => setTimeout(resolve, 60000));
+      const secondsToWait = 600
+      console.log('Waiting for ',secondsToWait,' seconds...');
+      await new Promise(resolve => setTimeout(resolve, secondsToWait*1000));
       console.log('Wait complete.');
       return { statusCode: 200 };
     };
   `),
 });
-const delayProvider = new cr.Provider(customStack, 'DelayProvider', {
+const delayProvider = new cr.Provider(productionAgentStack, 'DelayProvider', {
   onEventHandler: delayFunction,
 });
-const delayResource = new cdk.CustomResource(customStack, 'DelayResource', {
+const delayResource = new cdk.CustomResource(productionAgentStack, 'DelayResource', {
   serviceToken: delayProvider.serviceToken,
 });
 delayResource.node.addDependency(convertPdfToYamlFunction)
 delayResource.node.addDependency(triggerCrawlerSfnFunction)
 delayResource.node.addDependency(pdfProcessingQueue)
+delayResource.node.addDependency(wellFileDriveBucket)
 
-uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the functions triggerCrawlerSfnFunction and convertPdfToYamlFunction are done deploying
+uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the resources handling uploads are deployed
+
+// new cr.AwsCustomResource(productionAgentStack, 'GenerateS3CreateObjectEvents', {
+//   onCreate: {
+//       service: '@aws-sdk/client-s3',
+//       action: 'copy',
+//       parameters: {
+//           bucket: "",
+//           knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId
+//       },
+//       physicalResourceId: cr.PhysicalResourceId.of('StartIngestionPetroleumEngineeringDataSource'),
+//   },
+//   policy: cr.AwsCustomResourcePolicy.fromStatements([
+//       new iam.PolicyStatement({
+//           actions: ['bedrock:startIngestionJob'],
+//           resources: [petroleumEngineeringKnowledgeBase.knowledgeBaseArn]
+//       })
+//   ])
+// })
+
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
+backend.productionAgentFunction.addEnvironment('PETROLEUM_ENG_KNOWLEDGE_BASE_ID', petroleumEngineeringKnowledgeBase.knowledgeBaseId)
 backend.productionAgentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', athenaWorkgroup.name)
 backend.productionAgentFunction.addEnvironment('DATABASE_NAME', defaultProdDatabaseName)
 backend.productionAgentFunction.addEnvironment('ATHENA_CATALOG_NAME', athenaPostgresCatalog.name)
@@ -268,32 +273,16 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["bedrock:Retrieve"],
     resources: [
-      sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn
+      sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn,
+      petroleumEngineeringKnowledgeBase.knowledgeBaseArn
     ],
   })
 )
 
-
-// backend.productionAgentFunction.resources.lambda.addToRolePolicy(
-//   new iam.PolicyStatement({
-//     actions: ["states:StartSyncExecution"],
-//     resources: [queryImagesStateMachineArn],
-//   })
-// )
-
-// //Create data sources and resolvers for the lambdas created in the production agent stack
-// const convertPdfToImageDS = backend.data.addLambdaDataSource(
-//   'convertPdfToImageDS',
-//   getInfoFromPdfFunction
-// )
-
-// convertPdfToImageDS.createResolver(
-//   'getInfoFromPdfResolver',
-//   {
-//     typeName: 'Query',
-//     fieldName: 'getInfoFromPdf'
-//   }
-// )
+///////////////////////////////////////////////////////////
+/////// Create the Configurator Stack /////////////////////
+///////////////////////////////////////////////////////////
+// This stack configures the GraphQL API and adds a hook to the conginto user pool to check email address domain before allowing sign up.
 
 // Create a stack with the resources to configure the app
 const configuratorStack = backend.createStack('configuratorStack')
@@ -301,7 +290,6 @@ const configuratorStack = backend.createStack('configuratorStack')
 new AppConfigurator(configuratorStack, 'appConfigurator', {
   hydrocarbonProductionDb: hydrocarbonProductionDb,
   defaultProdDatabaseName: defaultProdDatabaseName,
-  // sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
   athenaWorkgroup: athenaWorkgroup,
   athenaPostgresCatalog: athenaPostgresCatalog,
   s3Bucket: backend.storage.resources.bucket,

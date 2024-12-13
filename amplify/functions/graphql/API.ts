@@ -4,12 +4,14 @@
 
 export type ChatMessage = {
   __typename: "ChatMessage",
+  chainOfThought?: boolean | null,
   chatSessionId?: string | null,
   chatSessionIdDashFieldName?: string | null,
   content: string,
   createdAt?: string | null,
   id: string,
   owner?: string | null,
+  responseComplete?: boolean | null,
   role?: ChatMessageRole | null,
   session?: ChatSession | null,
   tool_call_id?: string | null,
@@ -78,6 +80,7 @@ export type ModelStringKeyConditionInput = {
 
 export type ModelChatMessageFilterInput = {
   and?: Array< ModelChatMessageFilterInput | null > | null,
+  chainOfThought?: ModelBooleanInput | null,
   chatSessionId?: ModelIDInput | null,
   chatSessionIdDashFieldName?: ModelStringInput | null,
   content?: ModelStringInput | null,
@@ -86,6 +89,7 @@ export type ModelChatMessageFilterInput = {
   not?: ModelChatMessageFilterInput | null,
   or?: Array< ModelChatMessageFilterInput | null > | null,
   owner?: ModelStringInput | null,
+  responseComplete?: ModelBooleanInput | null,
   role?: ModelChatMessageRoleInput | null,
   tool_call_id?: ModelStringInput | null,
   tool_calls?: ModelStringInput | null,
@@ -93,6 +97,27 @@ export type ModelChatMessageFilterInput = {
   trace?: ModelStringInput | null,
   updatedAt?: ModelStringInput | null,
 };
+
+export type ModelBooleanInput = {
+  attributeExists?: boolean | null,
+  attributeType?: ModelAttributeTypes | null,
+  eq?: boolean | null,
+  ne?: boolean | null,
+};
+
+export enum ModelAttributeTypes {
+  _null = "_null",
+  binary = "binary",
+  binarySet = "binarySet",
+  bool = "bool",
+  list = "list",
+  map = "map",
+  number = "number",
+  numberSet = "numberSet",
+  string = "string",
+  stringSet = "stringSet",
+}
+
 
 export type ModelIDInput = {
   attributeExists?: boolean | null,
@@ -109,20 +134,6 @@ export type ModelIDInput = {
   notContains?: string | null,
   size?: ModelSizeInput | null,
 };
-
-export enum ModelAttributeTypes {
-  _null = "_null",
-  binary = "binary",
-  binarySet = "binarySet",
-  bool = "bool",
-  list = "list",
-  map = "map",
-  number = "number",
-  numberSet = "numberSet",
-  string = "string",
-  stringSet = "stringSet",
-}
-
 
 export type ModelSizeInput = {
   between?: Array< number | null > | null,
@@ -183,6 +194,7 @@ export type ModelChatSessionConnection = {
 
 export type ModelChatMessageConditionInput = {
   and?: Array< ModelChatMessageConditionInput | null > | null,
+  chainOfThought?: ModelBooleanInput | null,
   chatSessionId?: ModelIDInput | null,
   chatSessionIdDashFieldName?: ModelStringInput | null,
   content?: ModelStringInput | null,
@@ -190,6 +202,7 @@ export type ModelChatMessageConditionInput = {
   not?: ModelChatMessageConditionInput | null,
   or?: Array< ModelChatMessageConditionInput | null > | null,
   owner?: ModelStringInput | null,
+  responseComplete?: ModelBooleanInput | null,
   role?: ModelChatMessageRoleInput | null,
   tool_call_id?: ModelStringInput | null,
   tool_calls?: ModelStringInput | null,
@@ -199,12 +212,14 @@ export type ModelChatMessageConditionInput = {
 };
 
 export type CreateChatMessageInput = {
+  chainOfThought?: boolean | null,
   chatSessionId?: string | null,
   chatSessionIdDashFieldName?: string | null,
   content: string,
   createdAt?: string | null,
   id?: string | null,
   owner?: string | null,
+  responseComplete?: boolean | null,
   role?: ChatMessageRole | null,
   tool_call_id?: string | null,
   tool_calls?: string | null,
@@ -253,15 +268,18 @@ export type ResponseStreamChunk = {
   __typename: "ResponseStreamChunk",
   chatSessionId: string,
   chunk: string,
+  index?: number | null,
 };
 
 export type UpdateChatMessageInput = {
+  chainOfThought?: boolean | null,
   chatSessionId?: string | null,
   chatSessionIdDashFieldName?: string | null,
   content?: string | null,
   createdAt?: string | null,
   id: string,
   owner?: string | null,
+  responseComplete?: boolean | null,
   role?: ChatMessageRole | null,
   tool_call_id?: string | null,
   tool_calls?: string | null,
@@ -280,6 +298,7 @@ export type UpdateChatSessionInput = {
 
 export type ModelSubscriptionChatMessageFilterInput = {
   and?: Array< ModelSubscriptionChatMessageFilterInput | null > | null,
+  chainOfThought?: ModelSubscriptionBooleanInput | null,
   chatSessionId?: ModelSubscriptionIDInput | null,
   chatSessionIdDashFieldName?: ModelSubscriptionStringInput | null,
   content?: ModelSubscriptionStringInput | null,
@@ -287,12 +306,18 @@ export type ModelSubscriptionChatMessageFilterInput = {
   id?: ModelSubscriptionIDInput | null,
   or?: Array< ModelSubscriptionChatMessageFilterInput | null > | null,
   owner?: ModelStringInput | null,
+  responseComplete?: ModelSubscriptionBooleanInput | null,
   role?: ModelSubscriptionStringInput | null,
   tool_call_id?: ModelSubscriptionStringInput | null,
   tool_calls?: ModelSubscriptionStringInput | null,
   tool_name?: ModelSubscriptionStringInput | null,
   trace?: ModelSubscriptionStringInput | null,
   updatedAt?: ModelSubscriptionStringInput | null,
+};
+
+export type ModelSubscriptionBooleanInput = {
+  eq?: boolean | null,
+  ne?: boolean | null,
 };
 
 export type ModelSubscriptionIDInput = {
@@ -345,12 +370,14 @@ export type GetChatMessageQueryVariables = {
 export type GetChatMessageQuery = {
   getChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -448,6 +475,7 @@ export type InvokePlanAndExecuteAgentQuery = {
 
 export type InvokeProductionAgentQueryVariables = {
   chatSessionId?: string | null,
+  doNotSendResponseComplete?: boolean | null,
   lastMessageText: string,
   messageOwnerIdentity?: string | null,
   usePreviousMessageContext?: boolean | null,
@@ -494,12 +522,14 @@ export type ListChatMessageByChatSessionIdAndCreatedAtQuery = {
     __typename: "ModelChatMessageConnection",
     items:  Array< {
       __typename: "ChatMessage",
+      chainOfThought?: boolean | null,
       chatSessionId?: string | null,
       chatSessionIdDashFieldName?: string | null,
       content: string,
       createdAt?: string | null,
       id: string,
       owner?: string | null,
+      responseComplete?: boolean | null,
       role?: ChatMessageRole | null,
       tool_call_id?: string | null,
       tool_calls?: string | null,
@@ -525,12 +555,14 @@ export type ListChatMessageByChatSessionIdDashFieldNameAndCreatedAtQuery = {
     __typename: "ModelChatMessageConnection",
     items:  Array< {
       __typename: "ChatMessage",
+      chainOfThought?: boolean | null,
       chatSessionId?: string | null,
       chatSessionIdDashFieldName?: string | null,
       content: string,
       createdAt?: string | null,
       id: string,
       owner?: string | null,
+      responseComplete?: boolean | null,
       role?: ChatMessageRole | null,
       tool_call_id?: string | null,
       tool_calls?: string | null,
@@ -553,12 +585,14 @@ export type ListChatMessagesQuery = {
     __typename: "ModelChatMessageConnection",
     items:  Array< {
       __typename: "ChatMessage",
+      chainOfThought?: boolean | null,
       chatSessionId?: string | null,
       chatSessionIdDashFieldName?: string | null,
       content: string,
       createdAt?: string | null,
       id: string,
       owner?: string | null,
+      responseComplete?: boolean | null,
       role?: ChatMessageRole | null,
       tool_call_id?: string | null,
       tool_calls?: string | null,
@@ -602,12 +636,14 @@ export type CreateChatMessageMutationVariables = {
 export type CreateChatMessageMutation = {
   createChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -666,12 +702,14 @@ export type DeleteChatMessageMutationVariables = {
 export type DeleteChatMessageMutation = {
   deleteChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -725,6 +763,7 @@ export type DeleteChatSessionMutation = {
 export type PublishResponseStreamChunkMutationVariables = {
   chatSessionId: string,
   chunk: string,
+  index?: number | null,
 };
 
 export type PublishResponseStreamChunkMutation = {
@@ -732,6 +771,7 @@ export type PublishResponseStreamChunkMutation = {
     __typename: "ResponseStreamChunk",
     chatSessionId: string,
     chunk: string,
+    index?: number | null,
   } | null,
 };
 
@@ -743,12 +783,14 @@ export type UpdateChatMessageMutationVariables = {
 export type UpdateChatMessageMutation = {
   updateChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -807,12 +849,14 @@ export type OnCreateChatMessageSubscriptionVariables = {
 export type OnCreateChatMessageSubscription = {
   onCreateChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -871,12 +915,14 @@ export type OnDeleteChatMessageSubscriptionVariables = {
 export type OnDeleteChatMessageSubscription = {
   onDeleteChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -935,12 +981,14 @@ export type OnUpdateChatMessageSubscriptionVariables = {
 export type OnUpdateChatMessageSubscription = {
   onUpdateChatMessage?:  {
     __typename: "ChatMessage",
+    chainOfThought?: boolean | null,
     chatSessionId?: string | null,
     chatSessionIdDashFieldName?: string | null,
     content: string,
     createdAt?: string | null,
     id: string,
     owner?: string | null,
+    responseComplete?: boolean | null,
     role?: ChatMessageRole | null,
     session?:  {
       __typename: "ChatSession",
@@ -1000,5 +1048,6 @@ export type RecieveResponseStreamChunkSubscription = {
     __typename: "ResponseStreamChunk",
     chatSessionId: string,
     chunk: string,
+    index?: number | null,
   } | null,
 };

@@ -94,11 +94,13 @@ const schema = a.schema({
       trace: a.string(),
       role: a.enum(["human", "ai", "tool"]),
       chatSessionIdDashFieldName: a.string().default("none"), //This exists to let agents pull their messages in a multi agent environment
+      chainOfThought: a.boolean().default(false),
       owner: a.string(),
       createdAt: a.datetime(),
       tool_call_id: a.string(), //This is the langchain tool call id
       tool_name: a.string(),
-      tool_calls: a.json()
+      tool_calls: a.json(),
+      responseComplete: a.boolean().default(false)
     })
     .secondaryIndexes((index) => [
       index("chatSessionId").sortKeys(["createdAt"]),
@@ -156,7 +158,8 @@ const schema = a.schema({
       lastMessageText: a.string().required(),//input
       chatSessionId: a.string(),
       usePreviousMessageContext: a.boolean(),
-      messageOwnerIdentity: a.string()// Use this to set the identiy of the owner of the messages
+      messageOwnerIdentity: a.string(),// Use this to set the identiy of the owner of the messages
+      doNotSendResponseComplete: a.boolean()//If this agent is called by another agent, don't send responseComplete in the final message
     })
     .returns(a.json())
     .handler(a.handler.function(productionAgentFunction))
@@ -172,27 +175,11 @@ const schema = a.schema({
     .handler(a.handler.function(planAndExecuteAgentFunction))
     .authorization((allow) => [allow.authenticated()]),
 
-  // getInfoFromPdf: a
-  //   .query()
-  //   .arguments({
-  //     s3Key: a.string().required(),
-  //     tableColumns: a.json().required(),
-  //     dataToExclude: a.json(),
-  //     dataToInclude: a.json()
-  //   })
-  //   .returns(a.json()),
-
-  // convertPdfToJson: a
-  //   .query()
-  //   .arguments({
-  //     s3Key: a.string().required()
-  //   })
-  //   .returns(a.json()),
-
   //These assets enable token level streaming from the model
   ResponseStreamChunk: a
     .customType({
       chunk: a.string().required(),
+      index: a.integer(),
       chatSessionId: a.string().required()
     }),
 
@@ -200,6 +187,7 @@ const schema = a.schema({
     .mutation()
     .arguments({
       chunk: a.string().required(),
+      index: a.integer(),
       chatSessionId: a.string().required(),
     })
     .returns(a.ref('ResponseStreamChunk'))

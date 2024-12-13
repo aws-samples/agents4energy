@@ -5,16 +5,20 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { Schema } from '../../data/resource';
 
 import { ChatBedrockConverse } from "@langchain/aws";
-import { BaseMessage, AIMessage, ToolMessage, AIMessageChunk, HumanMessage, isAIMessageChunk } from "@langchain/core/messages";
+import { BaseMessage, AIMessage, ToolMessage, AIMessageChunk, HumanMessage, isAIMessageChunk, BaseMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { END, START, StateGraph, Annotation, CompiledStateGraph, StateDefinition } from "@langchain/langgraph";
 import { RunnableConfig } from "@langchain/core/runnables";
+import { RetryPolicy } from "@langchain/langgraph"
 
-import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
+import { AmplifyClientWrapper, getLangChainMessageTextContent, stringifyLimitStringLength } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk, updateChatSession } from '../graphql/mutations'
 
+import { Calculator } from "@langchain/community/tools/calculator";
+
 import { queryGQLToolBuilder } from './toolBox'
+import { isValidJSON } from "../../../src/utils/amplify-utils";
 
 const PlanStepSchema = z.object({
     title: z.string(),
@@ -48,21 +52,24 @@ function areListsEqual<T>(list1: T[] | undefined, list2: T[] | undefined): boole
         list1.every((value, index) => value === list2[index]);
 }
 
-async function publishTokenStreamChunk(props: { tokenStreamChunk: AIMessageChunk, amplifyClientWrapper: AmplifyClientWrapper }) {
+async function publishTokenStreamChunk(props: { tokenStreamChunk: AIMessageChunk, tokenIndex: number, amplifyClientWrapper: AmplifyClientWrapper }) {
     // console.log("publishTokenStreamChunk: ", props.tokenStreamChunk)
     const streamChunk = props.tokenStreamChunk// as AIMessageChunk
     // console.log("streamChunk: ", streamChunk)
     // const chunkContent = streamEvent.data.chunk.kwargs.content
+
     const chunkContent = getLangChainMessageTextContent(streamChunk)
-    // console.log("chunkContent: ", chunkContent)
+
+    // process.stdout.write(`\x1b[32m${chunkContent}\x1b[0m`); //Write the chunk to the log with green text
 
     if (chunkContent) {
         // console.log("chunkContent: ", chunkContent)
-        // process.stdout.write(chunkContent) //Write the chunk to the log
+
         await props.amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
             query: publishResponseStreamChunk,
             variables: {
                 chatSessionId: props.amplifyClientWrapper.chatSessionId,
+                index: props.tokenIndex,
                 chunk: chunkContent
             }
         })
@@ -87,7 +94,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
     })
 
     try {
-        console.log('Getting the current chat session info')
+        // console.log('Getting the current chat session info')
         const chatSession = await amplifyClientWrapper.getChatSession({ chatSessionId: event.arguments.chatSessionId })
         if (!chatSession) throw new Error(`Chat session ${event.arguments.chatSessionId} not found`)
 
@@ -97,41 +104,36 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             // latestHumanMessageText: event.arguments.input
         })
 
-
-        // console.log("mesages in langchain form: ", amplifyClientWrapper.chatMessages)
-        if (!chatSession.pastSteps) {
-            //This is the inital message to the planning agent
-            const executeAgentChatSessionUpdate = await amplifyClientWrapper.amplifyClient.graphql({
-                query: updateChatSession,
-                variables: {
-                    input: {
-                        id: event.arguments.chatSessionId,
-                        planGoal: event.arguments.lastMessageText
-                    }
+        // Update the chat session with the user's intention
+        await amplifyClientWrapper.amplifyClient.graphql({
+            query: updateChatSession,
+            variables: {
+                input: {
+                    id: event.arguments.chatSessionId,
+                    planGoal: event.arguments.lastMessageText
                 }
-            })
-        }
+            }
+        })
 
 
         // Define inputs to the agent
         const inputs = {
-            // input: event.arguments.lastMessageText,
-            input: chatSession?.planGoal || event.arguments.lastMessageText, //If the planGoal exists, this is a follow up message and so we preserve the intial goal
+            input: event.arguments.lastMessageText,
             plan: chatSession?.planSteps?.map(step => JSON.parse(step || "") as PlanStep),
             pastSteps: chatSession?.pastSteps?.map(step => JSON.parse(step || "") as PlanStep),
         }
 
-        ///////////////////////////////////////////////
-        ///////// Executor Agent Step /////////////////
-        ///////////////////////////////////////////////
-
         // Select the model to use for the executor agent
-        const executorAgentModel = new ChatBedrockConverse({
+        const agentModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
             temperature: 0
         });
 
+        ///////////////////////////////////////////////
+        ///////// Executor Agent Step /////////////////
+        ///////////////////////////////////////////////
         const agentExecutorTools = [
+            new Calculator,
             queryGQLToolBuilder({
                 amplifyClientWrapper: amplifyClientWrapper,
                 chatMessageOwnerIdentity: event.identity.sub
@@ -140,7 +142,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         //Create the executor agent
         const agentExecutor = createReactAgent({
-            llm: executorAgentModel,
+            llm: agentModel,
             tools: agentExecutorTools,
         });
 
@@ -160,61 +162,31 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                     .describe("Different steps to follow. Sort in order of completion"),
             }),
         );
-        const planFunction = {
-            name: "plan",
-            description: "This tool is used to plan the steps to follow",
-            type: "object",
-            parameters: plan,
-        };
 
-        const planTool = {
-            type: "function",
-            function: planFunction,
-        };
-
-        const plannerPrompt = ChatPromptTemplate.fromTemplate(
-            `For the given objective, come up with a simple step by step plan. 
-            This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps.
-            The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
-
-            {objective}`,
-        );
-
-        const planningModel = new ChatBedrockConverse({
-            model: process.env.MODEL_ID,
-            temperature: 0
-        }).withStructuredOutput(plan);
-
-        // const planner = plannerPrompt.pipe(planningModel);
-
-        // const dummyPlannerResponse = await planner.invoke({
-        //     objective: "what is the hometown of the current Australia open winner?",
-        // });
-        // console.log("Dummy Planner Response:\n", dummyPlannerResponse)
+        const planningModel = agentModel.withStructuredOutput(plan);
 
         ///////////////////////////////////////////////
         ///////// Re-Planning Step ////////////////////
         ///////////////////////////////////////////////
 
 
-
         const replannerPrompt = ChatPromptTemplate.fromTemplate(
             `For the given objective, come up with a simple step by step plan. 
             This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps.
             The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
+            Favor assigning the role of ai to human if an available tool may be able to resolve the step.
             
             Your objective was this:
             {objective}
             
-            Your original plan was this:
+            Your original plan (if any) was this:
             {plan}
             
             You have currently done the follow steps:
             {pastSteps}
             
-            Update your plan accordingly. If no more steps are needed and you can return to the user, then respond with that and use the 'response' function.
-            Otherwise, fill out the plan.  
-            Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.`,
+            Update your plan accordingly.  
+            Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.`.replace(/^\s+/gm, ''),
         );
 
         const replanner = replannerPrompt.pipe(planningModel);
@@ -224,7 +196,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////////////////////////////////////////////
 
         const responderPrompt = ChatPromptTemplate.fromTemplate(
-            `Respond to the user based on the origional objective and completed steps.
+            `Respond to the user in markdown format based on the origional objective and completed steps.
             
             Your objective was this:
             {input}
@@ -234,20 +206,17 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             
             You have currently done the follow steps:
             {pastSteps}
-            `,
+            `.replace(/^\s+/gm, ''),
         );
 
 
         const response = zodToJsonSchema(
             z.object({
-                response: z.string().describe("Response to user."),
+                response: z.string().describe("Response to user in markdown format."),
             }),
         );
 
-        const responderModel = new ChatBedrockConverse({
-            model: process.env.MODEL_ID,
-            temperature: 0
-        }).withStructuredOutput(response);
+        const responderModel = agentModel.withStructuredOutput(response);
 
         const responder = responderPrompt.pipe(responderModel)
 
@@ -257,19 +226,23 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////// Create the Graph ////////////////////
         ///////////////////////////////////////////////
         const customHandler = {
-            handleLLMNewToken: async (token: string, idx: any, runId: any, parentRunId: any, tags: any, fields: any) => {
-            //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
-            //   process.stdout.write(fields)
+            handleLLMNewToken: async (token: string, idx: { completion: number, prompt: number }, runId: any, parentRunId: any, tags: any, fields: any) => {
+                //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
+
+                const tokenStreamChunk = new AIMessageChunk({ content: token.length > 0 ? token : '.'.repeat(Math.ceil(Math.random() * 5)) })
+
+                process.stdout.write(`\x1b[32m${getLangChainMessageTextContent(tokenStreamChunk)}\x1b[0m`); //Write the chunk to the log with green text
+
                 await publishTokenStreamChunk({
-                    tokenStreamChunk: new AIMessageChunk({ content: token.length > 0 ? token: "."}),
+                    tokenStreamChunk: tokenStreamChunk,//This is just meant to show something is happening.
+                    tokenIndex: -2,
                     amplifyClientWrapper: amplifyClientWrapper
                 })
             },
             handleChatModelStart: async (llm: any, inputMessages: any, runId: any) => {
-                console.log("Chat model start:", llm, inputMessages, runId);
-              },
-          };
-
+                console.log("Chat model start:\n", stringifyLimitStringLength(inputMessages));
+            },
+        };
 
         async function executeStep(
             state: typeof PlanExecuteState.State,
@@ -279,12 +252,17 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
             const inputs = {
                 messages: [new HumanMessage(`
+                    The user has the following objective
+                    <objective>
+                    ${state.input}
+                    </objective>
+
                     The following steps have been completed
                     <previousSteps>
                     ${stringify(state.pastSteps)}
                     </previousSteps>
                     
-                    Now execute this task:
+                    Now execute this task
                     <task>
                     ${stringify(task)}
                     </task>
@@ -292,22 +270,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             };
             const { messages } = await agentExecutor.invoke(inputs, config);
             const resultText = getLangChainMessageTextContent(messages.slice(-1)[0]) || ""
-
-            // // console.log("Invoking agent executor")
-            // const agentExecutorResponse = await invokeAndStreamOutput({
-            //     langGraphAgent: agentExecutor,
-            //     inputs: inputs,
-            //     config: config
-            // })// as { output: {messages: AIMessage[]} }
-
-            // if (!agentExecutorResponse || !agentExecutorResponse.lastMessage) {
-            //     throw new Error(`No response from agent executor. AgentExecutorResponse:\n${stringify(agentExecutorResponse)}\n\n`)
-            // }
-
-            // console.log("Agent executor Response: \n", agentExecutorResponse)
-
-            // const resultText = getLangChainMessageTextContent(agentExecutorResponse.lastMessage) || ""
-            // // console.log('past Steps: ', state.pastSteps)
+            console.log("Execute Step Complete. Result Text:\n", resultText)
 
             return {
                 pastSteps: [
@@ -372,13 +335,39 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                     config
                 );
 
+            console.log("New Plan:\n", stringify(newPlanFromInvoke))
+
+            if (!newPlanFromInvoke.steps) throw new Error("No steps returned from replanner")
+
+            if (typeof newPlanFromInvoke.steps === 'string' && isValidJSON(newPlanFromInvoke.steps)) {
+                console.log("Steps are a string and valid JSON. Converting them to an object")
+                newPlanFromInvoke.steps = JSON.parse(newPlanFromInvoke.steps) as PlanStep[]
+            }
+
+            if (
+                !Array.isArray(newPlanFromInvoke.steps) ||
+                !newPlanFromInvoke.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
+                )
+            ) throw new Error(`Provided steps are not in the correct format.\nSteps: ${newPlanFromInvoke.steps}\n\n`)
+
             // Remove the result part if present from plan steps
             planSteps = newPlanFromInvoke.steps.map((step: PlanStep) => {
                 const { result, ...planPart } = step
                 return planPart
             })
 
-            console.log("New Plan from invoke: \n", stringify(planSteps))
+            if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
+            if (!event.identity) throw new Error("Event does not contain identity");
+            if (!('sub' in event.identity)) throw new Error("Event does not contain user");
+
+            //Send a message with the step title to make clear in the chat history where each step begins.
+            amplifyClientWrapper.publishMessage({
+                chatSessionId: event.arguments.chatSessionId,
+                owner: event.identity.sub,
+                message: new AIMessage({content: `## ${planSteps[0].title}`}),
+                responseComplete: true
+            })
+
             return {
                 plan: planSteps,
                 pastSteps: pastSteps
@@ -390,11 +379,10 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             config: RunnableConfig,
         ): Promise<Partial<typeof PlanExecuteState.State>> {
             const response = await responder
-                // .withConfig({
-                //     callbacks: config.callbacks,
-                //     // runName: "responder",
-                //     tags: ["responder"],
-                // })
+                .withConfig({
+                    callbacks: [customHandler],
+                    tags: ["responder"],
+                })
                 .invoke({
                     input: state.input,
                     plan: stringify(state.plan),
@@ -408,7 +396,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         function shouldEnd(state: typeof PlanExecuteState.State) {
             // If human input is requested, or there are no more steps, return true
-            console.log("Deciding to end based on the state: \n", stringify(state))
+            // console.log("Deciding to end based on the state: \n", stringify(state))
             if (!state.plan) return "false"
             if (state.plan.length === 0) return "true"
             if (state.plan[0].role === "human") return "true"
@@ -416,9 +404,9 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             // return state.response ? "true" : "false";
         }
         const workflow = new StateGraph(PlanExecuteState)
-            .addNode("agent", executeStep)
-            .addNode("replan", replanStep)
-            .addNode("respond", respondStep)
+            .addNode("agent", executeStep, { retryPolicy: { maxAttempts: 2 } })
+            .addNode("replan", replanStep, { retryPolicy: { maxAttempts: 2 } })
+            .addNode("respond", respondStep, { retryPolicy: { maxAttempts: 2 } })
             .addEdge(START, "replan")
             .addEdge("agent", "replan")
             .addConditionalEdges("replan", shouldEnd, {
@@ -454,6 +442,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         console.log('Listening for stream events')
         // for await (const streamEvent of stream) {
+        let currentChunkIndex = 10000 // This is meant to help if multiple agents are streaming at the same time to the client.
         for await (const streamEvent of agentEventStream) {
             // console.log('event: ', streamEvent.event)
 
@@ -461,16 +450,17 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 case "on_chat_model_stream":
                     const streamChunkText = getLangChainMessageTextContent(streamEvent.data.chunk as AIMessageChunk) || ""
 
-                    //Write the blurb in black
-                    process.stdout.write(`${streamChunkText}`)
+                    //Write the blurb in blue
+                    process.stdout.write(`\x1b[34m${streamChunkText}\x1b[0m`);
 
                     await publishTokenStreamChunk({
                         tokenStreamChunk: streamEvent.data.chunk,
+                        tokenIndex: currentChunkIndex++,
                         amplifyClientWrapper: amplifyClientWrapper,
                     })
                     break
                 case "on_chain_stream":
-                    console.log('on_chain_stream: \n', stringify(streamEvent))
+                    console.log('on_chain_stream: \n', stringifyLimitStringLength(streamEvent))
                     const chainStreamMessage = streamEvent.data.chunk
                     const chainMessageType = ("planner" in chainStreamMessage || "replan" in chainStreamMessage) ? "plan" :
                         ("agent" in chainStreamMessage) ? "agent" :
@@ -479,7 +469,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
                     switch (chainMessageType) {
                         case "plan":
-
                             const updatePlanResonseInput: Schema["ChatSession"]["updateType"] = {
                                 id: event.arguments.chatSessionId,
                                 planSteps: ((chainStreamMessage.planner || chainStreamMessage.replan) as typeof PlanExecuteState.State)
@@ -499,7 +488,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                                 }
                             })
 
-                            console.log("Update Plan Response:\n", stringify(updatePlanResonse))
+                            // console.log(`Update Plan Response:\n`, stringify(updatePlanResonse))
                             break
                         case "agent":
                             const executeAgentChatSessionUpdate = await amplifyClientWrapper.amplifyClient.graphql({
@@ -514,24 +503,38 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                             })
                             break
                         case "respond":
-                            console.log('Response Event: ', chainStreamMessage)
+                            // console.log('Response Event: ', chainStreamMessage)
                             const responseAIMessage = new AIMessage({
                                 content: chainStreamMessage.respond.response,
                             })
 
-                            console.log('Publishing AI Message: ', responseAIMessage, '. Content: ', responseAIMessage.content)
+                            // console.log('Publishing AI Message: ', responseAIMessage, '. Content: ', responseAIMessage.content)
 
                             await amplifyClientWrapper.publishMessage({
                                 chatSessionId: event.arguments.chatSessionId,
                                 owner: event.identity.sub,
-                                message: responseAIMessage
+                                message: responseAIMessage,
+                                responseComplete: true
                             })
                             break
                         default:
-                            console.log('Unknown message type:\n', stringify(chainStreamMessage))
+                            console.log('Unknown message type:\n', stringifyLimitStringLength(chainStreamMessage))
                             break
                     }
-
+                    break
+                // case "on_tool_end":
+                case "on_chat_model_end":
+                    const streamChunk = streamEvent.data.output as ToolMessage | AIMessageChunk
+                    const textContent = getLangChainMessageTextContent(streamChunk)
+                    if (textContent && textContent.length > 20){
+                        await amplifyClientWrapper.publishMessage({
+                            chatSessionId: event.arguments.chatSessionId,
+                            owner: event.identity.sub,
+                            message: streamChunk
+                        })
+                    }
+                    break
+                    
             }
         }
 
@@ -547,7 +550,8 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             await amplifyClientWrapper.publishMessage({
                 chatSessionId: event.arguments.chatSessionId,
                 owner: event.identity.sub,
-                message: AIErrorMessage
+                message: AIErrorMessage,
+                responseComplete: true
             })
             return error.message
         }
