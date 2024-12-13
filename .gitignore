@@ -2,6 +2,7 @@
 
 /tmp
 cdk.context.json
+cdk.out
 
 # dependencies
 /node_modules

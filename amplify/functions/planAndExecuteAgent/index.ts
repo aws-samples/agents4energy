@@ -348,7 +348,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 !Array.isArray(newPlanFromInvoke.steps) ||
                 !newPlanFromInvoke.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
                 )
-            ) throw new Error(`Provided steps are not in the correct format.\nSteps: ${newPlanFromInvoke.steps}\n\n`)
+            ) throw new Error(`Provided steps are not in the correct format.\n\nSteps: ${stringify(newPlanFromInvoke.steps)}\n\n`)
 
             // Remove the result part if present from plan steps
             planSteps = newPlanFromInvoke.steps.map((step: PlanStep) => {

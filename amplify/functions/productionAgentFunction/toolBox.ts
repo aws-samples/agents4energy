@@ -174,7 +174,7 @@ const executeSQLQuerySchema = z.object({
             SUM("oil(bbls)") AS total_oil_production,
             SUM("gas(mcf)") AS total_gas_production,
             SUM("water(bbls)") AS total_water_production
-        FROM "AwsDataCatalog"."<database_name>"."<table_name>"
+        FROM "AwsDataCatalog"."<database_name>"."crawler_monthly_production"
         WHERE "well api" = '<example_well_api>'
             AND CAST("date" AS DATE) >= CAST('1990-01-01' AS DATE)
         GROUP BY DATE_TRUNC('day', CAST("date" AS DATE))
@@ -281,7 +281,7 @@ const plotTableFromToolResponseSchema = z.object({
 
 
 export const plotTableFromToolResponseTool = tool(
-    async ({ chartTitle, numberOfPreviousTablesToInclude = 1 }) => {
+    async ({ chartTitle, numberOfPreviousTablesToInclude = 2 }) => {
 
         return {
             messageContentType: 'tool_plot',

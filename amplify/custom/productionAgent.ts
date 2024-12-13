@@ -111,6 +111,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             semanticVersion: '9.27.0',
         },
     });
+    // Suppress metadata
+    ghostScriptLayerStack.addMetadata('aws:cdk:path', undefined);
+    ghostScriptLayerStack.overrideLogicalId('GhostScriptLambdaLayerStaticId');
+
     const ghostScriptLayerArn = ghostScriptLayerStack.getAtt('Outputs.LayerVersion').toString()
     const ghostScriptLayer = lambda.LayerVersion.fromLayerVersionArn(scope, 'GhostScriptLayerVersion', ghostScriptLayerArn)
 
