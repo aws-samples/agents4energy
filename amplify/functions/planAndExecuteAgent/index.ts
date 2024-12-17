@@ -250,13 +250,13 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ): Promise<Partial<typeof PlanExecuteState.State>> {
             const { result, ...task } = state.plan[0];//Remove the "Result" field from the task if it exists
 
+            // The user has the following objective
+            // <objective>
+            // ${state.input}
+            // </objective>
+
             const inputs = {
                 messages: [new HumanMessage(`
-                    The user has the following objective
-                    <objective>
-                    ${state.input}
-                    </objective>
-
                     The following steps have been completed
                     <previousSteps>
                     ${stringify(state.pastSteps)}
