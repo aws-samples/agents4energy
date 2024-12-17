@@ -250,13 +250,13 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ): Promise<Partial<typeof PlanExecuteState.State>> {
             const { result, ...task } = state.plan[0];//Remove the "Result" field from the task if it exists
 
+            // The user has the following objective
+            // <objective>
+            // ${state.input}
+            // </objective>
+
             const inputs = {
                 messages: [new HumanMessage(`
-                    The user has the following objective
-                    <objective>
-                    ${state.input}
-                    </objective>
-
                     The following steps have been completed
                     <previousSteps>
                     ${stringify(state.pastSteps)}
@@ -348,7 +348,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 !Array.isArray(newPlanFromInvoke.steps) ||
                 !newPlanFromInvoke.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
                 )
-            ) throw new Error(`Provided steps are not in the correct format.\nSteps: ${newPlanFromInvoke.steps}\n\n`)
+            ) throw new Error(`Provided steps are not in the correct format.\n\nSteps: ${stringify(newPlanFromInvoke.steps)}\n\n`)
 
             // Remove the result part if present from plan steps
             planSteps = newPlanFromInvoke.steps.map((step: PlanStep) => {

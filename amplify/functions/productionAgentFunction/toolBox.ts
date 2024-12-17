@@ -38,42 +38,6 @@ export async function queryKnowledgeBase(props: { knowledgeBaseId: string, query
     }
 }
 
-// //////////////////////////////////////////
-// //////////// Calculator Tool /////////////
-// //////////////////////////////////////////
-
-// const calculatorSchema = z.object({
-//     operation: z
-//         .enum(["add", "subtract", "multiply", "divide", "log"])
-//         .describe("The type of operation to execute."),
-//     number1: z.number().describe("The first number to operate on."),
-//     number2: z.number().describe("The second number to operate on."),
-// });
-
-// export const calculatorTool = tool(
-//     async ({ operation, number1, number2 }) => {
-//         // Functions must return strings
-//         if (operation === "add") {
-//             return `${number1 + number2}`;
-//         } else if (operation === "subtract") {
-//             return `${number1 - number2}`;
-//         } else if (operation === "multiply") {
-//             return `${number1 * number2}`;
-//         } else if (operation === "divide") {
-//             return `${number1 / number2}`;
-//         } else if (operation === "log") {
-//             return `${Math.log(number1)}`;
-//         } else {
-//             throw new Error("Invalid operation.");
-//         }
-//     },
-//     {
-//         name: "calculator",
-//         description: "Can perform mathematical operations.",
-//         schema: calculatorSchema,
-//     }
-// );
-
 ///////////////////////////////////////////////////////////////
 ////// Retrieve Petroleum Enginnering Knowledge Tool //////////
 ///////////////////////////////////////////////////////////////
@@ -162,7 +126,7 @@ const executeSQLQuerySchema = z.object({
         To use date functions on a column with varchar type, cast the column to a date first.
         The DATE_SUB function is not available. Use the DATE_ADD(unit, value, timestamp) function any time you're adding an interval value to a timestamp. Never use DATE_SUB.
         <unavailableSqlFunctions> DATE_SUB ILIKE </unavailableSqlFunctions> 
-        Here's an example of how to use the DATE_TRUNC function: DATE_TRUNC('month', CAST("date" AS DATE))
+        Here's an example of how to use the DATE_TRUNC function: DATE_TRUNC('month', CAST("firstDayOfMonth" AS DATE))
         In the WHERE or GROUP BY causes, do not use column aliases defined in the SELECT clause.
         Column aliases defined in the SELECT clause cannot be referenced in the WHERE or GROUP BY clauses because they are evaluated before the SELECT clause during query processing.
         The first column in the returned result will be used as the x axis column. If the query contains a date, set it as the first column.
@@ -170,14 +134,14 @@ const executeSQLQuerySchema = z.object({
         Here's an example sql query for total daily oil, gas and water production
         <exampleSqlQuery>
         SELECT
-            DATE_TRUNC('day', CAST("date" AS DATE)) AS day,
+            DATE_TRUNC('day', CAST("firstDayOfMonth" AS DATE)) AS day,
             SUM("oil(bbls)") AS total_oil_production,
             SUM("gas(mcf)") AS total_gas_production,
             SUM("water(bbls)") AS total_water_production
-        FROM "AwsDataCatalog"."<database_name>"."<table_name>"
+        FROM "AwsDataCatalog"."<database_name>"."crawler_monthly_production"
         WHERE "well api" = '<example_well_api>'
-            AND CAST("date" AS DATE) >= CAST('1990-01-01' AS DATE)
-        GROUP BY DATE_TRUNC('day', CAST("date" AS DATE))
+            AND CAST("firstDayOfMonth" AS DATE) >= CAST('1990-01-01' AS DATE)
+        GROUP BY DATE_TRUNC('day', CAST("firstDayOfMonth" AS DATE))
         ORDER BY day
         </exampleSqlQuery>
         `.replace(/^\s+/gm, '')),
@@ -273,15 +237,13 @@ export const executeSQLQueryTool = tool(
 ///////////////////////////////////////////////////
 
 const plotTableFromToolResponseSchema = z.object({
-    // toolCallId: z.string().describe("The tool call ID which produced the table to plot. Ex: tooluse_xxxxxxx"),
-    // columnNameFromQueryForXAxis: z.string().describe("The column name of the SQL query result to be plotted on the X axis"),
     chartTitle: z.string().describe("The title of the plot."),
-    numberOfPreviousTablesToInclude: z.number().int().optional().describe("The number of previous tables to include in the plot. Default is 1."),
+    numberOfPreviousTablesToInclude: z.number().int().optional().describe("The number of previous tables to include in the plot. Use at least 2 to include produciton and event data tables."),
 });
 
 
 export const plotTableFromToolResponseTool = tool(
-    async ({ chartTitle, numberOfPreviousTablesToInclude = 1 }) => {
+    async ({ chartTitle, numberOfPreviousTablesToInclude = 2 }) => {
 
         return {
             messageContentType: 'tool_plot',
@@ -353,7 +315,7 @@ export const wellTableSchema = z.object({
     tableColumns: z.array(z.object({
         columnName: z.string().describe('The name of a column'),
         columnDescription: z.string().describe('A description of the information which this column contains.'),
-        columnDefinition: z.object({
+        columnDataDefinition: z.object({
             type: z.enum(['string', 'integer', 'date', 'number', 'boolean']).describe('The data type of the column.'),
             format: z.string().describe('The format of the column.').optional(),
             enum: z.array(z.string()).optional(),
@@ -368,8 +330,9 @@ export const wellTableSchema = z.object({
         {
             "tableColumns": [
                 {
+                    "columnName": "event",    
                     "columnDescription": "The type of well event that occurred",
-                    "columnDefinition": {
+                    "columnDataDefinition": {
                         "type": "string",
                         "enum": [
                             "Drilling",
@@ -378,15 +341,14 @@ export const wellTableSchema = z.object({
                             "Plugging",
                             "Inspection",
                             "Other"
-                        ],
-                        "columnName": "event"
+                        ]
                     }
                 },
                 {
+                    "columnName": "description",
                     "columnDescription": "A description of the well event",
-                    "columnDefinition": {
-                        "type": "string",
-                        "columnName": "description"
+                    "columnDataDefinition": {
+                        "type": "string"
                     }
                 }
             ]
@@ -504,7 +466,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
             tableColumns.unshift({
                 columnName: 'date',
                 columnDescription: `The date of the event in YYYY-MM-DD format.`,
-                columnDefinition: {
+                columnDataDefinition: {
                     type: 'string',
                     format: 'date',
                     pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
@@ -514,11 +476,11 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
             tableColumns.unshift({
                 columnName: 'includeScore',
                 columnDescription: `
-            If the JSON object contains information related to [${dataToExclude}], give a score of 1.
-            If not, give a score of 10 if JSON object contains information related to [${dataToInclude}].
-            Most scores should be around 5. Reserve 10 for exceptional cases.
-            `,
-                columnDefinition: {
+                    If the JSON object contains information related to [${dataToExclude}], give a score of 1.
+                    If not, give a score of 10 if JSON object contains information related to [${dataToInclude}].
+                    Most scores should be around 5. Reserve 10 for exceptional cases.
+                    `,
+                columnDataDefinition: {
                     type: 'integer',
                     minimum: 0,
                     maximum: 10
@@ -528,7 +490,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
             tableColumns.unshift({
                 columnName: 'includeScoreExplanation',
                 columnDescription: `Why did you choose that score?`,
-                columnDefinition: {
+                columnDataDefinition: {
                     type: 'string',
                 }
             })
@@ -536,7 +498,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
             tableColumns.unshift({
                 columnName: 'relevantPartOfJsonObject',
                 columnDescription: `Which part of the object caused you to give that score?`,
-                columnDefinition: {
+                columnDataDefinition: {
                     type: 'string',
                 }
             })
@@ -555,7 +517,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
                 const correctedColumnName = removeSpaceAndLowerCase(column.columnName)
 
                 fieldDefinitions[correctedColumnName] = {
-                    ...(column.columnDefinition ? column.columnDefinition : { type: 'string' }),
+                    ...(column.columnDataDefinition ? column.columnDataDefinition : { type: 'string' }),
                     description: column.columnDescription
                 };
             }

@@ -111,6 +111,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             semanticVersion: '9.27.0',
         },
     });
+    // Suppress metadata
+    ghostScriptLayerStack.addMetadata('aws:cdk:path', undefined);
+    ghostScriptLayerStack.overrideLogicalId('GhostScriptLambdaLayerStaticId');
+
     const ghostScriptLayerArn = ghostScriptLayerStack.getAtt('Outputs.LayerVersion').toString()
     const ghostScriptLayer = lambda.LayerVersion.fromLayerVersionArn(scope, 'GhostScriptLayerVersion', ghostScriptLayerArn)
 
@@ -323,11 +327,20 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 dataSourceId: petroleumEngineeringDataSource.dataSourceId,
                 knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId
             },
-            physicalResourceId: cr.PhysicalResourceId.of('StartIngestionPetroleumEngineeringDataSource'),
+            physicalResourceId: cr.PhysicalResourceId.fromResponse('ingestionJob.ingestionJobId')
+        },
+        onDelete: {
+            service: '@aws-sdk/client-bedrock-agent',
+            action: 'stopIngestionJob',
+            parameters: {
+                dataSourceId: petroleumEngineeringDataSource.dataSourceId,
+                knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId,
+                ingestionJobId: new cr.PhysicalResourceIdReference()
+            }
         },
         policy: cr.AwsCustomResourcePolicy.fromStatements([
             new iam.PolicyStatement({
-                actions: ['bedrock:startIngestionJob'],
+                actions: ['bedrock:startIngestionJob', 'bedrock:stopIngestionJob'],
                 resources: [petroleumEngineeringKnowledgeBase.knowledgeBaseArn]
             })
         ])

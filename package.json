@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "ecrAuth": "aws ecr-public get-login-password | docker login --username AWS --password-stdin public.ecr.aws",
+    "cdkDiff": "cdk diff --ci --app \"npx tsx amplify/backend.ts\" --output .amplify/artifacts/cdk.out --context amplify-backend-name=pw --context amplify-backend-namespace=$(node -e \"console.log(require('./package.json').name)\") --context amplify-backend-type=sandbox",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
