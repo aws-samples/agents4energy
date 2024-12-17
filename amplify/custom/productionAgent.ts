@@ -390,11 +390,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             s3Targets: [
                 {
                     path: `s3://${props.s3Bucket.bucketName}/production-agent/structured-data-files/`,
-                    exclusions: ['DS_Store']
+                    exclusions: ['**DS_Store']
                 },
             ],
         },
-        
         tablePrefix: 'crawler_',
     });
 

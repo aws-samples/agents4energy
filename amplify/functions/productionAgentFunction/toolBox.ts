@@ -564,7 +564,7 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
 
             const dataRows = await processWithConcurrency({
                 items: wellFiles,
-                concurrency: 5,
+                concurrency: 30,
                 fn: async (s3Key) => {
                     try {
 
