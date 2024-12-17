@@ -28,7 +28,7 @@ const testArguments =
       {
         "columnDescription": "Text describing the details of the operation",
         "columnName": "Operation Details",
-        "columnDefinition": {
+        "columnDataDefinition": {
           "type": "string",
         }
       }
