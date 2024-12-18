@@ -133,8 +133,9 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
   const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
-  const [messagePlot, setMessagePlot] = useState<React.FC>()
-  const [messageTable, setMessageTable] = useState<React.FC>()
+  const [MessagePlot, setMessagePlot] = useState<React.FC>()
+  // const [MessagePlot, setMessagePlot] = useState<React.ElementType>(() => (<div></div>))
+  const [MessageTable, setMessageTable] = useState<React.FC>()
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
   const messageContentCategory = getMessageCatigory(props.message);
@@ -376,24 +377,26 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           }
         };
 
-        setMessagePlot(() => (
-          <>
-            {/* <pre
-              style={{ //Wrap long lines
-                whiteSpace: 'pre-wrap',
-                wordWrap: 'break-word',
-                overflowWrap: 'break-word',
-              }}
-            >
-              {stringify(chartDataObject)}
-            </pre> */}
-            <Scatter
-              data={data}
-              options={options}
-            />
-          </>
+        setMessagePlot(() => {
+          return () => <>
+          {/* <pre
+            style={{ //Wrap long lines
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+            }}
+          >
+            {stringify(chartDataObject)}
+          </pre> */}
+          <Scatter
+            data={data}
+            options={options}
+          />
+        </>
+        }
+          
 
-        ))
+        )
       case 'tool_table':
         // https://mui.com/x/react-data-grid/
         // const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
@@ -465,7 +468,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         console.log('Row Data: ', rowData)
 
-        setMessageTable(() => (
+        setMessageTable(() => () => (
           <>
             {/* <pre
               style={{ //Wrap long lines
@@ -560,6 +563,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
 
   }
+
+  // console.log('messagePlot:', MessagePlot);
+  // console.log('Type of messagePlot:', typeof MessagePlot);
+  // console.log('Is valid React element:', React.isValidElement(MessagePlot));
 
   return (
     <div>
@@ -691,21 +698,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             switch (messageContentCategory) {
               case 'tool_plot':
                 return <>
-                  {/* <pre
-                    style={{ //Wrap long lines
-                      whiteSpace: 'pre-wrap',
-                      wordWrap: 'break-word',
-                      overflowWrap: 'break-word',
-                    }}
-                  >
-                    {JSON.stringify(datasets, null, 2)}
-                  </pre> */}
-
-                  {messagePlot ? messagePlot : null}
+                {/* <MessagePlot/> */}
+                {MessagePlot && <MessagePlot/>}
                 </>
               case 'tool_table':
                 return <>
-                  {messageTable ? messageTable : null}
+                {MessageTable && <MessageTable/>}
                 </>
               case 'tool_json':
                 return <pre
