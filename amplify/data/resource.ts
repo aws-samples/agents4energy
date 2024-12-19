@@ -145,7 +145,7 @@ const schema = a.schema({
 
   invokeBedrockWithStructuredOutput: a
     .query()
-    .arguments({ lastMessageText: a.string().required(), outputStructure: a.string().required(), chatSessionId: a.string().required() })
+    .arguments({ lastMessageText: a.string().required(), usePastMessages: a.boolean() ,outputStructure: a.string().required(), chatSessionId: a.string().required() })
     .returns(a.string())
     .authorization(allow => allow.authenticated())
     .handler(

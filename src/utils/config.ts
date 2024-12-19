@@ -24,7 +24,7 @@ export const defaultAgents: { [key: string]: defaultAgent } = {
     PlanAndExecuteAgent: {
         name: "Plan And Execute",
         samplePrompts: [
-            `This morning well with API number 30-045-29202 stopped producing gas with indication of the downhole pump's seat valve leaking. 
+            `This morning well with API number 30-045-29202 stopped producing gas with indication of a hole in tubing.  
             Make a table of all operational events found in the well files. 
             Query all historic monthly production rates and make a plot with both the event and production data. 
             Estimate the value of the well's remaining production. 

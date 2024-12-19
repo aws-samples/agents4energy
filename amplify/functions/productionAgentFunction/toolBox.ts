@@ -14,6 +14,9 @@ import { ToolMessageContentType } from '../../../src/utils/types'
 
 import { invokeBedrockWithStructuredOutput } from '../graphql/queries'
 
+import { getStructuredOutputResponse } from '../getStructuredOutputFromLangchain'
+import { HumanMessage } from "@langchain/core/messages";
+
 const s3Client = new S3Client();
 
 export async function queryKnowledgeBase(props: { knowledgeBaseId: string, query: string }) {
@@ -453,8 +456,8 @@ async function listS3Folders(
         throw error;
     }
 }
-
-export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper) => tool(
+// /(amplifyClientWrapper: AmplifyClientWrapper) => 
+export const wellTableTool = tool(
     async ({ dataToInclude, tableColumns, wellApiNumber, dataToExclude }) => {
         console.log("Well Table Tool Invoked")
         try {
@@ -575,27 +578,36 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
 
                         const objectContent = await getObjectResponse.Body?.transformToString()
                         if (!objectContent) throw new Error(`No object content for s3 key: ${s3Key}`)
-                        if (objectContent.length < 25) return // If the file contents are empty, do not create a row for that file. The empty file has a length of 22
+                        if (objectContent.length < 25) {
+                            console.log("Object Length too small. Not generating a response. Object:\n", objectContent)
+                            return
+                        } // If the file contents are empty, do not create a row for that file. The empty file has a length of 22
 
                         const messageText = `
-                    The user is asking you to extract information from a YAML object.
-                    The YAML object contains information about a well.
-                    <YamlObject>
-                    ${objectContent}
-                    </YamlObject>
-                    `
+                        The user is asking you to extract information from a YAML object.
+                        The YAML object contains information about a well.
+                        <YamlObject>
+                        ${objectContent}
+                        </YamlObject>
+                        `
 
-                        const fileDataResponse = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-                            query: invokeBedrockWithStructuredOutput,
-                            variables: {
-                                chatSessionId: 'dummy',
-                                lastMessageText: messageText,
-                                outputStructure: JSON.stringify(jsonSchema)
-                            }
+                        const fileDataResponse = await getStructuredOutputResponse({
+                            messages:[ new HumanMessage({ content: messageText })],
+                            outputStructure: jsonSchema,
+                            modelId: env.MODEL_ID
                         })
 
+                        // const fileDataResponse = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
+                        //     query: invokeBedrockWithStructuredOutput,
+                        //     variables: {
+                        //         chatSessionId: 'dummy',
+                        //         lastMessageText: messageText,
+                        //         outputStructure: JSON.stringify(jsonSchema),
+                        //     }
+                        // })
+
                         // If the GQL query returns an error, return the error to the agent
-                        if (fileDataResponse.errors) throw new Error(fileDataResponse.errors.map((error) => error.message).join('\n\n'))
+                        // if (fileDataResponse.errors) throw new Error(fileDataResponse.errors.map((error) => error.message).join('\n\n'))
                         // if (fileDataResponse.errors) {
                         //     throw new Error("")
                         //     return {
@@ -604,21 +616,23 @@ export const wellTableToolBuilder = (amplifyClientWrapper: AmplifyClientWrapper)
                         //     } as ToolMessageContentType
                         // }
 
-                        const fileData = JSON.parse(fileDataResponse.data.invokeBedrockWithStructuredOutput || "")
+                        // const fileData = JSON.parse("")
 
                         //Replace the keys in file Data with those from correctedColumnNameMap
-                        Object.keys(fileData).forEach(key => {
+                        Object.keys(fileDataResponse).forEach(key => {
                             if (key in correctedColumnNameMap) {
                                 const correctedKey = correctedColumnNameMap[key]
-                                fileData[correctedKey] = fileData[key]
-                                delete fileData[key]
+                                fileDataResponse[correctedKey] = fileDataResponse[key]
+                                delete fileDataResponse[key]
                             }
                         })
 
-                        return {
-                            ...fileData,
+                        const fileResponseData: Record<string, any> = {
+                            ...fileDataResponse,
                             s3Key: s3Key
                         }
+
+                        return fileResponseData
                     } catch (error) {
                         console.error('Error:', error);
                         throw new Error(`Error: ${JSON.stringify(error)}`)

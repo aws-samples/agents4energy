@@ -20,6 +20,8 @@ import { Calculator } from "@langchain/community/tools/calculator";
 import { queryGQLToolBuilder } from './toolBox'
 import { isValidJSON } from "../../../src/utils/amplify-utils";
 
+const MAX_RETRIES = 3
+
 const PlanStepSchema = z.object({
     title: z.string(),
     role: z.enum(['ai', 'human']),//TODO: add the human role so human input can be awaited.
@@ -262,10 +264,14 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                     ${stringify(state.pastSteps)}
                     </previousSteps>
                     
-                    Now execute this task
+                    Now execute this task.
                     <task>
                     ${stringify(task)}
                     </task>
+
+                    Once you have a result for this task, respond with that result.
+                    Tool messages can contain visualizations, query results and tables.
+                    If the tool message says it contains information which completes the task, return a summary to the user.
                     `)],
             };
             const { messages } = await agentExecutor.invoke(inputs, config);
@@ -319,36 +325,86 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 console.log(`User responded to a step with the role human. New Past Steps: \n${stringify(pastSteps)} \n New plan steps:\n${planSteps}`)
             }
 
-            const newPlanFromInvoke = await replanner
-                .withConfig({
-                    callbacks: [customHandler],
-                    // callbacks: config.callbacks!,
-                    // runName: "replanner",
-                    tags: ["replanner"],
-                })
-                .invoke(
-                    {
-                        objective: state.input,
-                        plan: stringify(planSteps),
-                        pastSteps: stringify(pastSteps)
-                    },
-                    config
-                );
+            // let newPlanFromInvoke: { steps: PlanStep[] }
+            const invokeReplanner = async () => {
+                let newPlan: { steps: PlanStep[] }
+                for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+                    try {
+                        newPlan = await replanner
+                            .withConfig({
+                                callbacks: [customHandler],
+                                // callbacks: config.callbacks!,
+                                // runName: "replanner",
+                                tags: ["replanner"],
+                            })
+                            .invoke(
+                                {
+                                    objective: state.input,
+                                    plan: stringify(planSteps),
+                                    pastSteps: stringify(pastSteps) + "\nMake sure you respond in the correct format".repeat(attempt)
+                                },
+                                config
+                            ) as { steps: PlanStep[] };
+
+                        if (!newPlan.steps) throw new Error("No steps returned from replanner")
+
+                        if (typeof newPlan.steps === 'string' && isValidJSON(newPlan.steps)) {
+                            console.log("Steps are a string and valid JSON. Converting them to an object")
+                            newPlan.steps = JSON.parse(newPlan.steps) as PlanStep[]
+                        }
+
+                        if (
+                            !Array.isArray(newPlan.steps) ||
+                            !newPlan.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
+                            )
+                        ) throw new Error(`Provided steps are not in the correct format.\n\nSteps: ${stringify(newPlan.steps)}\n\n`)
+
+                        return newPlan
+
+                    } catch (error) {
+                        if (attempt === MAX_RETRIES - 1) {
+                            throw new Error(`Failed to get valid output after ${MAX_RETRIES} attempts: ${error}`);
+                        }
+                        // console.log(`Attempt ${attempt + 1} failed, retrying after ${RETRY_DELAY_MS}ms...`);
+                        // await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                    }
+                }
+            }
+
+            // }
+
+            // const newPlanFromInvoke = await replanner
+            //     .withConfig({
+            //         callbacks: [customHandler],
+            //         // callbacks: config.callbacks!,
+            //         // runName: "replanner",
+            //         tags: ["replanner"],
+            //     })
+            //     .invoke(
+            //         {
+            //             objective: state.input,
+            //             plan: stringify(planSteps),
+            //             pastSteps: stringify(pastSteps)
+            //         },
+            //         config
+            //     );
+            const newPlanFromInvoke = await invokeReplanner()
+            if (!newPlanFromInvoke) throw new Error("No new plan returned from replanner")
 
             console.log("New Plan:\n", stringify(newPlanFromInvoke))
 
-            if (!newPlanFromInvoke.steps) throw new Error("No steps returned from replanner")
+            // if (!newPlanFromInvoke.steps) throw new Error("No steps returned from replanner")
 
-            if (typeof newPlanFromInvoke.steps === 'string' && isValidJSON(newPlanFromInvoke.steps)) {
-                console.log("Steps are a string and valid JSON. Converting them to an object")
-                newPlanFromInvoke.steps = JSON.parse(newPlanFromInvoke.steps) as PlanStep[]
-            }
+            // if (typeof newPlanFromInvoke.steps === 'string' && isValidJSON(newPlanFromInvoke.steps)) {
+            //     console.log("Steps are a string and valid JSON. Converting them to an object")
+            //     newPlanFromInvoke.steps = JSON.parse(newPlanFromInvoke.steps) as PlanStep[]
+            // }
 
-            if (
-                !Array.isArray(newPlanFromInvoke.steps) ||
-                !newPlanFromInvoke.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
-                )
-            ) throw new Error(`Provided steps are not in the correct format.\n\nSteps: ${stringify(newPlanFromInvoke.steps)}\n\n`)
+            // if (
+            //     !Array.isArray(newPlanFromInvoke.steps) ||
+            //     !newPlanFromInvoke.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
+            //     )
+            // ) throw new Error(`Provided steps are not in the correct format.\n\nSteps: ${stringify(newPlanFromInvoke.steps)}\n\n`)
 
             // Remove the result part if present from plan steps
             planSteps = newPlanFromInvoke.steps.map((step: PlanStep) => {
@@ -364,7 +420,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             amplifyClientWrapper.publishMessage({
                 chatSessionId: event.arguments.chatSessionId,
                 owner: event.identity.sub,
-                message: new AIMessage({content: `## ${planSteps[0].title}`}),
+                message: new AIMessage({ content: `## ${planSteps[0].title}` }),
                 responseComplete: true
             })
 
@@ -526,7 +582,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 case "on_chat_model_end":
                     const streamChunk = streamEvent.data.output as ToolMessage | AIMessageChunk
                     const textContent = getLangChainMessageTextContent(streamChunk)
-                    if (textContent && textContent.length > 20){
+                    if (textContent && textContent.length > 20) {
                         await amplifyClientWrapper.publishMessage({
                             chatSessionId: event.arguments.chatSessionId,
                             owner: event.identity.sub,
@@ -534,7 +590,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                         })
                     }
                     break
-                    
+
             }
         }
 

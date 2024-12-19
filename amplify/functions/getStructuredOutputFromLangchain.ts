@@ -82,59 +82,68 @@ async function getSortedMessages(chatSessionId: string, latestHumanMessageText: 
         })
     ]
 
-    // Remove all of the messages before the first message with the role of human
-    const firstHumanMessageIndex = sortedMessages.findIndex((message) => message.role === 'human');
-    const sortedMessagesStartingWithHumanMessage = sortedMessages.slice(firstHumanMessageIndex)
+    //Messages in a graph may not alternate between human, ai, and tool messages. Put all info into one human message to account for this.
+    return [
+        new HumanMessage({
+            content: sortedMessages
+                .map(message => `Role: ${message.role}\nContent: ${message.content}`)
+                .join("\n\n") + `\n\n Role: human\nContent: ${latestHumanMessageText}`
+        })
+    ]
 
-    //Here we're using the last 20 messages for memory
-    const messages: BaseMessage[] = sortedMessagesStartingWithHumanMessage.map((message) => {
-        if (message.role === 'human') {
-            return new HumanMessage({
-                content: message.content,
-            })
-        } else if (message.role === 'ai') {
-            return new AIMessage({
-                content: [{
-                    type: 'text',
-                    text: message.content
-                }],
-                tool_calls: JSON.parse(message.tool_calls || '[]')
-            })
-        } else {
-            return new ToolMessage({
-                content: message.content,
-                tool_call_id: message.tool_call_id || "",
-                name: message.tool_name || ""
-            })
-        }
-    })
+    // // Remove all of the messages before the first message with the role of human
+    // const firstHumanMessageIndex = sortedMessages.findIndex((message) => message.role === 'human');
+    // const sortedMessagesStartingWithHumanMessage = sortedMessages.slice(firstHumanMessageIndex)
 
-    // If the last message is from AI, add the latestHumanMessageText to the end of the messages.
-    if (
-        messages &&
-        messages[messages.length - 1] &&
-        !(messages[messages.length - 1] instanceof HumanMessage)
+    // //Here we're using the last 20 messages for memory
+    // const messages: BaseMessage[] = sortedMessagesStartingWithHumanMessage.map((message) => {
+    //     if (message.role === 'human') {
+    //         return new HumanMessage({
+    //             content: message.content,
+    //         })
+    //     } else if (message.role === 'ai') {
+    //         return new AIMessage({
+    //             content: [{
+    //                 type: 'text',
+    //                 text: message.content
+    //             }],
+    //             tool_calls: JSON.parse(message.tool_calls || '[]')
+    //         })
+    //     } else {
+    //         return new ToolMessage({
+    //             content: message.content,
+    //             tool_call_id: message.tool_call_id || "",
+    //             name: message.tool_name || ""
+    //         })
+    //     }
+    // })
 
-    ) {
-        messages.push(
-            new HumanMessage({
-                content: latestHumanMessageText,
-            })
-        )
-    } 
+    // // If the last message is from AI, add the latestHumanMessageText to the end of the messages.
+    // if (
+    //     messages &&
+    //     messages[messages.length - 1] &&
+    //     !(messages[messages.length - 1] instanceof HumanMessage)
 
-    // console.log("mesages in langchain form:\n", stringifyLimitStringLength(messages))
+    // ) {
+    //     messages.push(
+    //         new HumanMessage({
+    //             content: latestHumanMessageText,
+    //         })
+    //     )
+    // }
 
-    return messages
+    // // console.log("mesages in langchain form:\n", stringifyLimitStringLength(messages))
+
+    // return messages
 }
 
-async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => any; }, response: { raw: BaseMessage; parsed: Record<string, any>; }, targetJsonSchema: JsonSchema, messages: BaseMessage[]) {
+export async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => any; }, response: { raw: BaseMessage; parsed: Record<string, any>; }, targetJsonSchema: JsonSchema, messages: BaseMessage[]) {
     for (let attempt = 0; attempt < 3; attempt++) {
         const validationReslut = validate(response.parsed, targetJsonSchema);
-        
+
         if (validationReslut.valid) break
         console.log(`Data validation result (${attempt}): `, validationReslut.valid);
-        
+
         console.log("Data validation error:", validationReslut.errors.join('\n'));
         console.log('Model response which caused error: \n', response);
         messages.push(
@@ -149,33 +158,71 @@ async function correctStructuredOutputResponse(model: { invoke: (arg0: any) => a
     return response
 }
 
-export const handler: Schema["invokeBedrockWithStructuredOutput"]["functionHandler"] = async (event) => {
+export const getStructuredOutputResponse = async (props: {modelId: string, messages: BaseMessage[], outputStructure: JsonSchema}) => {
 
-    const outputStructure = JSON.parse(event.arguments.outputStructure)
-    // console.log('target output structure:\n', JSON.stringify(outputStructure, null, 2))
-
-    const sortedLangchainMessages = await getSortedMessages(event.arguments.chatSessionId, event.arguments.lastMessageText)
-    // console.log('sorted messages:\n', sortedLangchainMessages)
 
     const chatModelWithStructuredOutput = new ChatBedrockConverse({
         model: process.env.MODEL_ID,
         temperature: 0
     }).withStructuredOutput(
-        outputStructure, {
-        includeRaw: true,
-    }
+        props.outputStructure, 
+        {includeRaw: true}
     )
 
-    let structuredOutputResponse = await chatModelWithStructuredOutput.invoke(sortedLangchainMessages)
+    let structuredOutputResponse = await chatModelWithStructuredOutput.invoke(props.messages)
 
     structuredOutputResponse = await correctStructuredOutputResponse(
         chatModelWithStructuredOutput,
         structuredOutputResponse,
-        outputStructure,
-        sortedLangchainMessages
+        props.outputStructure,
+        props.messages
     )
 
     if (!structuredOutputResponse.parsed) throw new Error(`No parsed response from model. Full response: ${structuredOutputResponse}`);
 
-    return JSON.stringify(structuredOutputResponse.parsed)
+    return structuredOutputResponse.parsed
+}
+
+export const handler: Schema["invokeBedrockWithStructuredOutput"]["functionHandler"] = async (event) => {
+    
+    const outputStructure = JSON.parse(event.arguments.outputStructure)
+    // console.log('target output structure:\n', JSON.stringify(outputStructure, null, 2))
+
+    const sortedLangchainMessages = (event.arguments.usePastMessages) ?
+        await getSortedMessages(event.arguments.chatSessionId, event.arguments.lastMessageText) :
+        [
+            new HumanMessage({
+                content: event.arguments.lastMessageText,
+            })
+        ]
+    // console.log('sorted messages:\n', sortedLangchainMessages)
+
+    const structuredOutputResponse = await getStructuredOutputResponse({
+        modelId: env.MODEL_ID,
+        messages: sortedLangchainMessages,
+        outputStructure: outputStructure
+    })
+
+    return JSON.stringify(structuredOutputResponse)
+
+    // const chatModelWithStructuredOutput = new ChatBedrockConverse({
+    //     model: process.env.MODEL_ID,
+    //     temperature: 0
+    // }).withStructuredOutput(
+    //     outputStructure, 
+    //     {includeRaw: true}
+    // )
+
+    // let structuredOutputResponse = await chatModelWithStructuredOutput.invoke(sortedLangchainMessages)
+
+    // structuredOutputResponse = await correctStructuredOutputResponse(
+    //     chatModelWithStructuredOutput,
+    //     structuredOutputResponse,
+    //     outputStructure,
+    //     sortedLangchainMessages
+    // )
+
+    // if (!structuredOutputResponse.parsed) throw new Error(`No parsed response from model. Full response: ${structuredOutputResponse}`);
+
+    // return JSON.stringify(structuredOutputResponse.parsed)
 }
