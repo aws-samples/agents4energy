@@ -27,6 +27,7 @@ import {
 } from 'aws-cdk-lib'
 
 import { productionAgentBuilder } from "./custom/productionAgent"
+import { maintenanceAgentBuilder } from "./custom/maintenanceAgent"
 import { AppConfigurator } from './custom/appConfigurator'
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
@@ -172,6 +173,7 @@ applyTagsToRootStack()
 /////// Create the Production Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
 const productionAgentStack = backend.createStack('prodAgentStack')
+const maintenanceAgentStack = backend.createStack('maintAgentStack')
 
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -200,6 +202,14 @@ const {
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
   s3Bucket: backend.storage.resources.bucket,
 })
+
+// Build the Maintenance Agent
+const {defaultDatabaseName} = maintenanceAgentBuilder(maintenanceAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
+  s3Bucket: backend.storage.resources.bucket,
+})
+
 
 // Custom resource Lambda to introduce a delay between when the PDF to Yaml function finishes deploying, and when the objects are uploaded.
 const delayFunction = new lambda.Function(productionAgentStack, 'DelayFunction', {
