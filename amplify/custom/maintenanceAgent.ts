@@ -22,9 +22,11 @@ import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
 
 const defaultDatabaseName = 'maintdb'
 const foundationModel = 'anthropic.claude-3-sonnet-20240229-v1:0';
-const agentName = 'MaintenanceAssistant';
+const agentName = 'A4E-Maintenance';
 const agentRoleName = 'AmazonBedrockExecutionRole_A4E_Maintenance';
 const agentDescription = 'Agent for energy industry maintenance workflows';
+const knowledgeBaseName = 'A4E-KB-Maintenance'
+
 
 interface AgentProps {
     vpc: ec2.Vpc,
@@ -95,15 +97,16 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
 
     const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintKB`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
-        name: 'a4e-kb-maintenance',
+        name: knowledgeBaseName,
         instruction: `You are a helpful question answering assistant. You answer
         user questions factually and honestly related to industrial facility maintenance and operations`,
         description: 'Maintenance Knowledge Base',
     });
 
-    // const s3docsDataSource = maintenanceKnowledgeBase.addS3DataSource({
-        
-    // })
+    const s3docsDataSource = maintenanceKnowledgeBase.addS3DataSource({
+        bucket: props.s3Bucket,
+        dataSourceName: "a4e-kb-ds-s3-maint",
+    })
 
     const oilfieldServiceDataSource = maintenanceKnowledgeBase.addWebCrawlerDataSource({
         sourceUrls: ['https://novaoilfieldservices.com/learn/'],
@@ -116,7 +119,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
 
     // Create Bedrock Agent
     const agentMaint = new bedrock.CfnAgent(scope, 'MaintenanceAgent', {
-        agentName: 'MaintenanceAgent',
+        agentName: agentName,
         description: agentDescription,
         //agentRole: 'AGENT',
         instruction: `You are an industrial maintenance specialist who has access to files and data about internal company operations.  
@@ -207,9 +210,9 @@ $prompt_session_attributes$
 
     
     agentMaint.node.addDependency(maintenanceKnowledgeBase);
+    
+    // TODO: Sync KB and Prepare Agent
 
-    
-    
     
     console.log("Maintenance Stack UUID: ", stackUUID)
 
