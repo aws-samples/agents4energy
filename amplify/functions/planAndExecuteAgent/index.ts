@@ -357,9 +357,9 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                             !Array.isArray(newPlan.steps) ||
                             !newPlan.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
                             )
-                        ) throw new Error(`Provided steps are not in the correct format.\n\nSteps: ${stringify(newPlan.steps)}\n\n`)
-
-                        return newPlan
+                        ) {
+                            console.warn(`Provided steps are not in the correct format.\n\nSteps: ${stringify(newPlan.steps)}\n\n`)
+                        } else return newPlan
 
                     } catch (error) {
                         if (attempt === MAX_RETRIES - 1) {
