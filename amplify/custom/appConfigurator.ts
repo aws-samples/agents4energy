@@ -29,7 +29,7 @@ export interface AppConfiguratorProps {
   hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
   defaultProdDatabaseName: string,
   athenaWorkgroup: cdk.aws_athena.CfnWorkGroup,
-  athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
+  // athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
   s3Bucket: cdk.aws_s3.IBucket
   preSignUpFunction: lambda.IFunction
   cognitoUserPool: cdk.aws_cognito.IUserPool

@@ -1,14 +1,174 @@
 import { stringify } from 'yaml';
-import { S3Event, S3Handler, SQSEvent, SQSHandler } from 'aws-lambda';
+import { S3Event, SQSEvent, SQSHandler } from 'aws-lambda';
 
-import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
-import { ChatBedrockConverse } from "@langchain/aws";
+// import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
+// import { ChatBedrockConverse } from "@langchain/aws";
 
-import { convertPdfToB64Strings } from '../utils/pdfUtils'
-import { correctStructuredOutputResponse } from '../utils/amplifyUtils'
+// import { convertPdfToB64Strings } from '../utils/pdfUtils'
+// import { correctStructuredOutputResponse } from '../utils/amplifyUtils'
 import { uploadStringToS3 } from '../utils/sdkUtils'
+// const imageBatchSize = 2 //Claude.ai can handle 5 images in a single request https://docs.anthropic.com/en/docs/build-with-claude/vision
 
-const imageBatchSize = 2 //Claude.ai can handle 5 images in a single request https://docs.anthropic.com/en/docs/build-with-claude/vision
+
+import {
+    TextractClient,
+    StartDocumentAnalysisCommand,
+    GetDocumentAnalysisCommand,
+    FeatureType,
+    GetDocumentAnalysisCommandOutput
+} from "@aws-sdk/client-textract";
+
+// import { writeFileSync } from 'fs';
+
+async function startAndWaitForDocumentAnalysis(bucketName: string, documentName: string) {
+    try {
+        // Create Textract client
+        const client = new TextractClient();
+
+        // Start the analysis
+        const startParams = {
+            DocumentLocation: {
+                S3Object: {
+                    Bucket: bucketName,
+                    Name: documentName
+                }
+            },
+            FeatureTypes: [FeatureType.FORMS]
+        };
+
+        const startCommand = new StartDocumentAnalysisCommand(startParams);
+        const startResponse = await client.send(startCommand);
+
+        if (!startResponse.JobId) {
+            throw new Error("No JobId received from Textract");
+        }
+
+        console.log(`Started analysis job with ID: ${startResponse.JobId}`);
+
+        // Wait for the analysis to complete
+        const results = await waitForJobCompletion(client, startResponse.JobId);
+
+        // Process and print results
+        console.log("\nProcessed Form Analysis Results:");
+        return processResults(results);
+
+    } catch (error) {
+        console.error("Error analyzing document:", error);
+    }
+}
+
+async function waitForJobCompletion(
+    client: TextractClient,
+    jobId: string
+): Promise<GetDocumentAnalysisCommandOutput[]> {
+    const results: GetDocumentAnalysisCommandOutput[] = [];
+    let nextToken: string | undefined;
+
+    while (true) {
+        const getParams = {
+            JobId: jobId,
+            NextToken: nextToken
+        };
+
+        const getCommand = new GetDocumentAnalysisCommand(getParams);
+
+        // Poll every 5 seconds
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const response = await client.send(getCommand);
+        console.log('Job Status: ', response.JobStatus)
+
+        if (response.JobStatus === "FAILED") {
+            throw new Error(`Document analysis failed: \${response.StatusMessage}`);
+        }
+
+        if (response.JobStatus === "SUCCEEDED") {
+            results.push(response);
+
+            // Check if there are more pages of results
+            if (response.NextToken) {
+                nextToken = response.NextToken;
+            } else {
+                break; // No more pages, exit loop
+            }
+        }
+    }
+
+    return results;
+}
+
+function findRelationship(blocks: GetDocumentAnalysisCommandOutput["Blocks"], ids: string[]) {
+    return blocks!
+        .filter(b => b.Id && ids.includes(b.Id))
+}
+
+function processResults(results: GetDocumentAnalysisCommandOutput[]) {
+    // writeFileSync('./results.yaml', stringify(results))
+    const processedData = results.map((result, index) => {
+        console.log(`\nPage ${index + 1}:`);
+
+        if (result.Blocks) {
+
+            const formDataList = result.Blocks
+                .filter(block => block.BlockType === "KEY_VALUE_SET" && block.EntityTypes?.includes("KEY"))
+                .map(block => {
+                    const keyText = block.Relationships!
+                        .filter(relationship => relationship.Type === "CHILD")
+                        .map(keyRelationsips => {
+                            return findRelationship(result.Blocks!, keyRelationsips.Ids!)
+                                .map(block => block.Text)
+                                .join(" ")
+                        })
+                        .join(" ")
+
+                    const valueText = block.Relationships! //KEY_VALUE_SET - KEY
+                        .filter(relationship => relationship.Type === "VALUE")
+                        .map(valueRelationsips => (
+                            findRelationship(result.Blocks!, valueRelationsips.Ids!)//KEY_VALUE_SET - VALUE
+                                .map(block => {
+                                    // console.log("KEY_VALUE_SET - VALUE Block:\n", stringify(block))
+                                    if (block.Relationships) {
+                                        return block.Relationships
+                                            .filter(relationship => relationship.Type === "CHILD")
+                                            .map(
+                                                relationship => (
+                                                    findRelationship(result.Blocks!, relationship.Ids!) //CHILD
+                                                        .map(block => {
+                                                            if (block.BlockType! === "WORD") return block.Text
+                                                            else if (block.BlockType! === "SELECTION_ELEMENT") return block.SelectionStatus
+                                                        })
+                                                        .join(" ")
+                                                )
+                                            )
+                                            .join(" ")
+                                    } else return ""
+                                })
+                                .join(" ")
+                        ))
+                        .join(" ")
+
+                    return [keyText, valueText]
+                });
+
+            const formData = Object.fromEntries(formDataList.filter(item => item !== undefined))
+
+            console.log("Form Data: ", formData)
+
+            const textData = result.Blocks
+                .filter(block => block.BlockType === "LINE")
+                .map(block => block.Text)
+                .join('\n');
+
+            return {
+                page: index + 1,
+                formData: formData,
+                textData: textData
+            }
+        } else return { page: index + 1 }
+    });
+
+    if (processedData) return processedData.sort((a, b) => a?.page - b?.page)
+}
 
 export const handler: SQSHandler = async (event: SQSEvent) => {
     console.log('event:\n', JSON.stringify(event, null, 2))
@@ -25,63 +185,7 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
 
                 console.log(`Processing file: ${key} from bucket: ${bucket}`);
 
-                const pdfImageBuffers = await convertPdfToB64Strings({ s3BucketName: bucket, s3Key: key })
-                const imageMessaggeContentBlocks = pdfImageBuffers.map((imageB64String) => ({
-                    type: "image_url",
-                    image_url: {
-                        url: `data:image/png;base64,${imageB64String}`,
-                    }
-                }))
-
-                const outputStructure = {
-                    title: "FileContentsJSON",
-                    description: "All of the information in the file extracted into JSON form",
-                    type: "object",
-                    additionalProperties: true
-                };
-
-                const chatModelWithStructuredOutput = new ChatBedrockConverse({
-                    model: process.env.MODEL_ID,
-                    temperature: 0
-                }).withStructuredOutput(
-                    outputStructure,
-                    { includeRaw: true, }
-                )
-
-                const documentContent = [];
-                for (let i = 0; i < imageMessaggeContentBlocks.length; i += imageBatchSize) {
-                    const contentMessagesBatch = imageMessaggeContentBlocks.slice(i, i + imageBatchSize);
-                    const messages = [
-                        new HumanMessage({
-                            content: [
-                                ...contentMessagesBatch,
-                                {
-                                    type: "text",
-                                    text: `
-                                The user is asking you to extract information from an image of a PDF document. 
-                                Respond with a JSON object which contains all of the information from the document.
-                                `
-                                },
-                            ]
-                        }
-                        )
-                    ]
-
-                    // console.log('Invoking FM with messages:\n', messages)
-
-                    let structuredOutputResponse = await chatModelWithStructuredOutput.invoke(messages)
-                    console.log('structuredOutputResponse response: ', structuredOutputResponse)
-
-                    //If the parsing fails, retry the request
-                    structuredOutputResponse = await correctStructuredOutputResponse(
-                        chatModelWithStructuredOutput,
-                        structuredOutputResponse,
-                        outputStructure,
-                        messages
-                    )
-
-                    documentContent.push(structuredOutputResponse.parsed);
-                }
+                const documentContent = await startAndWaitForDocumentAnalysis(bucket, key) || "No contents found in file"
 
                 await uploadStringToS3({
                     bucket: bucket,
@@ -89,7 +193,7 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
                     content: stringify(documentContent)
                 })
 
-                console.log(`Successfully processed file: ${key}. Content:\n`, documentContent);
+                console.log(`Successfully processed file: ${key}. Content:\n`, stringify(documentContent));
             }
         }
 
