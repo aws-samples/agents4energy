@@ -39,6 +39,12 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     const stackName = cdk.Stack.of(scope).stackName
     const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
     
+    // // Agent-specific tags
+    // const tags = {
+    //     Agent: 'Maintenance',
+    //     Model: foundationModel
+    // }
+    
     // Create IAM role for Bedrock Agent
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
       roleName: agentRoleName,
@@ -113,9 +119,10 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         dataDeletionPolicy: cdkLabsBedrock.DataDeletionPolicy.RETAIN,
         chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.HIERARCHICAL_TITAN
     })
-
-
-
+    
+    // Add tags
+    //cdk.Tags.of(maintenanceKnowledgeBase.node.defaultChild as cdk.CfnResource).add(tags.Agent, tags.Agent);
+    
 
     // Create Bedrock Agent
     const agentMaint = new bedrock.CfnAgent(scope, 'MaintenanceAgent', {
@@ -208,11 +215,15 @@ $prompt_session_attributes$
         }
     });
 
-    
+    // Add dependency on the KB so it gets created first
     agentMaint.node.addDependency(maintenanceKnowledgeBase);
     
     // TODO: Sync KB and Prepare Agent
 
+    // Add tags
+    //cdk.Tags.of(agentMaint.node.defaultChild as cdk.CfnResource).add(tags.Agent, tags.Agent);
+    //cdk.Tags.of(agentMaint.node.defaultChild as cdk.CfnResource).add(tags.Model, tags.Model);
+    
     
     console.log("Maintenance Stack UUID: ", stackUUID)
 
