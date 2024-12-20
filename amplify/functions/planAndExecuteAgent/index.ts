@@ -416,13 +416,16 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             if (!event.identity) throw new Error("Event does not contain identity");
             if (!('sub' in event.identity)) throw new Error("Event does not contain user");
 
-            //Send a message with the step title to make clear in the chat history where each step begins.
-            amplifyClientWrapper.publishMessage({
-                chatSessionId: event.arguments.chatSessionId,
-                owner: event.identity.sub,
-                message: new AIMessage({ content: `## ${planSteps[0].title}` }),
-                responseComplete: true
-            })
+            if (planSteps[0]) {
+                //Send a message with the step title to make clear in the chat history where each step begins.
+                amplifyClientWrapper.publishMessage({
+                    chatSessionId: event.arguments.chatSessionId,
+                    owner: event.identity.sub,
+                    message: new AIMessage({ content: `## ${planSteps[0].title}` }),
+                    responseComplete: true
+                })
+            }
+
 
             return {
                 plan: planSteps,
