@@ -24,10 +24,11 @@ export const defaultAgents: { [key: string]: defaultAgent } = {
     PlanAndExecuteAgent: {
         name: "Plan And Execute",
         samplePrompts: [
-            `This morning well with API number 30-045-29202 fell in production to 10 MCFD with indication of a hole in tubing at 1000'. 
+            `This morning well with API number 30-045-29202 stopped producing gas with indication of a hole in tubing.  
             Make a table of all operational events found in the well files. 
             Query all historic monthly production rates and make a plot with both the event and production data. 
-            Write a procedure to repair the well, estimate the cost of the repair, and forecast the financial returns. 
+            Estimate the value of the well's remaining production. 
+            Write a procedure to repair the well, estimate the cost of the repair, and calculate financial metrics. 
             Make an executive report about repairing the well with detailed cost and procedure data. 
             Use the ai role for all steps.
             `.replace(/^\s+/gm, ''),

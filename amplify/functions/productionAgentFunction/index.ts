@@ -14,7 +14,7 @@ import { Calculator } from "@langchain/community/tools/calculator";
 
 import {
     queryKnowledgeBase,
-    wellTableToolBuilder,
+    wellTableTool,
     getTableDefinitionsTool,
     executeSQLQueryTool,
     plotTableFromToolResponseTool,
@@ -52,7 +52,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
     const agentTools = [
         new Calculator,
-        wellTableToolBuilder(amplifyClientWrapper),
+        wellTableTool,
         getS3KeyConentsTool,
         getTableDefinitionsTool,
         executeSQLQueryTool,

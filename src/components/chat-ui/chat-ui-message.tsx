@@ -60,7 +60,6 @@ export interface ChatUIMessageProps {
   // message: Schema["ChatMessage"]["type"];
   message: Message;
   messages: Message[];
-  allMessages: Message[];
   showCopyButton?: boolean;
 }
 
@@ -133,13 +132,18 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
   const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
-  const [messagePlot, setMessagePlot] = useState<React.FC>()
-  const [messageTable, setMessageTable] = useState<React.FC>()
+  const [MessagePlot, setMessagePlot] = useState<() => React.JSX.Element>()
+  // const [MessagePlot, setMessagePlot] = useState<React.ElementType>(() => (<div></div>))
+  const [MessageTable, setMessageTable] = useState<React.FC>()
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
   const messageContentCategory = getMessageCatigory(props.message);
 
+  const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
+
+  // Set the plot and table messages
   useEffect(() => {
+    // console.log("Number of Previous Messages: ", previousMessages.length)
     const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation', 'includeScore']
     switch (messageContentCategory) {
       case 'tool_plot':
@@ -149,8 +153,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           numberOfPreviousTablesToInclude: number
         }
 
-        //Limit messages to those before the plot message
-        const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
+        // //Limit messages to those before the plot message
+        // const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
 
         const toolResponseMessages = previousMessages.filter(
           (message) =>
@@ -160,11 +164,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             JSON.parse(message.content as string).messageContentType === 'tool_table'
         )
 
-        console.log('Tool Response Messages:\n', toolResponseMessages)
+        // console.log('Tool Response Messages:\n', toolResponseMessages)
 
         const selectedToolMessages = toolResponseMessages.slice(-1 * numberOfPreviousTablesToInclude)
 
-        console.log("Selected messages: ", selectedToolMessages)
+        // console.log("Selected messages: ", selectedToolMessages)
 
         if (selectedToolMessages.length === 0) return
 
@@ -236,7 +240,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               break
             case 'trend':
               const xAxisIsNumberNotDate = !isNaN(Number(chartDataObject[chartTrendNames[0]][0]))
-              console.log('xAxisIsNumberNotDate: ', xAxisIsNumberNotDate)
+              // console.log('xAxisIsNumberNotDate: ', xAxisIsNumberNotDate)
               const newData: ChartData<'scatter', ScatterDataPoint[]> = {
                 datasets: chartTrendNames
                   .slice(1) // The first column will be used for the x axis
@@ -376,24 +380,36 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           }
         };
 
-        setMessagePlot(() => (
-          <>
-            {/* <pre
-              style={{ //Wrap long lines
-                whiteSpace: 'pre-wrap',
-                wordWrap: 'break-word',
-                overflowWrap: 'break-word',
-              }}
-            >
-              {stringify(chartDataObject)}
-            </pre> */}
-            <Scatter
-              data={data}
-              options={options}
-            />
-          </>
+        const newMessagePlot = () => <>
+          {/* <pre
+            style={{ //Wrap long lines
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+            }}
+          >
+            {stringify(chartDataObject)}
+          </pre> */}
+          <Scatter
+            data={data}
+            options={options}
+          />
+        </>
+        
+        // console.log("Number of table tool response messages: ", toolResponseMessages.length)
+        // console.log("New Data: ", newMessagePlot().props.children?.props?.data)
+        // console.log("Previous Data: ", MessagePlot && MessagePlot().props.children?.props?.data)
+        if (
+          !MessagePlot || 
+          JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data) 
+        )  {
+          console.log("Number of datasets: ", data.datasets.length)
+          console.log("Number of table tool response messages: ", toolResponseMessages)
+          console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
+          console.log('New Message Plot Props: ', newMessagePlot().props.children?.props)
+          setMessagePlot(() => newMessagePlot)
+        }
 
-        ))
       case 'tool_table':
         // https://mui.com/x/react-data-grid/
         // const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
@@ -404,7 +420,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           return
         }
 
-        console.log('Query Response Data: ', queryResponseData)
+        // console.log('Query Response Data: ', queryResponseData)
         if (!queryResponseData[0]) {
           console.warn('No query response data')
           return
@@ -412,7 +428,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         const columnNames = Object.keys(queryResponseData[0])
 
-        console.log('Column Names: ', columnNames)
+        // console.log('Column Names: ', columnNames)
 
 
 
@@ -463,9 +479,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           ...item
         }))
 
-        console.log('Row Data: ', rowData)
-
-        setMessageTable(() => (
+        // console.log('Row Data: ', rowData)
+        const newMessageTable = () => (
           <>
             {/* <pre
               style={{ //Wrap long lines
@@ -513,10 +528,16 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             />
           </>
 
-        ))
+        )
+
+        if (!MessageTable) {
+          setMessageTable(() => newMessageTable)
+
+        }
+
 
     }
-  }, [props.message, props.messages, messageContentCategory])
+  }, [props.message, previousMessages, messageContentCategory, MessageTable, MessagePlot])
 
   // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
   async function getGlossary(message: Message) {
@@ -560,6 +581,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
 
   }
+
+  // console.log('messagePlot:', MessagePlot);
+  // console.log('Type of messagePlot:', typeof MessagePlot);
+  // console.log('Is valid React element:', React.isValidElement(MessagePlot));
 
   return (
     <div>
@@ -691,21 +716,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             switch (messageContentCategory) {
               case 'tool_plot':
                 return <>
-                  {/* <pre
-                    style={{ //Wrap long lines
-                      whiteSpace: 'pre-wrap',
-                      wordWrap: 'break-word',
-                      overflowWrap: 'break-word',
-                    }}
-                  >
-                    {JSON.stringify(datasets, null, 2)}
-                  </pre> */}
-
-                  {messagePlot ? messagePlot : null}
+                  {/* <MessagePlot/> */}
+                  {MessagePlot && <MessagePlot/>}
                 </>
               case 'tool_table':
                 return <>
-                  {messageTable ? messageTable : null}
+                  {MessageTable && <MessageTable/>}
                 </>
               case 'tool_json':
                 return <pre
@@ -721,7 +737,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                       props.message.content
                   }
                 </pre>/* Render as YAML */;
-              default: 
+              default:
                 return <div className="prose !max-w-none w-full" >
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}

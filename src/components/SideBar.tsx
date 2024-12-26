@@ -74,7 +74,7 @@ const SideBar: React.FC<SideBarProps> = ({ children, anchor, initiallyOpen = tru
     return (
         <Box sx={{ 
             display: 'flex', 
-            width: (open ? drawerWidth: '10px'), 
+            width: (open ? drawerWidth: '30px'), 
             position: 'relative' 
             }}>
 
