@@ -173,7 +173,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     // Add SQS as trigger for Lambda
     convertPdfToYamlFunction.addEventSource(new lambdaEvent.SqsEventSource(pdfProcessingQueue, {
         batchSize: 1,
-        maxConcurrency: 2 //This prevents throttling when calling foundation models
+        maxConcurrency: 10
     }));
 
     const wellFileDriveBucket = s3.Bucket.fromBucketName(scope, 'ExistingBucket', props.s3Bucket.bucketName);

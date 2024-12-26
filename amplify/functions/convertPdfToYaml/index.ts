@@ -34,7 +34,7 @@ async function startAndWaitForDocumentAnalysis(bucketName: string, documentName:
                 }
             },
             FeatureTypes: [FeatureType.FORMS]
-        };
+        }; 
 
         const startCommand = new StartDocumentAnalysisCommand(startParams);
         const startResponse = await client.send(startCommand);

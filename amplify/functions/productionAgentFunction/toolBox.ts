@@ -339,9 +339,10 @@ export const wellTableSchema = z.object({
                         "type": "string",
                         "enum": [
                             "Drilling",
-                            "Completion",
+                            "Stimulation",
                             "Workover",
                             "Plugging",
+                            "Legal",
                             "Inspection",
                             "Other"
                         ]
