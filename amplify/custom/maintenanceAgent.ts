@@ -26,6 +26,8 @@ const agentName = 'A4E-Maintenance';
 const agentRoleName = 'AmazonBedrockExecutionRole_A4E_Maintenance';
 const agentDescription = 'Agent for energy industry maintenance workflows';
 const knowledgeBaseName = 'A4E-KB-Maintenance'
+const postgresPort = 5432
+const maxLength = 4096
 
 
 interface AgentProps {
@@ -39,11 +41,11 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     const stackName = cdk.Stack.of(scope).stackName
     const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
     
-    // // Agent-specific tags
-    // const tags = {
-    //     Agent: 'Maintenance',
-    //     Model: foundationModel
-    // }
+    // Agent-specific tags
+    const maintTags = {
+        Agent: 'Maintenance',
+        Model: foundationModel
+    }
     
     // Create IAM role for Bedrock Agent
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
@@ -55,8 +57,8 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     bedrockAgentRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonBedrockFullAccess'))
     
     
-    // Create Knowledge Base - https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
-    const maintDb = new rds.DatabaseCluster(scope, 'A4E-CMMS', {
+    // Create Aurora DB - https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
+    const maintDb = new rds.DatabaseCluster(scope, 'MaintDB', {
         engine: rds.DatabaseClusterEngine.auroraPostgres({
             version: rds.AuroraPostgresEngineVersion.VER_16_4,
         }),
@@ -64,67 +66,53 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         enableDataApi: true,
         writer: rds.ClusterInstance.serverlessV2('writer'),
         serverlessV2MinCapacity: 0.5,
-        serverlessV2MaxCapacity: 2,
+        serverlessV2MaxCapacity: 4,
         vpcSubnets: {
             subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
         },
         vpc: props.vpc,
-        port: 5432,
+        port: postgresPort,
         removalPolicy: cdk.RemovalPolicy.DESTROY
     });
     const writerNode = maintDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
     //Allow inbound traffic from the default SG in the VPC
     maintDb.connections.securityGroups[0].addIngressRule(
         ec2.Peer.securityGroupId(props.vpc.vpcDefaultSecurityGroup),
-        ec2.Port.tcp(5432),
+        ec2.Port.tcp(postgresPort),
         'Allow inbound traffic from default SG'
     );
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefinitionBedrockKnoledgeBase", {
-        vpc: props.vpc,
-        bucket: props.s3Bucket,
-        schemaName: 'bedrock_integration'
-    })
-    const maintAgentTableDefDataSource = new bedrock.CfnDataSource(scope, 'sqlTableDefinitions', {
-        name: "sqlTableDefinition",
-        dataSourceConfiguration: {
-            type: 'S3',
-            s3Configuration: {
-                bucketArn: props.s3Bucket.bucketArn,
-                inclusionPrefixes: ['maintenance-agent/']
-            },
-        },
-        vectorIngestionConfiguration: {
-            chunkingConfiguration: {
-                chunkingStrategy: 'NONE' // This sets the whole file as a single chunk
-            }
-        },
-        knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
-    })
 
+    // Bedrock KB with OpenSearchServerless (OSS) vector backend
     const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintKB`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         name: knowledgeBaseName,
-        instruction: `You are a helpful question answering assistant. You answer
-        user questions factually and honestly related to industrial facility maintenance and operations`,
+        instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to industrial facility maintenance and operations`,
         description: 'Maintenance Knowledge Base',
     });
-
     const s3docsDataSource = maintenanceKnowledgeBase.addS3DataSource({
         bucket: props.s3Bucket,
         dataSourceName: "a4e-kb-ds-s3-maint",
+        inclusionPrefixes: ['maintenance-agent/'],
+        //chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.NONE
     })
-
     const oilfieldServiceDataSource = maintenanceKnowledgeBase.addWebCrawlerDataSource({
         sourceUrls: ['https://novaoilfieldservices.com/learn/'],
         dataDeletionPolicy: cdkLabsBedrock.DataDeletionPolicy.RETAIN,
         chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.HIERARCHICAL_TITAN
     })
-    
-    // Add tags
-    //cdk.Tags.of(maintenanceKnowledgeBase.node.defaultChild as cdk.CfnResource).add(tags.Agent, tags.Agent);
-    
 
-    // Create Bedrock Agent
+    // // Synch KB - S3 data source
+    // const startIngestionJobResourceCall: cr.AwsSdkCall = {
+    //     service: '@aws-sdk/client-bedrock-agent',
+    //     action: 'startIngestionJob',
+    //     parameters: {
+    //         dataSourceId: s3docsDataSource.attrDataSourceId,
+    //         knowledgeBaseId: maintenanceKnowledgeBase.knowledgeBase.attrKnowledgeBaseId,
+    //     },
+    //     physicalResourceId: cr.PhysicalResourceId.of('startKbIngestion'),
+    // }
+
+    // BEDROCK AGENT
     const agentMaint = new bedrock.CfnAgent(scope, 'MaintenanceAgent', {
         agentName: agentName,
         description: agentDescription,
@@ -202,7 +190,7 @@ $prompt_session_attributes$
         ]
 }`,
               inferenceConfiguration: {
-                maximumLength: 4096,
+                maximumLength: maxLength,
                 stopSequences:['</function_calls>', '</answer>', '</error>'],
                 temperature: 1,
                 topK: 250,
@@ -218,11 +206,43 @@ $prompt_session_attributes$
     // Add dependency on the KB so it gets created first
     agentMaint.node.addDependency(maintenanceKnowledgeBase);
     
-    // TODO: Sync KB and Prepare Agent
-
+    // Associate KBs with the Agent
+    // const associateKBsWithAgent = new cr.AwsCustomResource(scope, 'AssociateKBsWithAgent', {
+    //     onUpdate: {
+    //         service: 'Bedrock',
+    //         action: 'associateKnowledgeBases',
+    //         parameters: {
+    //             agentId: agentMaint.ref,
+    //             knowledgeBaseIds: [maintenanceKnowledgeBase.knowledgeBaseId]
+    //         },
+    //         physicalResourceId: cr.PhysicalResourceId.of(agentMaint.ref + '-' + maintenanceKnowledgeBase.knowledgeBaseId)
+    //     },
+    //     policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+    //         resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE
+    //     })
+    // });
+    // Prepare the Agent
+    // const prepareAgent = new cr.AwsCustomResource(scope, 'PrepareAgent', {
+    //     onUpdate: {
+    //         service: 'Bedrock',
+    //         action: 'prepareAgent',
+    //         parameters: {
+    //             agentId: agentMaint.ref
+    //         },
+    //         physicalResourceId: cr.PhysicalResourceId.of(agentMaint.ref)
+    //     },
+    //     policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+    //         resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE
+    //     })
+    // });
+    // Add dependencies to ensure the order of operations
+    //syncKBDataSource.node.addDependency(maintenanceKnowledgeBase);
+    //associateKBsWithAgent.node.addDependency(syncKBDataSource);
+    //prepareAgent.node.addDependency(associateKBsWithAgent);
+    
     // Add tags
-    //cdk.Tags.of(agentMaint.node.defaultChild as cdk.CfnResource).add(tags.Agent, tags.Agent);
-    //cdk.Tags.of(agentMaint.node.defaultChild as cdk.CfnResource).add(tags.Model, tags.Model);
+    //cdk.Tags.of(agentMaint.node.defaultChild as cdk.CfnResource).add(maintTags.Agent, maintTags.Agent);
+    //cdk.Tags.of(agentMaint.node.defaultChild as cdk.CfnResource).add(maintTags.Model, maintTags.Model);
     
     
     console.log("Maintenance Stack UUID: ", stackUUID)
