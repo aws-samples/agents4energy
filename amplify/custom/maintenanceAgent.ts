@@ -73,7 +73,6 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
         roleName: agentRoleName,
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
-        assumeRolePolicyDocument: iam.PolicyDocument.fromJson(assumeRolePolicy),
         description: 'IAM role for Maintenance Agent to access KBs and query CMMS',
     });
     //addLlmAgentPolicies(bedrockAgentRole);
@@ -835,6 +834,14 @@ MaintID int NOT NULL
         database and documents in the KB.  For each request, check both data sources and compare the data to see if it matches.  When running SQL statements, 
         verify that the syntax is correct and results are returned from the CMMS database.  If you do not get results, rewrite the query and try again.`,
         foundationModel: foundationModel,
+        autoPrepare: true,
+        knowledgeBases: [{
+          description: 'Maintenance Knowledge Base',
+          knowledgeBaseId: maintenanceKnowledgeBase.knowledgeBaseId,
+      
+          // the properties below are optional
+          knowledgeBaseState: 'ENABLED',
+        }],
         agentResourceRoleArn: bedrockAgentRole.roleArn,
         promptOverrideConfiguration: {
             promptConfigurations: [{
