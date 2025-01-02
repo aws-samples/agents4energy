@@ -73,7 +73,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
         roleName: agentRoleName,
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
-        assumeRolePolicyDocument: iam.PolicyDocument.fromJson(assumeRolePolicy),
+        //assumeRolePolicyDocument: iam.PolicyDocument.fromJson(assumeRolePolicy),
         description: 'IAM role for Maintenance Agent to access KBs and query CMMS',
     });
     //addLlmAgentPolicies(bedrockAgentRole);
@@ -959,7 +959,6 @@ $prompt_session_attributes$
     // Add tags to all resources in this scope
     cdk.Tags.of(scope).add('Agent', maintTags.Agent);
     cdk.Tags.of(scope).add('Model', maintTags.Model);
-
 
     return {
         defaultDatabaseName: defaultDatabaseName,
