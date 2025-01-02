@@ -25,16 +25,16 @@ interface AgentProps {
 
 export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const stackName = cdk.Stack.of(scope).stackName
-    const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
-    const defaultDatabaseName = 'maintdb'
+    const stackName = cdk.Stack.of(scope).stackName;
+    const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3);
+    const defaultDatabaseName = 'maintdb';
     const foundationModel = 'anthropic.claude-3-sonnet-20240229-v1:0';
-    const agentName = 'A4E-Maintenance';
+    const agentName = `A4E-Maintenance-${stackUUID}`;
     const agentRoleName = 'AmazonBedrockExecutionRole_A4E_Maintenance';
     const agentDescription = 'Agent for energy industry maintenance workflows';
-    const knowledgeBaseName = `A4E-KB-Maintenance-${stackUUID}`
-    const postgresPort = 5432
-    const maxLength = 4096
+    const knowledgeBaseName = `A4E-KB-Maintenance-${stackUUID}`;
+    const postgresPort = 5432;
+    const maxLength = 4096;
 
     console.log("Maintenance Stack UUID: ", stackUUID)
 
@@ -766,7 +766,7 @@ MaintID int NOT NULL
     // Bedrock KB with OpenSearchServerless (OSS) vector backend
     const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintKB`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
-        name: knowledgeBaseName,
+        //name: knowledgeBaseName,
         instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to industrial facility maintenance and operations`,
         description: 'Maintenance Knowledge Base',
     });
@@ -787,7 +787,7 @@ MaintID int NOT NULL
     // ===== ACTION GROUP =====
     // Lambda Function
     const lambdaFunction = new lambda.Function(scope, 'QueryCMMS', {
-       functionName: 'Query-CMMS',
+       //functionName: 'Query-CMMS',
        runtime: lambda.Runtime.PYTHON_3_12,
        code: lambda.Code.fromAsset('amplify/functions/text2SQL/'),
        handler: 'maintenanceAgentAG.lambda_handler',
