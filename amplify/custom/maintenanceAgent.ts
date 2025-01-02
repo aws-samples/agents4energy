@@ -16,14 +16,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
 
-const defaultDatabaseName = 'maintdb'
-const foundationModel = 'anthropic.claude-3-sonnet-20240229-v1:0';
-const agentName = 'A4E-Maintenance';
-const agentRoleName = 'AmazonBedrockExecutionRole_A4E_Maintenance';
-const agentDescription = 'Agent for energy industry maintenance workflows';
-const knowledgeBaseName = 'A4E-KB-Maintenance'
-const postgresPort = 5432
-const maxLength = 4096
 
 interface AgentProps {
     vpc: ec2.Vpc,
@@ -35,7 +27,15 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const stackName = cdk.Stack.of(scope).stackName
     const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
-    
+    const defaultDatabaseName = 'maintdb'
+    const foundationModel = 'anthropic.claude-3-sonnet-20240229-v1:0';
+    const agentName = 'A4E-Maintenance';
+    const agentRoleName = 'AmazonBedrockExecutionRole_A4E_Maintenance';
+    const agentDescription = 'Agent for energy industry maintenance workflows';
+    const knowledgeBaseName = `A4E-KB-Maintenance-${stackUUID}`
+    const postgresPort = 5432
+    const maxLength = 4096
+
     console.log("Maintenance Stack UUID: ", stackUUID)
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
@@ -71,7 +71,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     };
 
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
-        roleName: agentRoleName,
+        //roleName: agentRoleName,
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
         description: 'IAM role for Maintenance Agent to access KBs and query CMMS',
     });
@@ -923,7 +923,7 @@ $prompt_session_attributes$
 
     // Create a custom inline policy with a recognizable name in IAM
     const customAgentPolicy = new iam.Policy(scope, 'A4E-MaintAgentPolicy', {
-        policyName: 'A4E-MaintAgentPolicy', // Custom policy name
+        //policyName: 'A4E-MaintAgentPolicy', // Custom policy name
         statements: [
             new iam.PolicyStatement({
                 actions: ['bedrock:InvokeModel'],
