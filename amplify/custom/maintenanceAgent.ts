@@ -959,9 +959,7 @@ $prompt_session_attributes$
     // Add custom policy to the Agent role
     bedrockAgentRole.attachInlinePolicy(customAgentPolicy);
     bedrockAgentRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonBedrockFullAccess'));
-    
-    // TODO: Remove for Least Privilege
-    bedrockAgentRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AdministratorAccess'));    
+
 
     // Add tags to all resources in this scope
     cdk.Tags.of(scope).add('Agent', maintTags.Agent);
