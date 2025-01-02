@@ -967,7 +967,6 @@ $prompt_session_attributes$
     cdk.Tags.of(scope).add('Agent', maintTags.Agent);
     cdk.Tags.of(scope).add('Model', maintTags.Model);
 
-
     return {
         defaultDatabaseName: defaultDatabaseName,
     };
