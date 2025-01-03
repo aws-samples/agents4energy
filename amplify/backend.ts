@@ -155,7 +155,7 @@ const vpc = new ec2.Vpc(networkingStack, 'A4E-VPC', {
     },
   ],
 });
-// Delete the VPC when the cloudformation  
+// Delete the VPC when the cloudformation template is deleted
 vpc.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY)
 
 function applyTagsToRootStack() {
@@ -195,7 +195,7 @@ const {
   sqlTableDefBedrockKnoledgeBase,
   petroleumEngineeringKnowledgeBase,
   athenaWorkgroup,
-  athenaPostgresCatalog,
+  // athenaPostgresCatalog,
 
 } = productionAgentBuilder(productionAgentStack, {
   vpc: vpc,
@@ -263,7 +263,7 @@ backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTable
 backend.productionAgentFunction.addEnvironment('PETROLEUM_ENG_KNOWLEDGE_BASE_ID', petroleumEngineeringKnowledgeBase.knowledgeBaseId)
 backend.productionAgentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', athenaWorkgroup.name)
 backend.productionAgentFunction.addEnvironment('DATABASE_NAME', defaultProdDatabaseName)
-backend.productionAgentFunction.addEnvironment('ATHENA_CATALOG_NAME', athenaPostgresCatalog.name)
+// backend.productionAgentFunction.addEnvironment('ATHENA_CATALOG_NAME', athenaPostgresCatalog.name)
 
 addLlmAgentPolicies({
   role: backend.planAndExecuteAgentFunction.resources.lambda.role!,
@@ -301,7 +301,7 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   hydrocarbonProductionDb: hydrocarbonProductionDb,
   defaultProdDatabaseName: defaultProdDatabaseName,
   athenaWorkgroup: athenaWorkgroup,
-  athenaPostgresCatalog: athenaPostgresCatalog,
+  // athenaPostgresCatalog: athenaPostgresCatalog,
   s3Bucket: backend.storage.resources.bucket,
   appSyncApi: backend.data.resources.graphqlApi,
   preSignUpFunction: backend.preSignUp.resources.lambda,

@@ -78,7 +78,8 @@ export const handler: Schema["invokeBedrockAgent"]["functionHandler"] = async (e
                         content: completion,
                         owner: event.identity.sub,
                         trace: orchestrationTraceRationale,
-                        role: APITypes.ChatMessageRole.ai
+                        role: APITypes.ChatMessageRole.ai,
+                        responseComplete: true
                     },
                 },
             }).then((response) => {
