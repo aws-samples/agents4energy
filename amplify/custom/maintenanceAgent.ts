@@ -783,7 +783,6 @@ MaintID int NOT NULL
         chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.HIERARCHICAL_TITAN
     })
 
-    
     // ===== ACTION GROUP =====
     // Lambda Function
     const lambdaFunction = new lambda.Function(scope, 'QueryCMMS', {
@@ -798,7 +797,6 @@ MaintID int NOT NULL
             db_credentials_secrets_arn: maintDb.secret!.secretArn,
        }
     });
-    lambdaFunction.grantInvoke(bedrockAgentRole)
     lambdaFunction.node.addDependency(maintDb);
     // Add DB query permissions to the Lambda function's role
     const policyRDS = new iam.PolicyStatement({
@@ -817,8 +815,6 @@ MaintID int NOT NULL
     } else {
       console.warn("Lambda function role is undefined, cannot add policy.");
     }
-    
-    
     
     // ===== BEDROCK AGENT =====
     //const agentMaint = new BedrockAgent(scope, 'MaintenanceAgent', {
@@ -953,9 +949,20 @@ $prompt_session_attributes$
 
     // Add dependency on the KB so it gets created first
     agentMaint.node.addDependency(maintenanceKnowledgeBase);
-    agentMaint.node.addDependency(lambdaFunction);
 
-    // Create a custom inline policy with a recognizable name in IAM
+
+
+    // Grant invoke permission to the Bedrock Agent
+    const bedrockAgentArn = agentMaint.attrAgentArn;
+    lambdaFunction.addPermission('BedrockAgentInvokePermission', {
+        principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
+        action: 'lambda:InvokeFunction',
+        sourceArn: bedrockAgentArn,
+    });
+
+    
+
+    // Create a custom inline policy for Agent permissions
     const customAgentPolicy = new iam.Policy(scope, 'A4E-MaintAgentPolicy', {
         //policyName: 'A4E-MaintAgentPolicy', // Custom policy name
         statements: [
