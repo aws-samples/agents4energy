@@ -10,7 +10,6 @@ import {
     aws_lambda_event_sources as lambdaEvent,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as sfnTasks,
-    aws_logs as logs,
     aws_athena as athena,
     aws_rds as rds,
     aws_ec2 as ec2,
@@ -26,7 +25,6 @@ import {
 import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
 
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
-import { CfnApplication, CfnFunction } from 'aws-cdk-lib/aws-sam';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -34,8 +32,6 @@ import { fileURLToPath } from 'url';
 import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
 
 import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
-
-import * as crypto from 'crypto';
 
 const defaultProdDatabaseName = 'proddb'
 
@@ -49,10 +45,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
     const stackName = cdk.Stack.of(scope).stackName
-    // const stackUUID = cdk.Names.uniqueId(scope).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3);
     const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
-    
-    // const stackUUID = crypto.createHash('md5').update(stackUUIDLong).digest('hex').slice(-3)
     
     // console.log("Produciton Stack UUID Long: ", stackUUIDLong)
     console.log("Production Stack UUID: ", stackUUID)
