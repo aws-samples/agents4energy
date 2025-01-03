@@ -13,9 +13,13 @@ const main = async () => {
             summary: {
                 type: 'string',
                 description: `Message intent summary in 20 characters or fewer.`,
+            },
+            svgImage: {
+                type: 'string',
+                description: `SVG describing the input`,
             }
         },
-        required: ['summary'],
+        required: ['summary','svgImage'],
     };
 
     const response = await getStructuredOutputResponse({
