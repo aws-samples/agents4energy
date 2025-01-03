@@ -48,27 +48,27 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     }
     
     // Create IAM role for Bedrock Agent
-    const assumeRolePolicy = {
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Sid: 'AmazonBedrockAgentBedrockFoundationModelPolicyProd',
-          Effect: 'Allow',
-          Principal: {
-            Service: 'bedrock.amazonaws.com',
-          },
-          Action: 'sts:AssumeRole',
-          Condition: {
-            StringEquals: {
-              'aws:SourceAccount': `${rootStack.account}`,
-            },
-            ArnLike: {
-              'aws:SourceArn': `arn:aws:bedrock:${rootStack.region}:${rootStack.account}:agent/*`,
-            },
-          },
-        },
-      ],
-    };
+    // const assumeRolePolicy = {
+    //   Version: '2012-10-17',
+    //   Statement: [
+    //     {
+    //       Sid: 'AmazonBedrockAgentBedrockFoundationModelPolicyProd',
+    //       Effect: 'Allow',
+    //       Principal: {
+    //         Service: 'bedrock.amazonaws.com',
+    //       },
+    //       Action: 'sts:AssumeRole',
+    //       Condition: {
+    //         StringEquals: {
+    //           'aws:SourceAccount': `${rootStack.account}`,
+    //         },
+    //         ArnLike: {
+    //           'aws:SourceArn': `arn:aws:bedrock:${rootStack.region}:${rootStack.account}:agent/*`,
+    //         },
+    //       },
+    //     },
+    //   ],
+    // };
 
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
         //roleName: agentRoleName,
@@ -766,7 +766,7 @@ MaintID int NOT NULL
     // Bedrock KB with OpenSearchServerless (OSS) vector backend
     const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintKB`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
-        //name: knowledgeBaseName,
+        name: knowledgeBaseName,
         instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to industrial facility maintenance and operations`,
         description: 'Maintenance Knowledge Base',
     });
@@ -838,9 +838,43 @@ MaintID int NOT NULL
         knowledgeBases: [{
           description: 'Maintenance Knowledge Base',
           knowledgeBaseId: maintenanceKnowledgeBase.knowledgeBaseId,
-      
           // the properties below are optional
           knowledgeBaseState: 'ENABLED',
+        }],
+        actionGroups: [{
+            actionGroupName: 'Query-CMMS-AG',
+            actionGroupExecutor: {
+                lambda: lambdaFunction.functionArn,
+            },
+            actionGroupState: 'ENABLED',
+            description: 'Action group to perform SQL queries against CMMS database',
+            functionSchema: {
+                functions: [{
+                    name: 'get_tables',
+                    description: 'get a list of usable tables from the database',
+                },  {
+                    name: 'get_tables_information',
+                    description: 'get the column level details of a list of tables',
+                    parameters: {
+                        'tables_list': {
+                            type: 'array',
+                            description: 'list of tables',
+                            required: true,
+                        },
+                    },
+                },  {
+                    name: 'execute_statement',
+                    description: 'Execute a SQL query against the CMMS databases',
+                    parameters: {
+                        'sql_statement': {
+                            type: 'string',
+                            description: 'the SQL query to execute',
+                            required: true,
+                        },
+                    },
+                }
+                ],
+            },
         }],
         agentResourceRoleArn: bedrockAgentRole.roleArn,
         promptOverrideConfiguration: {
