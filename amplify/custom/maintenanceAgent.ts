@@ -16,7 +16,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
 
-
 interface AgentProps {
     vpc: ec2.Vpc,
     s3Bucket: s3.IBucket,
@@ -46,36 +45,13 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         Agent: 'Maintenance',
         Model: foundationModel
     }
-    
-    // Create IAM role for Bedrock Agent
-    // const assumeRolePolicy = {
-    //   Version: '2012-10-17',
-    //   Statement: [
-    //     {
-    //       Sid: 'AmazonBedrockAgentBedrockFoundationModelPolicyProd',
-    //       Effect: 'Allow',
-    //       Principal: {
-    //         Service: 'bedrock.amazonaws.com',
-    //       },
-    //       Action: 'sts:AssumeRole',
-    //       Condition: {
-    //         StringEquals: {
-    //           'aws:SourceAccount': `${rootStack.account}`,
-    //         },
-    //         ArnLike: {
-    //           'aws:SourceArn': `arn:aws:bedrock:${rootStack.region}:${rootStack.account}:agent/*`,
-    //         },
-    //       },
-    //     },
-    //   ],
-    // };
+
 
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
         //roleName: agentRoleName,
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
         description: 'IAM role for Maintenance Agent to access KBs and query CMMS',
     });
-    //addLlmAgentPolicies(bedrockAgentRole);
 
     // ===== CMMS Database =====
     // Create Aurora PostgreSQL DB for CMMS - https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
@@ -761,7 +737,6 @@ MaintID int NOT NULL
     });
 
 
-
     // ===== MAINTENANCE KNOWLEDGE BASE =====
     // Bedrock KB with OpenSearchServerless (OSS) vector backend
     const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintKB`, {//${stackName.slice(-5)}
@@ -783,10 +758,12 @@ MaintID int NOT NULL
         chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.HIERARCHICAL_TITAN
     })
 
+
     // ===== ACTION GROUP =====
     // Lambda Function
     const lambdaFunction = new lambda.Function(scope, 'QueryCMMS', {
        //functionName: 'Query-CMMS',
+       description: 'Agents4Energy tools to query CMMS database',
        runtime: lambda.Runtime.PYTHON_3_12,
        code: lambda.Code.fromAsset('amplify/functions/text2SQL/'),
        handler: 'maintenanceAgentAG.lambda_handler',
