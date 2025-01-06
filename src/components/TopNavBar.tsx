@@ -65,7 +65,7 @@ const TopNavBar = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Link color="inherit" href='/' sx={{ textDecoration: 'none' }}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Agents For Energy
+              Agents4Energy
             </Typography>
           </Link>
         </Box>

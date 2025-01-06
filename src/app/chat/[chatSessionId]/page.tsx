@@ -11,7 +11,7 @@ import { formatDate } from "@/utils/date-utils";
 import DropdownMenu from '@/components/DropDownMenu';
 import SideBar from '@/components/SideBar';
 
-import { defaultAgents } from '@/utils/config'
+import { defaultAgents, BedrockAgent} from '@/utils/config'
 import { Message } from '@/utils/types'
 
 import '@aws-amplify/ui-react/styles.css'
@@ -19,8 +19,6 @@ import '@aws-amplify/ui-react/styles.css'
 import {
     Typography,
     Box,
-    // Drawer,
-    // Toolbar,
     MenuItem,
     IconButton,
     Card,
@@ -28,7 +26,6 @@ import {
     CardActions,
     Button,
     Tooltip
-    // CircularProgress
 } from '@mui/material';
 
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -37,7 +34,8 @@ import { ChatUIProps } from "@/components/chat-ui/chat-ui";
 import { withAuth } from '@/components/WithAuth';
 
 import dynamic from 'next/dynamic'
-// import { error } from 'console';
+
+import { createHash } from 'crypto';
 
 const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
     ssr: false,
@@ -82,25 +80,30 @@ const jsonParseHandleError = (jsonString: string) => {
     }
 }
 
-const invokeBedrockAgentParseBodyGetTextAndTrace = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
-    console.log('Prompt: ', prompt)
-    if (!chatSession.aiBotInfo?.aiBotAliasId) throw new Error('No Agent Alias ID found in invoke request')
-    if (!chatSession.aiBotInfo?.aiBotId) throw new Error('No Agent ID found in invoke request')
+const invokeBedrockAgentParseBodyGetTextAndTrace = async (props: {prompt: string, chatSession: Schema['ChatSession']['type'], agentId?: string, agentAliasId?: string}) => {
+    const {prompt, chatSession} = props
+    const agentId = props.agentId || chatSession.aiBotInfo?.aiBotId
+    const agentAliasId = props.agentAliasId || chatSession.aiBotInfo?.aiBotAliasId
+    console.log(`Agent (id: ${agentId}, aliasId: ${agentAliasId}) Prompt:\n ${prompt} `)
+
+    if (!agentId) throw new Error('No Agent ID found in invoke request')
+    if (!agentAliasId) throw new Error('No Agent Alias ID found in invoke request')
+    
     const response = await amplifyClient.queries.invokeBedrockAgent({
         prompt: prompt,
-        agentId: chatSession.aiBotInfo?.aiBotId,
-        agentAliasId: chatSession.aiBotInfo?.aiBotAliasId,
+        agentId: agentId,
+        agentAliasId: agentAliasId,
         chatSessionId: chatSession.id
     })
-    console.log('Bedrock Agent Response: ', response.data)
-    if (!(response.data)) {
-        console.log('No response from bedrock agent after prompt: ', prompt)
-        return
-    }
-    return {
-        text: response.data.completion,
-        trace: response.data.orchestrationTrace
-    }
+    console.log('Bedrock Agent Response: ', response)
+    // if (!(response.data)) {
+    //     console.log('No response from bedrock agent after prompt: ', prompt)
+    //     return
+    // }
+    // return {
+    //     text: response.data.completion,
+    //     trace: response.data.orchestrationTrace
+    // }
 }
 
 const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targetChatSession: Schema['ChatSession']['type']) => {
@@ -164,7 +167,8 @@ const getAgentAliasId = async (agentId: string) => {
     return mostRecentAliasId
 }
 
-const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr2: Array<Schema["ChatMessage"]["type"]>) => {
+// const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr2: Array<Schema["ChatMessage"]["type"]>) => {
+const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
     const combinedMessages = [...arr1, ...arr2]
     const uniqueMessages = combinedMessages.filter((message, index, self) =>
         index === self.findIndex((p) => p.id === message.id)
@@ -176,7 +180,9 @@ const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr
 })
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
-    const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["type"]>>([]);
+    const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["createType"]>>([]);
+    // const [messages, setMessages] = useState<Array<Message>>([]);
+
     const [, setCharacterStream] = useState<{ content: string, index: number }[]>([{
         content: "\n\n\n",
         index: -1
@@ -230,7 +236,13 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     // This runs when the chat session messages change
     // The blurb below sets the suggested prompts and the isLoading indicator
     useEffect(() => {
+
+        // console.log("initialActiveChatSession hash: ", createHash('md5').update("dasf").digest('hex'))
         console.log("Messages: ", messages)
+        console.log("initialActiveChatSession: ", initialActiveChatSession)
+
+        console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
+        console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
 
         //Reset the character stream when we get a new message
         setCharacterStream(() => {
@@ -303,7 +315,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             fetchAndSetSuggestedPrompts()
         } else if (messages.length) setIsLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
 
-    }, [messages, initialActiveChatSession])
+    }, [JSON.stringify(messages), JSON.stringify(initialActiveChatSession)])
 
     // List the user's chat sessions
     useEffect(() => {
@@ -322,7 +334,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     // Subscribe to messages of the active chat session
     useEffect(() => {
-        setMessages([])
+        // setMessages([])
         if (initialActiveChatSession) {
             const sub = amplifyClient.models.ChatMessage.observeQuery({
                 filter: {
@@ -377,7 +389,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                         return newStream
                     })
 
-
                     // setCharacterStreamMessage((prevStreamMessage) => ({
                     //     content: prevStreamMessage ? (prevStreamMessage.content || "") + chunk : chunk,
                     //     role: "ai",
@@ -429,18 +440,43 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
     }
 
-    function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string, chainOfThought?: boolean }) {
+    async function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string, chainOfThought?: boolean }) {
         const targetChatSessionId = initialActiveChatSession?.id;
 
-        if (targetChatSessionId) {
-            return amplifyClient.models.ChatMessage.create({
+        setMessages((previousMessages) => [
+            ...previousMessages,
+            {
+                id: "temp",
                 content: props.body,
-                trace: props.trace,
-                role: props.role,
-                chatSessionId: targetChatSessionId,
-                chainOfThought: props.chainOfThought
-            })
+                role: "human",
+                createdAt: new Date().toISOString(),
+            }
+        ])
+
+        const newMessage = await amplifyClient.models.ChatMessage.create({
+            content: props.body,
+            trace: props.trace,
+            role: props.role,
+            chatSessionId: targetChatSessionId,
+            chainOfThought: props.chainOfThought
+        })
+
+        // Remove the message with the id "temp"
+        setMessages((previousMessages) => [
+            ...previousMessages.filter(message => message.id != "temp")
+        ])
+
+        // if (!newMessage.data) throw new Error("Message failed to create");
+        
+        // setMessages((previousMessages) => [
+        //     ...previousMessages,
+        //     newMessage.data!
+        // ])
+
+        if (targetChatSessionId) {
+            return newMessage
         }
+
     }
 
     async function addUserChatMessage(body: string) {
@@ -455,25 +491,35 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     async function sendMessageToChatBot(prompt: string) {
         setIsLoading(true);
-
+        await addChatMessage({ body: prompt, role: "human" })
         if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
-            const response = await invokeBedrockAgentParseBodyGetTextAndTrace(prompt, initialActiveChatSession)
-            if (!response) throw new Error("No response from agent");
+            const response = await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession})
+            // if (!response) throw new Error("No response from agent");
         } else {
             switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
                 case defaultAgents.FoundationModel.name:
-                    await addChatMessage({ body: prompt, role: "human" })
+                    // await addChatMessage({ body: prompt, role: "human" })
                     console.log("invoking the foundation model")
                     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
                     if (!responseText) throw new Error("No response from agent");
                     addChatMessage({ body: responseText, role: "ai" })
                     break
+                case defaultAgents.MaintenanceAgent.name:
+                    const response = await invokeBedrockAgentParseBodyGetTextAndTrace({ 
+                        prompt: prompt, 
+                        chatSession: initialActiveChatSession,
+                        agentAliasId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentAliasId,
+                        agentId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentId,
+                    })
+                    console.log("MaintenanceAgentResponse: ", response)
+                    // addChatMessage({ body: response!.text!, role: "ai" })
+                    break
                 case defaultAgents.ProductionAgent.name:
-                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true})
+                    // await addChatMessage({ body: prompt, role: "human" chainOfThought: true})
                     await invokeProductionAgent(prompt, initialActiveChatSession)
                     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
-                    await addChatMessage({ body: prompt, role: "human" })
+                    // await addChatMessage({ body: prompt, role: "human" })
                     const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: initialActiveChatSession.id })
                     console.log('Plan and execute response: ', planAndExecuteResponse)
                     break;
@@ -482,29 +528,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     break;
             }
         }
-
-
-
-
-        // else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.FoundationModel.name) {
-        //     console.log("invoking the foundation model")
-        //     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
-        //     if (!responseText) throw new Error("No response from agent");
-        //     addChatMessage({ body: responseText, role: "ai" })
-        // } else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.ProductionAgent.name) {
-        //     await invokeProductionAgent(prompt, activeChatSession)
-        // } else if (activeChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name) {
-        //     const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: activeChatSession.id })
-        //     console.log('Plan and execute response: ', planAndExecuteResponse)
-        // } else {
-        //     throw new Error("No Agent Configured");
-        // }
-
-        // console.log('Response Text: ', responseText)
-        // if (!responseText) throw new Error("No response from agent");
-
-
-        // addChatMessage(responseText, "ai")
     }
 
     return (

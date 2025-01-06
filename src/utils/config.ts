@@ -1,12 +1,36 @@
-type defaultAgent = {
-    name: string,
+// import { BedrockAgent } from "@aws-sdk/client-bedrock-agent"
+import outputs from '@/../amplify_outputs.json';
+
+type BaseAgent = {
+    name: string
     samplePrompts: string[]
-    invokeFieldName?: string
 }
 
-export const defaultAgents: { [key: string]: defaultAgent } = {
+export type BedrockAgent = BaseAgent & {
+    source: "bedrockAgent"
+    agentId: string
+    agentAliasId: string
+}
+
+export type LangGraphAgent = BaseAgent & {
+    source: "graphql"
+    invokeFieldName: string
+}
+
+export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGraphAgent } = {
+    MaintenanceAgent: {
+        name: "Maintenance Agent",
+        source: "bedrockAgent",
+        agentId: outputs.custom.maintenanceAgentId,
+        agentAliasId: outputs.custom.maintenanceAgentAliasId,
+        samplePrompts: [
+            "How many tanks are in my biodiesel unit?",
+            "In September 2024, what are a few key incidents and actions taken at the biodiesel unit?",
+        ],
+    } as BedrockAgent,
     ProductionAgent: {
         name: "Production Agent",
+        source: "graphql",
         invokeFieldName: "invokeProductionAgent",
         samplePrompts: [
             `Search the well files for the well with API number 30-045-29202 to make a table with type of operation (drilling, completion, workover, plugging, other), text from the report describing operational details, and document title.
