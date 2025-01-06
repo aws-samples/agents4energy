@@ -19,6 +19,7 @@ import { formatDate } from "@/utils/date-utils";
 import { amplifyClient, invokeBedrockModelParseBodyGetText, isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
 
 import styles from "@/styles/chat-ui.module.scss";
+
 import React, { useState, useEffect } from "react";
 import { Message } from "../../utils/types";
 

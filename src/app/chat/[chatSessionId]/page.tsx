@@ -493,7 +493,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         setIsLoading(true);
         await addChatMessage({ body: prompt, role: "human" })
         if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
-            const response = await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession})
+            await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession})
             // if (!response) throw new Error("No response from agent");
         } else {
             switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
