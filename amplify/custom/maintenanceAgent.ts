@@ -16,7 +16,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
 
-
 interface AgentProps {
     vpc: ec2.Vpc,
     s3Bucket: s3.IBucket,
@@ -46,36 +45,13 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         Agent: 'Maintenance',
         Model: foundationModel
     }
-    
-    // Create IAM role for Bedrock Agent
-    // const assumeRolePolicy = {
-    //   Version: '2012-10-17',
-    //   Statement: [
-    //     {
-    //       Sid: 'AmazonBedrockAgentBedrockFoundationModelPolicyProd',
-    //       Effect: 'Allow',
-    //       Principal: {
-    //         Service: 'bedrock.amazonaws.com',
-    //       },
-    //       Action: 'sts:AssumeRole',
-    //       Condition: {
-    //         StringEquals: {
-    //           'aws:SourceAccount': `${rootStack.account}`,
-    //         },
-    //         ArnLike: {
-    //           'aws:SourceArn': `arn:aws:bedrock:${rootStack.region}:${rootStack.account}:agent/*`,
-    //         },
-    //       },
-    //     },
-    //   ],
-    // };
+
 
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
         //roleName: agentRoleName,
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
         description: 'IAM role for Maintenance Agent to access KBs and query CMMS',
     });
-    //addLlmAgentPolicies(bedrockAgentRole);
 
     // ===== CMMS Database =====
     // Create Aurora PostgreSQL DB for CMMS - https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.DatabaseCluster.html
@@ -761,7 +737,6 @@ MaintID int NOT NULL
     });
 
 
-
     // ===== MAINTENANCE KNOWLEDGE BASE =====
     // Bedrock KB with OpenSearchServerless (OSS) vector backend
     const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintKB`, {//${stackName.slice(-5)}
@@ -783,11 +758,12 @@ MaintID int NOT NULL
         chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.HIERARCHICAL_TITAN
     })
 
-    
+
     // ===== ACTION GROUP =====
     // Lambda Function
     const lambdaFunction = new lambda.Function(scope, 'QueryCMMS', {
        //functionName: 'Query-CMMS',
+       description: 'Agents4Energy tools to query CMMS database',
        runtime: lambda.Runtime.PYTHON_3_12,
        code: lambda.Code.fromAsset('amplify/functions/text2SQL/'),
        handler: 'maintenanceAgentAG.lambda_handler',
@@ -798,7 +774,6 @@ MaintID int NOT NULL
             db_credentials_secrets_arn: maintDb.secret!.secretArn,
        }
     });
-    lambdaFunction.grantInvoke(bedrockAgentRole)
     lambdaFunction.node.addDependency(maintDb);
     // Add DB query permissions to the Lambda function's role
     const policyRDS = new iam.PolicyStatement({
@@ -817,8 +792,6 @@ MaintID int NOT NULL
     } else {
       console.warn("Lambda function role is undefined, cannot add policy.");
     }
-    
-    
     
     // ===== BEDROCK AGENT =====
     //const agentMaint = new BedrockAgent(scope, 'MaintenanceAgent', {
@@ -953,9 +926,20 @@ $prompt_session_attributes$
 
     // Add dependency on the KB so it gets created first
     agentMaint.node.addDependency(maintenanceKnowledgeBase);
-    agentMaint.node.addDependency(lambdaFunction);
 
-    // Create a custom inline policy with a recognizable name in IAM
+
+
+    // Grant invoke permission to the Bedrock Agent
+    const bedrockAgentArn = agentMaint.attrAgentArn;
+    lambdaFunction.addPermission('BedrockAgentInvokePermission', {
+        principal: new iam.ServicePrincipal('bedrock.amazonaws.com'),
+        action: 'lambda:InvokeFunction',
+        sourceArn: bedrockAgentArn,
+    });
+
+    
+
+    // Create a custom inline policy for Agent permissions
     const customAgentPolicy = new iam.Policy(scope, 'A4E-MaintAgentPolicy', {
         //policyName: 'A4E-MaintAgentPolicy', // Custom policy name
         statements: [
