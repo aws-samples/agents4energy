@@ -15,22 +15,28 @@ import {
 // import DropdownMenu from '@/components/DropDownMenu';
 
 import { useAuthenticator } from '@aws-amplify/ui-react';
-import { fetchUserAttributes, FetchUserAttributesOutput } from 'aws-amplify/auth';
 
-const getUserAttributes = async () => {
-  try {
-    const userAttributes = (await fetchUserAttributes());
-    return userAttributes;
-  } catch {
-    return null;
-  }
-};
+
+import { useUserAttributes } from '@/components/UserAttributesProvider';
+
+// import { fetchUserAttributes, FetchUserAttributesOutput } from 'aws-amplify/auth';
+// 
+// const getUserAttributes = async () => {
+//   try {
+//     const userAttributes = (await fetchUserAttributes());
+//     return userAttributes;
+//   } catch {
+//     return null;
+//   }
+// };
 
 const TopNavBar = () => {
-  const [userAttributes, setUserAttributes] = useState<FetchUserAttributesOutput | null>();
+  // const [userAttributes, setUserAttributes] = useState<FetchUserAttributesOutput | null>();
   const { user, signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
   // const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
+
+  const { userAttributes } = useUserAttributes();
 
   //TODO Impliment the dropdown menu for the user menu
   const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -46,15 +52,15 @@ const TopNavBar = () => {
   };
 
   // Set the user attributtes if the user is signed in
-  useEffect(() => {
-    if (user) {
-      getUserAttributes().then(
-        (attriutes) => {
-          setUserAttributes(attriutes)
-        }
-      );
-    }
-  }, [user])
+  // useEffect(() => {
+  //   if (user) {
+  //     getUserAttributes().then(
+  //       (attriutes) => {
+  //         setUserAttributes(attriutes)
+  //       }
+  //     );
+  //   }
+  // }, [user])
 
   return (
     <AppBar
