@@ -56,7 +56,6 @@ const TopNavBar = () => {
             </Typography>
           </Link>
 
-
         </Box>
 
 
