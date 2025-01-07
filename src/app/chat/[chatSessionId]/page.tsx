@@ -429,7 +429,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         amplifyClient.models.ChatSession.create(chatSession).then(({ data: newChatSession }) => {
             if (newChatSession) {
                 router.push(`/chat/${newChatSession.id}`)
-
             }
         })
     }
@@ -463,15 +462,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         // Remove the message with the id "temp"
         setMessages((previousMessages) => [
-            ...previousMessages.filter(message => message.id != "temp")
+            ...previousMessages.filter(message => message.id != "temp"),
+            newMessage.data!
         ])
-
-        // if (!newMessage.data) throw new Error("Message failed to create");
-        
-        // setMessages((previousMessages) => [
-        //     ...previousMessages,
-        //     newMessage.data!
-        // ])
 
         if (targetChatSessionId) {
             return newMessage
@@ -505,13 +498,13 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     addChatMessage({ body: responseText, role: "ai" })
                     break
                 case defaultAgents.MaintenanceAgent.name:
-                    const response = await invokeBedrockAgentParseBodyGetTextAndTrace({ 
+                    await invokeBedrockAgentParseBodyGetTextAndTrace({ 
                         prompt: prompt, 
                         chatSession: initialActiveChatSession,
                         agentAliasId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentAliasId,
                         agentId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentId,
                     })
-                    console.log("MaintenanceAgentResponse: ", response)
+                    // console.log("MaintenanceAgentResponse: ", response)
                     // addChatMessage({ body: response!.text!, role: "ai" })
                     break
                 case defaultAgents.ProductionAgent.name:
