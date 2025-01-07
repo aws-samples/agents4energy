@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   AppBar,
   Toolbar,
@@ -11,50 +11,25 @@ import {
   MenuItem,
   Link
 } from '@mui/material';
-// import MenuIcon from '@mui/icons-material/Menu';
-// import DropdownMenu from '@/components/DropDownMenu';
 
 import { useAuthenticator } from '@aws-amplify/ui-react';
-import { fetchUserAttributes, FetchUserAttributesOutput } from 'aws-amplify/auth';
 
-const getUserAttributes = async () => {
-  try {
-    const userAttributes = (await fetchUserAttributes());
-    return userAttributes;
-  } catch {
-    return null;
-  }
-};
+import { useUserAttributes } from '@/components/UserAttributesProvider';
 
 const TopNavBar = () => {
-  const [userAttributes, setUserAttributes] = useState<FetchUserAttributesOutput | null>();
-  const { user, signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
-  // const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
+  const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
+
+  const { userAttributes } = useUserAttributes();
 
   //TODO Impliment the dropdown menu for the user menu
   const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorElUser(event.currentTarget);
   };
 
-  // const handleCloseNavMenu = () => {
-  //   setAnchorElNav(null);
-  // };
-
   const handleCloseUserMenu = () => {
     setAnchorElUser(null);
   };
-
-  // Set the user attributtes if the user is signed in
-  useEffect(() => {
-    if (user) {
-      getUserAttributes().then(
-        (attriutes) => {
-          setUserAttributes(attriutes)
-        }
-      );
-    }
-  }, [user])
 
   return (
     <AppBar
@@ -65,13 +40,10 @@ const TopNavBar = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Link color="inherit" href='/' sx={{ textDecoration: 'none' }}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Agents For Energy
+              Agents4Energy
             </Typography>
           </Link>
-        </Box>
 
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Link color="inherit" href='/files' sx={{ textDecoration: 'none' }}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               Files
@@ -84,7 +56,12 @@ const TopNavBar = () => {
             </Typography>
           </Link>
 
-          {authStatus === 'authenticated' && userAttributes?.email ? (
+        </Box>
+
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          
+          {userAttributes?.email ? (
 
             <Box sx={{ flexGrow: 0 }}>
               <Tooltip title="Open settings">
@@ -114,11 +91,14 @@ const TopNavBar = () => {
 
               </Menu>
             </Box>
-          ) : <Link color="inherit" href='/login' sx={{ textDecoration: 'none' }}>
+          ) : 
+          (authStatus === "unauthenticated") ? (
+          <Link color="inherit" href='/login' sx={{ textDecoration: 'none' }}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               Login
             </Typography>
           </Link>
+          ) : null
           }
         </Box>
       </Toolbar>

@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 
 import ConfigureAmplify from '@/components/ConfigureAmplify';
-import Providers from '@/components/providers';
+import Providers from '@/components/ContextProviders';
 
 // import TopNavBar from '@/components/TopNavBar';
 import ClientLayout from '@/components/ClientLayout';

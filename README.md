@@ -1,5 +1,5 @@
 
-## Deployent Steps
+## Agents4Energy Deployent Steps
 1. Fork the repo
 1. Configure the AWS Amplify to deploy the repo
     1. Use this build image: aws/codebuild/amazonlinux2-x86_64-standard:5.0

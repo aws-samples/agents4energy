@@ -27,6 +27,7 @@ import {
 } from 'aws-cdk-lib'
 
 import { productionAgentBuilder } from "./custom/productionAgent"
+import { maintenanceAgentBuilder } from "./custom/maintenanceAgent"
 import { AppConfigurator } from './custom/appConfigurator'
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
@@ -69,17 +70,6 @@ const bedrockAgentDataSource = backend.data.resources.graphqlApi.addHttpDataSour
     },
   }
 );
-
-// const bedrockAgentRuntimeDataSource = backend.data.resources.graphqlApi.addHttpDataSource(
-//   "bedrockAgentRuntimeDS",
-//   `https://bedrock-agent-runtime.${backend.auth.stack.region}.amazonaws.com`,
-//   {
-//     authorizationConfig: {
-//       signingRegion: backend.auth.stack.region,
-//       signingServiceName: "bedrock",
-//     },
-//   }
-// );
 
 bedrockRuntimeDataSource.grantPrincipal.addToPrincipalPolicy(
   new iam.PolicyStatement({
@@ -172,6 +162,7 @@ applyTagsToRootStack()
 /////// Create the Production Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
 const productionAgentStack = backend.createStack('prodAgentStack')
+const maintenanceAgentStack = backend.createStack('maintAgentStack')
 
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -201,6 +192,8 @@ const {
   s3Bucket: backend.storage.resources.bucket,
 })
 
+
+
 // Custom resource Lambda to introduce a delay between when the PDF to Yaml function finishes deploying, and when the objects are uploaded.
 const delayFunction = new lambda.Function(productionAgentStack, 'DelayFunction', {
   runtime: lambda.Runtime.NODEJS_18_X,
@@ -226,27 +219,7 @@ delayResource.node.addDependency(convertPdfToYamlFunction)
 delayResource.node.addDependency(triggerCrawlerSfnFunction)
 delayResource.node.addDependency(pdfProcessingQueue)
 delayResource.node.addDependency(wellFileDriveBucket)
-
 uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the resources handling uploads are deployed
-
-// new cr.AwsCustomResource(productionAgentStack, 'GenerateS3CreateObjectEvents', {
-//   onCreate: {
-//       service: '@aws-sdk/client-s3',
-//       action: 'copy',
-//       parameters: {
-//           bucket: "",
-//           knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId
-//       },
-//       physicalResourceId: cr.PhysicalResourceId.of('StartIngestionPetroleumEngineeringDataSource'),
-//   },
-//   policy: cr.AwsCustomResourcePolicy.fromStatements([
-//       new iam.PolicyStatement({
-//           actions: ['bedrock:startIngestionJob'],
-//           resources: [petroleumEngineeringKnowledgeBase.knowledgeBaseArn]
-//       })
-//   ])
-// })
-
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
 backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
@@ -278,6 +251,22 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
     ],
   })
 )
+
+///////////////////////////////////////////////////////////
+/////// Create the Maintenance Agent Stack /////////////////
+///////////////////////////////////////////////////////////
+const {defaultDatabaseName, maintenanceAgent, maintenanceAgentAlias} = maintenanceAgentBuilder(maintenanceAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
+  s3Bucket: backend.storage.resources.bucket,
+})
+
+backend.addOutput({
+  custom: {
+    maintenanceAgentId: maintenanceAgent.attrAgentId,
+    maintenanceAgentAliasId: maintenanceAgentAlias.attrAgentAliasId,
+  },
+})
 
 ///////////////////////////////////////////////////////////
 /////// Create the Configurator Stack /////////////////////

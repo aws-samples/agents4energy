@@ -3,6 +3,7 @@ import type { Schema } from "../data/resource"
 import * as APITypes from "./graphql/API";
 import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
 import { AmplifyClientWrapper, createChatMessage } from './utils/amplifyUtils'
+import { publishResponseStreamChunk, updateChatSession } from './graphql/mutations'
 import { env } from '$amplify/env/invoke-bedrock-agent';
 
 const client = new BedrockAgentRuntimeClient();
@@ -54,17 +55,19 @@ export const handler: Schema["invokeBedrockAgent"]["functionHandler"] = async (e
                 }
 
                 if (trace && trace.trace && trace.trace.orchestrationTrace && trace.trace.orchestrationTrace.rationale)  {
-                    orchestrationTraceRationale += trace.trace.orchestrationTrace.rationale.text
+                    orchestrationTraceRationale += trace.trace.orchestrationTrace.rationale.text + "\n\n"
                     console.log('orchestrationTraceRationale: ', orchestrationTraceRationale)
+
+                    //Stream the rational to the client
+                    amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
+                        query: publishResponseStreamChunk,
+                        variables: {
+                            chatSessionId: event.arguments.chatSessionId,
+                            index: 0,
+                            chunk: orchestrationTraceRationale
+                        }
+                    })
                 }
-
-                if (trace && trace.trace) console.log('trace: ', trace)
-
-                // if (trace && trace.trace)  {
-                //     console.log('trace.trace: ', trace.trace)
-                //     orchestrationTraceRationale += JSON.stringify(trace.trace)
-                // }
-
                 
             }
 
@@ -75,10 +78,11 @@ export const handler: Schema["invokeBedrockAgent"]["functionHandler"] = async (e
                 variables: {
                     input: {
                         chatSessionId: event.arguments.chatSessionId,
-                        content: completion,
+                        content: orchestrationTraceRationale + completion,
                         owner: event.identity.sub,
                         trace: orchestrationTraceRationale,
-                        role: APITypes.ChatMessageRole.ai
+                        role: APITypes.ChatMessageRole.ai,
+                        responseComplete: true
                     },
                 },
             }).then((response) => {
