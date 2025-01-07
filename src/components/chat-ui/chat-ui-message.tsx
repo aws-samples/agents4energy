@@ -209,7 +209,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                     data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
                       x: new Date(xValue), // Convert to Date object
                       y: 100,
-                      url: `/files/${chartDataObject['s3Key'][i]}`.slice(0, -5),//Remove the .yaml,
+                      // url: `/files/${chartDataObject['s3Key'][i]}`.slice(0, -5),//Remove the .yaml,
+                      url: `/view/?s3Key=${chartDataObject['s3Key'][i]}`.slice(0, -5),//Remove the .yaml,
                       rowData: stringify(Object.keys(chartDataObject)
                         .filter((columnName) => !nonDefaultColumns.includes(columnName))
                         .reduce((acc, key) => ({ //Create a yaml string with the row's data
@@ -462,16 +463,17 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               if (!params.value) return
               return (
                 <Box display='flex' flexDirection='column'>
-                  <Link href={`/files/${params.value.slice(0, -5)}`} target="_blank" rel="noopener">
+                  <Link href={`/view/?s3Key=${params.value.slice(0, -5)}`} target="_blank" rel="noopener">
+                  {/* <Link href={`/files/${params.value.slice(0, -5)}`} target="_blank" rel="noopener"> */}
                     pdf link
                   </Link>
-                  <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
+                  <Link href={`/view/?s3Key=${params.value}`} target="_blank" rel="noopener">
+                  {/* <Link href={`/files/${params.value}`} target="_blank" rel="noopener"> */}
                     yaml link
                   </Link>
                 </Box>
               )
             },
-
           })
         }
 
@@ -588,7 +590,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   // console.log('Is valid React element:', React.isValidElement(MessagePlot));
 
   return (
-    <div>
+    <div
+      key={props.message.id}
+      id={props.message.content}
+    >
       {props.message?.role != 'human' && (
         <Container>
           <div className={styles.btn_chabot_message_copy}>

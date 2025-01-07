@@ -3,6 +3,7 @@
 /tmp
 cdk.context.json
 cdk.out
+next-app.zip
 
 # dependencies
 /node_modules

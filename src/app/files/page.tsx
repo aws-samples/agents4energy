@@ -69,7 +69,8 @@ function Page() {
         </button>
       )
     } else {
-      return <a href={`/files/${item.Key}`} target="_blank">
+      // return <a href={`/files/${item.Key}`} target="_blank">
+      return <a href={`/view/?s3Key=${item.Key}`} target="_blank">
         <span className={styles['icon']}>📄</span>
         {item.Key.substring(pathPrefix.length)}
       </a>

@@ -3,13 +3,15 @@ import React, { useState, useEffect } from 'react';
 
 import { getUrl } from 'aws-amplify/storage';
 
-export default function Page({ params }: { params: { s3Key: string[] } }) {
+export default function Page({ searchParams }: { searchParams: { s3Key?: string } }) {
+// export default function Page({ params }: { params: { s3Key: string[] } }) {
   
-
   const [selectedFileUrl, setSelectedFileUrl] = useState<URL>();
 
   useEffect(() => {
-    const s3KeyDecoded = params.s3Key.map((item) => decodeURIComponent(item)).join('/')
+    if (!searchParams.s3Key) return
+    // const s3KeyDecoded = params.s3Key.map((item) => decodeURIComponent(item)).join('/')
+    const s3KeyDecoded = searchParams.s3Key
 
     console.log('s3 Key: ', s3KeyDecoded)
 
@@ -24,7 +26,7 @@ export default function Page({ params }: { params: { s3Key: string[] } }) {
       console.error('error: ', error)
     }
     )
-  }, [params.s3Key])
+  }, [searchParams.s3Key])
 
 
   // return <div>My Post: {selectedFileUrl?.toString()}</div>

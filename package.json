@@ -8,7 +8,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "zipBuild": "rm -f next-app.zip && cd out && zip ../next-app.zip -r . && cd .."
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.5.3",
