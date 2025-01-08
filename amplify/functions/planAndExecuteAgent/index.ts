@@ -78,6 +78,17 @@ async function publishTokenStreamChunk(props: { tokenStreamChunk: AIMessageChunk
     }
 }
 
+async function streamToArray<T>(stream: AsyncIterable<T>): Promise<T[]> {
+    const chunks: T[] = [];
+    for await (const chunk of stream) {
+        console.log("streamToArray Chunk:\n", stringifyLimitStringLength(chunk))
+        chunks.push(chunk);
+    }
+    return chunks;
+}
+
+
+
 export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = async (event) => {
 
     // console.log('event: ', event)
@@ -93,6 +104,31 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
     const amplifyClientWrapper = new AmplifyClientWrapper({
         chatSessionId: event.arguments.chatSessionId,
         env: process.env
+    })
+
+    const customHandler = {
+        handleLLMNewToken: async (token: string, idx: { completion: number, prompt: number }, runId: any, parentRunId: any, tags: any, fields: any) => {
+            //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
+
+            const tokenStreamChunk = new AIMessageChunk({ content: token.length > 0 ? token : '.'.repeat(Math.ceil(Math.random() * 5)) })
+
+            process.stdout.write(`\x1b[32m${getLangChainMessageTextContent(tokenStreamChunk)}\x1b[0m`); //Write the chunk to the log with green text
+
+            await publishTokenStreamChunk({
+                tokenStreamChunk: tokenStreamChunk,//This is just meant to show something is happening.
+                tokenIndex: -2,
+                amplifyClientWrapper: amplifyClientWrapper
+            })
+        },
+        handleChatModelStart: async (llm: any, inputMessages: any, runId: any) => {
+            console.log("Chat model start:\n", stringifyLimitStringLength(inputMessages));
+        },
+    };
+
+    await publishTokenStreamChunk({
+        tokenStreamChunk: new AIMessageChunk({ content: "Generating plan..." }),//This is just meant to show something is happening.
+        tokenIndex: -1,
+        amplifyClientWrapper: amplifyClientWrapper
     })
 
     try {
@@ -129,7 +165,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         const agentModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
             temperature: 0
-        });
+        })
 
         ///////////////////////////////////////////////
         ///////// Executor Agent Step /////////////////
@@ -157,15 +193,23 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////// Planning Step ///////////////////////
         ///////////////////////////////////////////////
 
-        const plan = zodToJsonSchema(
-            z.object({
-                steps: z
-                    .array(PlanStepSchema)
-                    .describe("Different steps to follow. Sort in order of completion"),
-            }),
-        );
+        // const plan = zodToJsonSchema(
+        //     z.object({
+        //         steps: z
+        //             .array(PlanStepSchema)
+        //             .describe("Different steps to follow. Sort in order of completion"),
+        //     }),
+        // );
 
-        const planningModel = agentModel.withStructuredOutput(plan);
+        const Plan = z.object({
+            steps: z.array(PlanStepSchema)
+        })
+
+        const planningModel = agentModel
+            .withStructuredOutput(Plan)
+            .withConfig({
+                callbacks: [customHandler],
+            })
 
         ///////////////////////////////////////////////
         ///////// Re-Planning Step ////////////////////
@@ -227,24 +271,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////////////////////////////////////////////
         ///////// Create the Graph ////////////////////
         ///////////////////////////////////////////////
-        const customHandler = {
-            handleLLMNewToken: async (token: string, idx: { completion: number, prompt: number }, runId: any, parentRunId: any, tags: any, fields: any) => {
-                //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
 
-                const tokenStreamChunk = new AIMessageChunk({ content: token.length > 0 ? token : '.'.repeat(Math.ceil(Math.random() * 5)) })
-
-                process.stdout.write(`\x1b[32m${getLangChainMessageTextContent(tokenStreamChunk)}\x1b[0m`); //Write the chunk to the log with green text
-
-                await publishTokenStreamChunk({
-                    tokenStreamChunk: tokenStreamChunk,//This is just meant to show something is happening.
-                    tokenIndex: -2,
-                    amplifyClientWrapper: amplifyClientWrapper
-                })
-            },
-            handleChatModelStart: async (llm: any, inputMessages: any, runId: any) => {
-                console.log("Chat model start:\n", stringifyLimitStringLength(inputMessages));
-            },
-        };
 
         async function executeStep(
             state: typeof PlanExecuteState.State,
@@ -331,12 +358,12 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
                     try {
                         newPlan = await replanner
-                            .withConfig({
-                                callbacks: [customHandler],
-                                // callbacks: config.callbacks!,
-                                // runName: "replanner",
-                                tags: ["replanner"],
-                            })
+                            // .withConfig({
+                            //     callbacks: [customHandler],
+                            //     // callbacks: config.callbacks!,
+                            //     // runName: "replanner",
+                            //     tags: ["replanner"],
+                            // })
                             .invoke(
                                 {
                                     objective: state.input,
@@ -345,6 +372,23 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                                 },
                                 config
                             ) as { steps: PlanStep[] };
+
+                        // const newPlanStream = await replanner
+                        //     // .withConfig({
+                        //     //     callbacks: [customHandler],
+                        //     //     tags: ["replanner"],
+                        //     // })
+                        //     .stream(
+                        //         {
+                        //             objective: state.input,
+                        //             plan: stringify(planSteps),
+                        //             pastSteps: stringify(pastSteps) + "\nMake sure you respond in the correct format".repeat(attempt)
+                        //         },
+                        //         // config
+                        //     );
+
+                        // const chunks = await streamToArray(newPlanStream)
+                        // const newPlan = chunks[chunks.length - 1] as { steps: PlanStep[] }
 
                         if (!newPlan.steps) throw new Error("No steps returned from replanner")
 
@@ -365,46 +409,14 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                         if (attempt === MAX_RETRIES - 1) {
                             throw new Error(`Failed to get valid output after ${MAX_RETRIES} attempts: ${error}`);
                         }
-                        // console.log(`Attempt ${attempt + 1} failed, retrying after ${RETRY_DELAY_MS}ms...`);
-                        // await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
                     }
                 }
             }
 
-            // }
-
-            // const newPlanFromInvoke = await replanner
-            //     .withConfig({
-            //         callbacks: [customHandler],
-            //         // callbacks: config.callbacks!,
-            //         // runName: "replanner",
-            //         tags: ["replanner"],
-            //     })
-            //     .invoke(
-            //         {
-            //             objective: state.input,
-            //             plan: stringify(planSteps),
-            //             pastSteps: stringify(pastSteps)
-            //         },
-            //         config
-            //     );
             const newPlanFromInvoke = await invokeReplanner()
             if (!newPlanFromInvoke) throw new Error("No new plan returned from replanner")
 
             console.log("New Plan:\n", stringify(newPlanFromInvoke))
-
-            // if (!newPlanFromInvoke.steps) throw new Error("No steps returned from replanner")
-
-            // if (typeof newPlanFromInvoke.steps === 'string' && isValidJSON(newPlanFromInvoke.steps)) {
-            //     console.log("Steps are a string and valid JSON. Converting them to an object")
-            //     newPlanFromInvoke.steps = JSON.parse(newPlanFromInvoke.steps) as PlanStep[]
-            // }
-
-            // if (
-            //     !Array.isArray(newPlanFromInvoke.steps) ||
-            //     !newPlanFromInvoke.steps.every((step: unknown) => (PlanStepSchema.safeParse(step).success)
-            //     )
-            // ) throw new Error(`Provided steps are not in the correct format.\n\nSteps: ${stringify(newPlanFromInvoke.steps)}\n\n`)
 
             // Remove the result part if present from plan steps
             planSteps = newPlanFromInvoke.steps.map((step: PlanStep) => {
@@ -482,11 +494,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         ///////////////////////////////////////////////
         ///////// Invoke the Graph ////////////////////
         ///////////////////////////////////////////////
-
-        // const stream = await agent.stream(inputs, {
-        //     recursionLimit: 50,
-        //     streamMode: "messages"
-        // });
 
         const agentEventStream = agent.streamEvents(
             inputs,
