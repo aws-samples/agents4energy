@@ -106,6 +106,30 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         env: process.env
     })
 
+    await publishTokenStreamChunk({
+        tokenStreamChunk: new AIMessageChunk({ content: "Generating plan..." }),//This is just meant to show something is happening.
+        tokenIndex: -1,
+        amplifyClientWrapper: amplifyClientWrapper
+    })
+
+    async function periodicUpdate(): Promise<never> {
+        let count = 0;
+        while (true) {
+            try {
+                await publishTokenStreamChunk({
+                    tokenStreamChunk: new AIMessageChunk({ content: ".".repeat(1 + count % 4) + '\n\n' }),
+                    tokenIndex: -2,
+                    amplifyClientWrapper: amplifyClientWrapper
+                });
+                count++;
+                await new Promise(resolve => setTimeout(resolve, 1200));
+            } catch (error) {
+                console.error('Error in periodic update:', error);
+                throw error; // This will cause Promise.race to resolve with this error
+            }
+        }
+    }
+
     const customHandler = {
         handleLLMNewToken: async (token: string, idx: { completion: number, prompt: number }, runId: any, parentRunId: any, tags: any, fields: any) => {
             //   console.log(`Chat model new token: ${token}. Length: ${token.length}`);
@@ -125,11 +149,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         },
     };
 
-    await publishTokenStreamChunk({
-        tokenStreamChunk: new AIMessageChunk({ content: "Generating plan..." }),//This is just meant to show something is happening.
-        tokenIndex: -1,
-        amplifyClientWrapper: amplifyClientWrapper
-    })
+
 
     try {
         // console.log('Getting the current chat session info')
@@ -357,38 +377,19 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 let newPlan: { steps: PlanStep[] }
                 for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
                     try {
-                        newPlan = await replanner
-                            // .withConfig({
-                            //     callbacks: [customHandler],
-                            //     // callbacks: config.callbacks!,
-                            //     // runName: "replanner",
-                            //     tags: ["replanner"],
-                            // })
-                            .invoke(
-                                {
-                                    objective: state.input,
-                                    plan: stringify(planSteps),
-                                    pastSteps: stringify(pastSteps) + "\nMake sure you respond in the correct format".repeat(attempt)
-                                },
-                                config
-                            ) as { steps: PlanStep[] };
-
-                        // const newPlanStream = await replanner
-                        //     // .withConfig({
-                        //     //     callbacks: [customHandler],
-                        //     //     tags: ["replanner"],
-                        //     // })
-                        //     .stream(
-                        //         {
-                        //             objective: state.input,
-                        //             plan: stringify(planSteps),
-                        //             pastSteps: stringify(pastSteps) + "\nMake sure you respond in the correct format".repeat(attempt)
-                        //         },
-                        //         // config
-                        //     );
-
-                        // const chunks = await streamToArray(newPlanStream)
-                        // const newPlan = chunks[chunks.length - 1] as { steps: PlanStep[] }
+                        //The race here is to send periodic updates while the replanner is generating a new plan.
+                        newPlan = await Promise.race([
+                            periodicUpdate(),
+                            replanner
+                                .invoke(
+                                    {
+                                        objective: state.input,
+                                        plan: stringify(planSteps),
+                                        pastSteps: stringify(pastSteps) + "\nMake sure you respond in the correct format".repeat(attempt)
+                                    },
+                                    config
+                                )
+                        ]) as { steps: PlanStep[] }
 
                         if (!newPlan.steps) throw new Error("No steps returned from replanner")
 
@@ -438,7 +439,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 })
             }
 
-
             return {
                 plan: planSteps,
                 pastSteps: pastSteps
@@ -449,18 +449,17 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             state: typeof PlanExecuteState.State,
             config: RunnableConfig,
         ): Promise<Partial<typeof PlanExecuteState.State>> {
-            const response = await responder
-                .withConfig({
-                    callbacks: [customHandler],
-                    tags: ["responder"],
-                })
-                .invoke({
-                    input: state.input,
-                    plan: stringify(state.plan),
-                    pastSteps: stringify(state.pastSteps)
-                },
-                    config
-                );
+            const response = await Promise.race([
+                periodicUpdate(),
+                responder
+                    .invoke({
+                        input: state.input,
+                        plan: stringify(state.plan),
+                        pastSteps: stringify(state.pastSteps)
+                    },
+                        config
+                    )
+            ]) as { response: string }
 
             return { response: response.response };
         }
@@ -479,11 +478,11 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             .addNode("replan", replanStep, { retryPolicy: { maxAttempts: 2 } })
             .addNode("respond", respondStep, { retryPolicy: { maxAttempts: 2 } })
             .addEdge(START, "replan")
-            .addEdge("agent", "replan")
             .addConditionalEdges("replan", shouldEnd, {
                 true: "respond",
                 false: "agent",
             })
+            .addEdge("agent", "replan")
             .addEdge("respond", END);
 
         // Finally, we compile it!
