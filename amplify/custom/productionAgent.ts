@@ -348,7 +348,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 dataSourceId: petroleumEngineeringDataSource.dataSourceId,
                 knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId,
                 ingestionJobId: new cr.PhysicalResourceIdReference()
-            }
+            },
+            ignoreErrorCodesMatching: '.*' //The delete operation should always succeed. If the injestion job is already in the completed job the hook will return an error.
         },
         policy: cr.AwsCustomResourcePolicy.fromStatements([
             new iam.PolicyStatement({
