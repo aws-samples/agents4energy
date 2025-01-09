@@ -1,21 +1,10 @@
-import React, { useEffect } from 'react';
-import { useAuthenticator } from '@aws-amplify/ui-react';
-import { redirect } from 'next/navigation';
+import React from 'react';
+import { Authenticator } from '@aws-amplify/ui-react';
 
 export function withAuth<P extends object>(Component: React.ComponentType<P>) {
+  
   return function AuthProtected(props: P) {
-    const { authStatus } = useAuthenticator(context => [context.authStatus]);
+    return (<Authenticator><Component {...props} /></Authenticator>)
 
-    useEffect(() => {
-      if (authStatus === 'unauthenticated') {
-        redirect('/login')
-      }
-    }, [authStatus]);
-
-    if (authStatus === 'authenticated') {
-      return <Component {...props} />;
-    }
-
-    return null;
   };
 }

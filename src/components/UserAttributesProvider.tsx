@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { fetchUserAttributes, FetchUserAttributesOutput } from 'aws-amplify/auth';
+import { useAuthenticator } from '@aws-amplify/ui-react';
+import { Hub } from 'aws-amplify/utils';
 
 // Define the type for your context value
 interface UserContextType {
@@ -12,19 +14,34 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export function UserAttributesProvider({ children }: { children: ReactNode }) {
   const [userAttributes, setUserAttributes] = useState<FetchUserAttributesOutput | null>(null);
 
+  const { authStatus } = useAuthenticator(context => [context.authStatus]);
+
+  //If the user starts out unauthenticated, make sure the userAttributes are null
   useEffect(() => {
-    const fetchAttributes = async () => {
-      try {
+    if (authStatus === 'unauthenticated') {
+      setUserAttributes(null)
+    } else if (authStatus === 'authenticated') {
+      const fetchAttributes = async () => {
         const userAttributesResponse = await fetchUserAttributes();
         if (userAttributesResponse) setUserAttributes(userAttributesResponse);
-      } catch (error) {
-        console.error('Error fetching user attributes:', error);
-        setUserAttributes(null);
       }
-    };
+      fetchAttributes();
+    }
+  }, [authStatus]);
 
-    fetchAttributes();
-  }, []);
+  Hub.listen('auth', async ({ payload }) => {
+    switch (payload.event) {
+      case 'signedIn':
+        console.log('user have been signedIn successfully.');
+        const userAttributesResponse = await fetchUserAttributes();
+        if (userAttributesResponse) setUserAttributes(userAttributesResponse);
+        break;
+      case 'signedOut':
+        console.log('user have been signedOut successfully.');
+        setUserAttributes(null);
+        break;
+    }
+  });
 
   // Pass the object as the value
   return (

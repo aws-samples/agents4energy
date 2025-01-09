@@ -310,7 +310,7 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
 
     // List the user's chat sessions
     useEffect(() => {
-        if (user) {
+        if (user && searchParams.id) {
             amplifyClient.models.ChatSession.observeQuery({
                 filter: {
                     // owner: { eq: user.userId }
@@ -321,7 +321,7 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
             })
         }
 
-    }, [user])
+    }, [user, searchParams.id])
 
     // Subscribe to messages of the active chat session
     useEffect(() => {
@@ -407,8 +407,8 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
             setBedrockAgents(listAgentsResponseBody)
             // return listAgentsResponseBody
         }
-        fetchListBedrockAgents()
-    }, [])
+        if (user) fetchListBedrockAgents()
+    }, [user])
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
         setMessages([])
@@ -429,15 +429,15 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
     async function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string, chainOfThought?: boolean }) {
         const targetChatSessionId = initialActiveChatSession?.id;
 
-        setMessages((previousMessages) => [
-            ...previousMessages,
-            {
+        setMessages((previousMessages) => combineAndSortMessages(
+            [...previousMessages],
+            [{
                 id: "temp",
                 content: props.body,
                 role: "human",
                 createdAt: new Date().toISOString(),
-            }
-        ])
+            }]
+        ))
 
         const newMessage = await amplifyClient.models.ChatMessage.create({
             content: props.body,
@@ -448,10 +448,10 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
         })
 
         // Remove the message with the id "temp"
-        setMessages((previousMessages) => [
-            ...previousMessages.filter(message => message.id != "temp"),
-            newMessage.data!
-        ])
+        setMessages((previousMessages) => combineAndSortMessages(
+            [...previousMessages.filter(message => message.id != "temp")],
+            [newMessage.data!]
+        ))
 
         if (targetChatSessionId) {
             return newMessage
@@ -694,8 +694,7 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
                             })}
                             {LiveUpdateActiveChatSession?.planSteps?.map((step) => {
                                 try {
-                                    const { result, ...stepContent } = JSON.parse(step as string)// Remove the result if it exists from the plan steps
-                                    console.info(result)//TODO: remove this
+                                    const { result, ...stepContent } = JSON.parse(step as string)// eslint-disable-line @typescript-eslint/no-unused-vars
                                     return (
                                         <Tooltip
                                             key={step as string}

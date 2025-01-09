@@ -1,5 +1,5 @@
 "use client"
-import React from 'react';
+import React, { useState, useEffect }from 'react';
 import {
   AppBar,
   Toolbar,
@@ -14,13 +14,33 @@ import {
 
 import { useAuthenticator } from '@aws-amplify/ui-react';
 
-import { useUserAttributes } from '@/components/UserAttributesProvider';
+import { fetchUserAttributes, FetchUserAttributesOutput } from 'aws-amplify/auth';
+
+// import { useUserAttributes } from '@/components/UserAttributesProvider';
 
 const TopNavBar = () => {
   const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
 
-  const { userAttributes } = useUserAttributes();
+    const [userAttributes, setUserAttributes] = useState<FetchUserAttributesOutput | null>(null);
+  
+    // const { authStatus } = useAuthenticator(context => [context.authStatus]);
+  
+    //If the user starts out unauthenticated, make sure the userAttributes are null
+    useEffect(() => {
+      if (authStatus === 'unauthenticated') {
+        setUserAttributes(null)
+      } else if (authStatus === 'authenticated') {
+        const fetchAttributes = async () => {
+          const userAttributesResponse = await fetchUserAttributes();
+          if (userAttributesResponse) setUserAttributes(userAttributesResponse);
+        }
+        fetchAttributes();
+      }
+    }, [authStatus]);
+
+
+  // const { userAttributes } = useUserAttributes();
 
   //TODO Impliment the dropdown menu for the user menu
   const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -99,7 +119,8 @@ const TopNavBar = () => {
                     Login
                   </Typography>
                 </Link>
-              ) : null
+              ) : null 
+              //<button onClick={signOut}>{authStatus} {JSON.stringify(userAttributes)}</button>
             }
           </Box>
         </Toolbar>
