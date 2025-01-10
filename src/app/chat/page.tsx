@@ -310,7 +310,7 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
 
     // List the user's chat sessions
     useEffect(() => {
-        if (user && searchParams.id) {
+        if (user) {
             amplifyClient.models.ChatSession.observeQuery({
                 filter: {
                     // owner: { eq: user.userId }
@@ -321,7 +321,7 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
             })
         }
 
-    }, [user, searchParams.id])
+    }, [user])
 
     // Subscribe to messages of the active chat session
     useEffect(() => {
@@ -410,12 +410,21 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
         if (user) fetchListBedrockAgents()
     }, [user])
 
-    async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
+    function openChatSession(id: string){
         setMessages([])
+        router.push(`?id=${id}`)
+        router.refresh()
+    }
+
+    async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
+        // setMessages([])
         amplifyClient.models.ChatSession.create(chatSession).then(({ data: newChatSession }) => {
             if (newChatSession) {
+                openChatSession(newChatSession.id)
                 // router.push(`/chat/${newChatSession.id}`)
-                router.push(`/chat?id=${newChatSession.id}`)
+                // router.push(`/chat?id=${newChatSession.id}`)
+                // router.push(`?id=${newChatSession.id}`)
+                // router.refresh()
             }
         })
     }
@@ -562,7 +571,8 @@ function Page({ searchParams }: { searchParams: { id?: string } }) {
                                     <Button
                                         size="small"
                                         // onClick={() => router.push(`/chat/${session.id}`)}
-                                        onClick={() => router.push(`/chat?id=${session.id}`)}
+                                        // onClick={() => router.push(`/chat?id=${session.id}`)}
+                                        onClick={() => openChatSession(session.id)}
                                     >
                                         Open Chat
                                     </Button>
