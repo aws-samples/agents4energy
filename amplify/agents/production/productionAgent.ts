@@ -156,6 +156,16 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }
     );
 
+    // Now update the S3 notification to send to SQS instead of directly to Lambda
+    wellFileDriveBucket.addEventNotification(
+        s3.EventType.OBJECT_CREATED,
+        new s3n.SqsDestination(pdfProcessingQueue),
+        {
+            prefix: 'production-agent/well-files/',
+            suffix: '.PDF'
+        }
+    );
+
     // //When a new pdf is uploaded to the well file drive, transform it into YAML and save it back to the well file drive
     // // Add S3 event notification
     // wellFileDriveBucket.addEventNotification(
