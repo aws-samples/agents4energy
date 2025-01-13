@@ -26,8 +26,8 @@ import {
   custom_resources as cr,
 } from 'aws-cdk-lib'
 
-import { productionAgentBuilder } from "./custom/productionAgent"
-import { maintenanceAgentBuilder } from "./custom/maintenanceAgent"
+import { productionAgentBuilder } from "./agents/production/productionAgent"
+import { maintenanceAgentBuilder } from "./agents/maintenance/maintenanceAgent"
 import { AppConfigurator } from './custom/appConfigurator'
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'

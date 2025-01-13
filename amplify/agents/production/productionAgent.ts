@@ -29,9 +29,9 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { AuroraBedrockKnoledgeBase } from "../constructs/bedrockKnoledgeBase";
+import { AuroraBedrockKnoledgeBase } from "../../constructs/bedrockKnoledgeBase";
 
-import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
+import { addLlmAgentPolicies } from '../../functions/utils/cdkUtils'
 
 const defaultProdDatabaseName = 'proddb'
 
@@ -86,36 +86,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }
     });
 
-    // // Import the ImageMagick Lambda Layer from the AWS SAM Application
-    // const imageMagickLayerStack = new CfnApplication(scope, 'ImageMagickLayer', {
-    //     location: {
-    //         applicationId: 'arn:aws:serverlessrepo:us-east-1:145266761615:applications/image-magick-lambda-layer',
-    //         semanticVersion: '1.0.0',
-    //     },
-    // });
-    // //Get outputs from the imageMagickLayer
-    // const imageMagickLayerArn = imageMagickLayerStack.getAtt('Outputs.LayerVersion').toString()
-
-    // // Convert the layer arn into an cdk.aws_lambda.ILayerVersion
-    // const imageMagickLayer = lambda.LayerVersion.fromLayerVersionArn(scope, 'ImageMagickLayerVersion', imageMagickLayerArn)
-
-    // const ghostScriptLayerStack = new CfnApplication(scope, 'GhostScriptLambdaLayer', {
-    //     location: {
-    //         applicationId: 'arn:aws:serverlessrepo:us-east-1:154387959412:applications/ghostscript-lambda-layer',
-    //         semanticVersion: '9.27.0',
-    //     },
-    // });
-    // // Suppress metadata
-    // ghostScriptLayerStack.addMetadata('aws:cdk:path', undefined);
-    // ghostScriptLayerStack.overrideLogicalId('GhostScriptLambdaLayerStaticId');
-
-    // const ghostScriptLayerArn = ghostScriptLayerStack.getAtt('Outputs.LayerVersion').toString()
-    // const ghostScriptLayer = lambda.LayerVersion.fromLayerVersionArn(scope, 'GhostScriptLayerVersion', ghostScriptLayerArn)
-
 
     const convertPdfToYamlFunction = new NodejsFunction(scope, 'ConvertPdfToYamlFunction', {
         runtime: lambda.Runtime.NODEJS_20_X,
-        entry: path.join(__dirname, '..', 'functions', 'convertPdfToYaml', 'index.ts'),
+        entry: path.join(__dirname, '..', '..', 'functions', 'convertPdfToYaml', 'index.ts'),
         bundling: {
             format: OutputFormat.CJS,
             loader: {
@@ -132,7 +106,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             DATA_BUCKET_NAME: props.s3Bucket.bucketName,
             // MODEL_ID: 'us.anthropic.claude-3-5-sonnet-20240620-v1:0'
             // MODEL_ID: 'us.anthropic.claude-3-5-haiku-20241022-v1:0'
-            'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
+            // 'MODEL_ID': 'us.anthropic.claude-3-sonnet-20240229-v1:0',
             // 'MODEL_ID': 'us.anthropic.claude-3-haiku-20240307-v1:0',
         },
         // layers: [imageMagickLayer, ghostScriptLayer]
@@ -165,8 +139,9 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // Add SQS as trigger for Lambda
     convertPdfToYamlFunction.addEventSource(new lambdaEvent.SqsEventSource(pdfProcessingQueue, {
-        batchSize: 1,
-        maxConcurrency: 10
+        batchSize: 10,
+        maxBatchingWindow: cdk.Duration.seconds(10),
+        maxConcurrency: 100,
     }));
 
     const wellFileDriveBucket = s3.Bucket.fromBucketName(scope, 'ExistingBucket', props.s3Bucket.bucketName);
@@ -315,7 +290,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     knowledgeBaseName: "petrowiki"
     // })
 
-    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `PetroleumEngKB`, {//${stackName.slice(-5)}
+    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `PetroleumKB`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         instruction: `You are a helpful question answering assistant. You answer
         user questions factually and honestly related to petroleum engineering data`,
@@ -348,7 +323,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 dataSourceId: petroleumEngineeringDataSource.dataSourceId,
                 knowledgeBaseId: petroleumEngineeringKnowledgeBase.knowledgeBaseId,
                 ingestionJobId: new cr.PhysicalResourceIdReference()
-            }
+            },
+            ignoreErrorCodesMatching: ".*" //The delete operation should always succeed. If ingestion job is already complete, stopping it will throw an error. That error will be ignored.
         },
         policy: cr.AwsCustomResourcePolicy.fromStatements([
             new iam.PolicyStatement({
@@ -416,7 +392,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     ////////////////////////////////////////////////////////////
     const configureProdDbFunction = new NodejsFunction(scope, 'configureProdDbFunction', {
         runtime: lambda.Runtime.NODEJS_LATEST,
-        entry: path.join(__dirname, '..', 'functions', 'configureProdDb', 'index.ts'),
+        entry: path.join(__dirname, '..', '..',  'functions', 'configureProdDb', 'index.ts'),
         timeout: cdk.Duration.seconds(300),
         environment: {
             CLUSTER_ARN: hydrocarbonProductionDb.clusterArn,
@@ -521,7 +497,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //This function will get table definitions from any athena data source with the AgentsForEnergy tag, upload them to s3, and start a knoledge base ingestion job to present them to an agent 
     const recordTableDefAndStarkKBIngestionJob = new NodejsFunction(scope, 'RecordTableDefAndStartKbIngestionJob', {
         runtime: lambda.Runtime.NODEJS_20_X,
-        entry: path.join(__dirname, '..', 'functions', 'recordTableDefAndStartKBIngestion', 'index.ts'),
+        entry: path.join(__dirname, '..', '..', 'functions', 'recordTableDefAndStartKBIngestion', 'index.ts'),
         bundling: {
             format: OutputFormat.CJS,
             loader: {

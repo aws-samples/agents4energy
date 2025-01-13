@@ -14,7 +14,7 @@ import {
 import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
+import { addLlmAgentPolicies } from '../../functions/utils/cdkUtils'
 
 interface AgentProps {
     vpc: ec2.Vpc,
