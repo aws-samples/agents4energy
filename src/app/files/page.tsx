@@ -27,6 +27,11 @@ const addSlashIfDefined = (path: string): string => {
   return path.endsWith('/') ? path : path + '/';
 };
 
+const formatFileSize = (bytes: number | undefined): string => {
+  if (bytes === undefined) return '';
+  return bytes.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
 function Page() {
   // const PAGE_SIZE = 20;
   // const [resource, setResource] = React.useState({ uri: "" });
@@ -101,7 +106,7 @@ function Page() {
             <thead>
               <tr>
                 <th>Name (click to open)</th>
-                <th>Size</th>
+                <th style={{ textAlign: 'right', paddingRight: '16px' }}>Size</th>
                 <th></th>
               </tr>
             </thead>
@@ -109,7 +114,7 @@ function Page() {
               {s3Assets.map((item, index) => (
                 <tr key={index}>
                   <td>{displayFolderOrObject({ item })}</td>
-                  <td>{item.Size}</td>
+                  <td style={{ textAlign: 'right', paddingRight: '16px' }}>{formatFileSize(item.Size)}</td>
                   <td>
                     {!item.IsFolder ?
                       <button onClick={() => onRemoveObject(item.Key)}>Remove File</button>

@@ -127,7 +127,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     // Create the main queue for processing
     const pdfProcessingQueue = new sqs.Queue(scope, 'PdfToYamlQueue', {
-        visibilityTimeout: cdk.Duration.seconds(1000), // Should match or exceed lambda timeout
+        visibilityTimeout: cdk.Duration.minutes(16), // Should match or exceed lambda timeout
         deadLetterQueue: {
             queue: pdfDlQueue,
             maxReceiveCount: 3 // Number of retries before sending to DLQ
@@ -141,7 +141,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     convertPdfToYamlFunction.addEventSource(new lambdaEvent.SqsEventSource(pdfProcessingQueue, {
         batchSize: 10,
         maxBatchingWindow: cdk.Duration.seconds(10),
-        maxConcurrency: 100,
+        maxConcurrency: 90,
     }));
 
     const wellFileDriveBucket = s3.Bucket.fromBucketName(scope, 'ExistingBucket', props.s3Bucket.bucketName);
