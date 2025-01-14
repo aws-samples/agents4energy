@@ -14,7 +14,7 @@ import {
 import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { addLlmAgentPolicies } from '../functions/utils/cdkUtils'
+import { addLlmAgentPolicies } from '../../functions/utils/cdkUtils'
 
 interface AgentProps {
     vpc: ec2.Vpc,
@@ -744,9 +744,9 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
 
     // ===== MAINTENANCE KNOWLEDGE BASE =====
     // Bedrock KB with OpenSearchServerless (OSS) vector backend
-    const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintKB`, {//${stackName.slice(-5)}
+    const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintenanceKB`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
-        name: knowledgeBaseName,
+        // name: knowledgeBaseName,
         instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to industrial facility maintenance and operations`,
         description: 'Maintenance Knowledge Base',
     });

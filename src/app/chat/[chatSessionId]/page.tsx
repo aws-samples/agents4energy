@@ -285,6 +285,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
                     chatSessionId: initialActiveChatSession?.id,
                     lastMessageText: "Suggest three follow up prompts",
+                    usePastMessages: true,
                     outputStructure: JSON.stringify({
                         title: "RecommendNextPrompt",
                         description: "Help the user chose the next prompt to send.",

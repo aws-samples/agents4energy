@@ -42,8 +42,6 @@ export class AppConfigurator extends Construct {
   constructor(scope: Construct, id: string, props: AppConfiguratorProps) {
     super(scope, id);
 
-
-
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
 
