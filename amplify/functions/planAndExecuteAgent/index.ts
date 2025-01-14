@@ -95,6 +95,12 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
         env: process.env
     })
 
+    await publishTokenStreamChunk({
+        tokenStreamChunk: new AIMessageChunk({content: "Generating new plan ...\n\n"}),//This is just meant to show something is happening.
+        tokenIndex: -1,
+        amplifyClientWrapper: amplifyClientWrapper
+    })
+
     try {
         // console.log('Getting the current chat session info')
         const chatSession = await amplifyClientWrapper.getChatSession({ chatSessionId: event.arguments.chatSessionId })
