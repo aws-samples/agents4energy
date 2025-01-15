@@ -148,10 +148,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation', 'includeScore']
     switch (messageContentCategory) {
       case 'tool_plot':
-        const { chartTitle, numberOfPreviousTablesToInclude } = JSON.parse(props.message.content) as {
+        const { chartTitle, includePreviousEventTable, includePreviousDataTable} = JSON.parse(props.message.content) as {
           // columnNameFromQueryForXAxis: string,
           chartTitle: string | undefined,
-          numberOfPreviousTablesToInclude: number
+          // numberOfPreviousTablesToInclude: number,
+          includePreviousEventTable: boolean,
+          includePreviousDataTable: boolean
         }
 
         // //Limit messages to those before the plot message
@@ -167,7 +169,46 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         // console.log('Tool Response Messages:\n', toolResponseMessages)
 
-        const selectedToolMessages = toolResponseMessages.slice(-1 * numberOfPreviousTablesToInclude)
+        const dataTableMessages = toolResponseMessages.filter(
+          (message) => {
+            const chartContent = JSON.parse(message.content) as {
+              queryResponseData: RowDataInput,
+            }
+
+            if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
+
+            const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+            const chartTrendNames = Object.keys(chartDataObject)
+
+            const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+
+            return tableType === 'trend'
+          }
+        )
+
+        const eventTableMessages = toolResponseMessages.filter(
+          (message) => {
+            const chartContent = JSON.parse(message.content) as {
+              queryResponseData: RowDataInput,
+            }
+
+            if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
+
+            const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+            const chartTrendNames = Object.keys(chartDataObject)
+
+            const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+
+            return tableType === 'events'
+          }
+        )
+
+        const selectedToolMessages = [
+          ...includePreviousDataTable ? dataTableMessages.slice(-1) : [],
+          ...includePreviousEventTable ? eventTableMessages.slice(-1) : []
+        ]
 
         // console.log("Selected messages: ", selectedToolMessages)
 

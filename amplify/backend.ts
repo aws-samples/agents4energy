@@ -20,15 +20,20 @@ import * as cdk from 'aws-cdk-lib'
 // import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import {
   aws_iam as iam,
+  aws_s3 as s3,
   aws_s3_deployment as s3Deployment,
   aws_ec2 as ec2,
   aws_lambda as lambda,
   custom_resources as cr,
+  Aspects
 } from 'aws-cdk-lib'
+
+import { AwsSolutionsChecks } from 'cdk-nag'
 
 import { productionAgentBuilder } from "./agents/production/productionAgent"
 import { maintenanceAgentBuilder } from "./agents/maintenance/maintenanceAgent"
 import { AppConfigurator } from './custom/appConfigurator'
+import { cdkNagSupperssionsHandler } from './custom/cdkNagHandler';
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
 
@@ -143,7 +148,14 @@ const vpc = new ec2.Vpc(networkingStack, 'A4E-VPC', {
       subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
     },
   ],
+  flowLogs: {
+    'flow-log': {
+      destination: ec2.FlowLogDestination.toCloudWatchLogs(),
+      trafficType: ec2.FlowLogTrafficType.ALL,
+    }
+  }
 });
+
 // Delete the VPC when the cloudformation template is deleted
 vpc.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY)
 
@@ -286,3 +298,35 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   preSignUpFunction: backend.preSignUp.resources.lambda,
   cognitoUserPool: backend.auth.resources.userPool,
 })
+
+
+// First, create a logging bucket
+const accessLogsBucket = new s3.Bucket(networkingStack, 'accessLogs', {
+  // Enforce SSL for data in transit
+  enforceSSL: true,
+  // Block all public access
+  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+  // Enable encryption by default
+  encryption: s3.BucketEncryption.S3_MANAGED,
+  // Set a lifecycle rule to clean up old logs if desired
+  lifecycleRules: [
+    {
+      expiration: cdk.Duration.days(365), // Adjust retention period as needed
+    }
+  ],
+  removalPolicy: cdk.RemovalPolicy.RETAIN // Retain logs even if stack is destroyed
+});
+
+// backend.storage.resources.bucket.grantReadWrite(accessLogsBucket)
+
+const cfnBucket = backend.storage.resources.bucket.node.defaultChild as s3.CfnBucket;
+cfnBucket.loggingConfiguration = {
+  destinationBucketName: accessLogsBucket.bucketName,
+  logFilePrefix: 'bucket-logs/'
+};
+
+// Run CDK nag on the stacks
+cdkNagSupperssionsHandler(rootStack)
+Aspects.of(productionAgentStack).add(new AwsSolutionsChecks({ verbose: true }))
+Aspects.of(maintenanceAgentStack).add(new AwsSolutionsChecks({ verbose: true }))
+Aspects.of(networkingStack).add(new AwsSolutionsChecks({ verbose: true }))

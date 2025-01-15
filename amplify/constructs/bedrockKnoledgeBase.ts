@@ -5,6 +5,7 @@ import {
   aws_bedrock as bedrock,
   aws_rds as rds,
   aws_iam as iam,
+  aws_secretsmanager as secretsmanager,
   aws_lambda as lambda,
   custom_resources as cr
 } from 'aws-cdk-lib';
@@ -53,6 +54,8 @@ export class AuroraBedrockKnoledgeBase extends Construct {
           version: rds.AuroraPostgresEngineVersion.VER_16_4,
         }),
         enableDataApi: true,
+        iamAuthentication: true,
+        storageEncrypted: true,
         defaultDatabaseName: defaultDatabaseName,
         writer: rds.ClusterInstance.serverlessV2('writer'),
         serverlessV2MinCapacity: 0.5,
@@ -64,6 +67,10 @@ export class AuroraBedrockKnoledgeBase extends Construct {
         port: 2000,
         removalPolicy: cdk.RemovalPolicy.DESTROY
       });
+      this.vectorStorePostgresCluster.secret?.addRotationSchedule('RotationSchedule', {
+              hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser(),
+              automaticallyAfter: cdk.Duration.days(30)
+          });
     // Wait until this writer node is created before running sql queries against the db
     this.vectorStoreWriterNode = this.vectorStorePostgresCluster.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 

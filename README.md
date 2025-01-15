@@ -6,7 +6,7 @@
     1. Set the maximum build time to 1 hour
 
 ## Develop
-To begin developing in this repo, perform the following steps.
+To begin developing in this repo, perform the following steps. These steps are indepent of the deployment steps.
 1. Clone the repo
 1. Run `npm install` to install the required packages.
 1. Run `npm run ecrAuth` to authenticate with the AWS ECR repo. This lets you pull lambda build images.
@@ -14,6 +14,16 @@ To begin developing in this repo, perform the following steps.
 1. In a different ternimal run `npm run dev` to start a develpment server for the front end. You can reach this server by navigating to `localhost:3000` in an internet browser.
 1. Now when you make code changes, they will be deployed to both the front and back end.
 
+
+## Limit sign up to certain email addresses
+When a user signs up for an account, the suffix of their email address is checked against an allow list.
+To change which email address suffixes are allowed, follow these steps:
+1. In the AWS amplify console, navigate to your branch.
+1. Click the "Functions" button on the left side bar
+1. Look for the funciton with "preSignUp" in the function name. Click on this function.
+1. Click "View in Lambda"
+1. Click "Configuration" and then "Environmental Variables"
+1. The variable named "ALLOWED_EMAIL_SUFFIXES" is a comma seperated list of allowed email suffixes. Change this variable to reflect the email addresses you would like to allow. If you add an empty element (ex: `@amazon.com,`), any email address will be allowed. 
 
 ## Production Agent
 

@@ -18,6 +18,8 @@ import {
     aws_sqs as sqs,
     aws_glue as glue,
     aws_events as events,
+    aws_logs as logs,
+    aws_secretsmanager as secretsmanager,
     aws_events_targets as eventsTargets,
     custom_resources as cr
 } from 'aws-cdk-lib';
@@ -134,6 +136,27 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
     });
 
+    // Add a queue policy to enforce HTTPS
+    for (const queue of [pdfDlQueue, pdfProcessingQueue]) {
+        queue.addToResourcePolicy(
+            new iam.PolicyStatement({
+                sid: 'DenyUnsecureTransport',
+                effect: iam.Effect.DENY,
+                principals: [new iam.AnyPrincipal()],
+                actions: [
+                    'sqs:*'
+                ],
+                resources: [queue.queueArn],
+                conditions: {
+                    'Bool': {
+                        'aws:SecureTransport': 'false'
+                    }
+                }
+            })
+        )
+    }
+
+
     // Grant the Lambda permission to read from the queue
     pdfProcessingQueue.grantConsumeMessages(convertPdfToYamlFunction);
 
@@ -184,6 +207,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }),
         defaultDatabaseName: defaultProdDatabaseName,
         enableDataApi: true,
+        iamAuthentication: true,
+        storageEncrypted: true,
         writer: rds.ClusterInstance.serverlessV2('writer'),
         serverlessV2MinCapacity: 0.5,
         serverlessV2MaxCapacity: 2,
@@ -194,6 +219,10 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         port: 5432,
         removalPolicy: cdk.RemovalPolicy.DESTROY
     });
+    hydrocarbonProductionDb.secret?.addRotationSchedule('RotationSchedule', {
+                  hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser(),
+                  automaticallyAfter: cdk.Duration.days(30)
+              });
     const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
     //Allow inbound traffic from the default SG in the VPC
@@ -642,6 +671,13 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const runCrawlerRecordTableDefintionStateMachine = new sfn.StateMachine(scope, 'CrawlerStateMachine', {
         definition,
         timeout: cdk.Duration.minutes(30),
+        tracingEnabled: true,
+        logs: {
+            destination: new logs.LogGroup(scope, 'CrawlerStateMachineLogs', {
+                retention: logs.RetentionDays.ONE_MONTH,
+            }),
+            level: sfn.LogLevel.ALL,
+        },
     });
 
     recordTableDefAndStarkKBIngestionJob.grantInvoke(runCrawlerRecordTableDefintionStateMachine);

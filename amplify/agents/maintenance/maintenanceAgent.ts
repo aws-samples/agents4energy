@@ -6,6 +6,7 @@ import {
     aws_bedrock as bedrock,
     aws_iam as iam,
     aws_s3 as s3,
+    aws_secretsmanager as secretsmanager,
     aws_rds as rds,
     aws_lambda as lambda,
     aws_ec2 as ec2,
@@ -61,6 +62,8 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         }),
         defaultDatabaseName: defaultDatabaseName,
         enableDataApi: true,
+        iamAuthentication: true,
+        storageEncrypted: true,
         writer: rds.ClusterInstance.serverlessV2('writer'),
         serverlessV2MinCapacity: 0.5,
         serverlessV2MaxCapacity: 4,
@@ -69,7 +72,12 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         },
         vpc: props.vpc,
         port: postgresPort,
-        removalPolicy: cdk.RemovalPolicy.DESTROY
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        
+    });
+    maintDb.secret?.addRotationSchedule('RotationSchedule', {
+        hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser(),
+        automaticallyAfter: cdk.Duration.days(30)
     });
     const writerNode = maintDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance // Set this as a dependency to cause a resource to wait until the database is queriable
 

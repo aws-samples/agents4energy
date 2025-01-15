@@ -403,27 +403,27 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }, [initialActiveChatSession])
 
-    // List the available bedrock agents
-    useEffect(() => {
-        const fetchListBedrockAgents = async () => {
-            const response = await amplifyClient.queries.listBedrockAgents()
-            console.log('List Agents Response: ', response.data)
-            if (!(response.data && response.data.body)) {
-                console.log('No response from listing bedrock agents')
-                return
-            }
-            // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
-            const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
-            if (!listAgentsResponseBody) {
-                console.log('Could not parse response body from listing bedrock agents')
-                return
-            }
-            console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
-            setBedrockAgents(listAgentsResponseBody)
-            // return listAgentsResponseBody
-        }
-        fetchListBedrockAgents()
-    }, [])
+    // // List the available bedrock agents
+    // useEffect(() => {
+    //     const fetchListBedrockAgents = async () => {
+    //         const response = await amplifyClient.queries.listBedrockAgents()
+    //         console.log('List Agents Response: ', response.data)
+    //         if (!(response.data && response.data.body)) {
+    //             console.log('No response from listing bedrock agents')
+    //             return
+    //         }
+    //         // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
+    //         const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
+    //         if (!listAgentsResponseBody) {
+    //             console.log('Could not parse response body from listing bedrock agents')
+    //             return
+    //         }
+    //         console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
+    //         setBedrockAgents(listAgentsResponseBody)
+    //         // return listAgentsResponseBody
+    //     }
+    //     fetchListBedrockAgents()
+    // }, [])
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
         setMessages([])

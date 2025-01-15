@@ -241,18 +241,22 @@ export const executeSQLQueryTool = tool(
 
 const plotTableFromToolResponseSchema = z.object({
     chartTitle: z.string().describe("The title of the plot."),
-    numberOfPreviousTablesToInclude: z.number().int().optional().describe("The number of previous tables to include in the plot. Use at least 2 to include produciton and event data tables."),
+    includePreviousDataTable: z.boolean().optional().describe("If true, the last table in the plot will be the data table. If false, the last table in the plot will be the event data table. Default is true."),
+    includePreviousEventTable: z.boolean().optional().describe("If true, the last table in the plot will be the event data table. If false, the last table in the plot will be the data table. Default is true.")
+    // numberOfPreviousTablesToInclude: z.number().int().optional().describe("The number of previous tables to include in the plot. Use at least 2 to include produciton and event data tables."),
 });
 
 
 export const plotTableFromToolResponseTool = tool(
-    async ({ chartTitle, numberOfPreviousTablesToInclude = 2 }) => {
+    async ({ chartTitle, includePreviousDataTable = true, includePreviousEventTable = true }) => {
 
         return {
             messageContentType: 'tool_plot',
             // columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
             chartTitle: chartTitle,
-            numberOfPreviousTablesToInclude: numberOfPreviousTablesToInclude
+            // numberOfPreviousTablesToInclude: numberOfPreviousTablesToInclude,
+            includePreviousDataTable: includePreviousDataTable,
+            includePreviousEventTable: includePreviousEventTable
             // chartData: queryResponseData
         } as ToolMessageContentType
 

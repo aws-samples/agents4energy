@@ -128,7 +128,8 @@ export const main = async () => {
 
   const toolResponse = await plotTableFromToolResponseTool.invoke({
     chartTitle: "Hello World",
-    numberOfPreviousTablesToInclude: 2
+    includePreviousDataTable: true,
+    includePreviousEventTable: true
   })
 
   console.log('Tool response: ', toolResponse)

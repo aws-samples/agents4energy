@@ -126,7 +126,7 @@ async function waitForJobCompletion(
 
         const getCommand = new GetDocumentAnalysisCommand(getParams);
 
-        // Poll every 5 seconds
+        // Poll every 2 seconds
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         const response = await client.send(getCommand);
@@ -159,7 +159,7 @@ function findRelationship(blocks: GetDocumentAnalysisCommandOutput["Blocks"], id
 function processResults(results: GetDocumentAnalysisCommandOutput[]) {
     // writeFileSync('./results.yaml', stringify(results))
     const processedData = results.map((result, index) => {
-        console.log(`\nPage ${index + 1}:`);
+        console.log(`\nChunk ${index + 1}:`);
 
         if (result.Blocks) {
 
@@ -214,14 +214,14 @@ function processResults(results: GetDocumentAnalysisCommandOutput[]) {
                 .join('\n');
 
             return {
-                page: index + 1,
+                chunk: index + 1,
                 formData: formData,
                 textData: textData
             }
-        } else return { page: index + 1 }
+        } else return { chunk: index + 1 }
     });
 
-    if (processedData) return processedData.sort((a, b) => a?.page - b?.page)
+    if (processedData) return processedData.sort((a, b) => a?.chunk - b?.chunk)
 }
 
 export const handler: SQSHandler = async (event: SQSEvent) => {
