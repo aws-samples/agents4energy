@@ -13,8 +13,11 @@
   "dependencies": {
     "@aws-amplify/ui-react": "^6.5.3",
     "@aws-amplify/ui-react-storage": "^3.3.8",
-    "@cloudscape-design/components": "^3.0.781",
+    "@cloudscape-design/chat-components": "^1.0.19",
+    "@cloudscape-design/code-view": "^3.0.36",
+    "@cloudscape-design/components": "^3.0.866",
     "@cloudscape-design/design-tokens": "^3.0.44",
+    "@cloudscape-design/global-styles": "^1.0.34",
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
     "@langchain/aws": "^0.1.1",

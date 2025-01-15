@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import "@cloudscape-design/global-styles/index.css"
 import "./globals.css";
 
 import ConfigureAmplify from '@/components/ConfigureAmplify';

@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* :root {
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -24,4 +24,8 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+} */
+
+.awsui_tabs-header-list_14rmt_1xftp_298.awsui_tabs-header-list_1acwa_dp0cl_5 {
+  justify-content: center;
 }

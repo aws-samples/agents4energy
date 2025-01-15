@@ -11,10 +11,12 @@ import {
   MenuItem,
   Link
 } from '@mui/material';
+import TopNavigation from "@cloudscape-design/components/top-navigation";
 
 import { useAuthenticator } from '@aws-amplify/ui-react';
 
 import { useUserAttributes } from '@/components/UserAttributesProvider';
+import logoSmallTopNavigation from '@/a4e-logo.png'; 
 
 const TopNavBar = () => {
   const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
@@ -32,77 +34,53 @@ const TopNavBar = () => {
   };
 
   return (
-    <AppBar
-      position="fixed"
-      sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
-    >
-      <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Link color="inherit" href='/' sx={{ textDecoration: 'none' }}>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Agents4Energy
-            </Typography>
-          </Link>
-
-          <Link color="inherit" href='/files' sx={{ textDecoration: 'none' }}>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Files
-            </Typography>
-          </Link>
-
-          <Link color="inherit" href='/chat' sx={{ textDecoration: 'none' }}>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Chat
-            </Typography>
-          </Link>
-
-        </Box>
-
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          
-          {userAttributes?.email ? (
-
-            <Box sx={{ flexGrow: 0 }}>
-              <Tooltip title="Open settings">
-                <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }} color="inherit">
-                  <Typography sx={{ textAlign: 'center' }}>{userAttributes.email}</Typography>
-                </IconButton>
-              </Tooltip>
-              <Menu
-                sx={{ mt: '45px' }}
-                id="menu-appbar"
-                anchorEl={anchorElUser}
-                anchorOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-                keepMounted
-                transformOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-                open={Boolean(anchorElUser)}
-                onClose={handleCloseUserMenu}
-              >
-                <MenuItem key='logout' onClick={signOut}>
-                  <Typography sx={{ textAlign: 'center' }}>logout</Typography>
-                </MenuItem>
-
-              </Menu>
-            </Box>
-          ) : 
-          (authStatus === "unauthenticated") ? (
-          <Link color="inherit" href='/login' sx={{ textDecoration: 'none' }}>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Login
-            </Typography>
-          </Link>
-          ) : null
-          }
-        </Box>
-      </Toolbar>
-    </AppBar>
+    <TopNavigation
+      identity={{
+        href: "/",
+        title: "Agents4Energy",
+        logo: {
+          src: logoSmallTopNavigation.src,
+          alt: "A4E"
+        }
+      }}
+      utilities={[
+        {
+          type: "menu-dropdown",
+          text: userAttributes?.email || "Customer Name",
+          description: userAttributes?.email || "email@example.com",
+          iconName: "user-profile",
+          items: [
+            { id: "profile", text: "Profile" },
+            { id: "preferences", text: "Preferences" },
+            { id: "security", text: "Security" },
+            {
+              id: "support-group",
+              text: "Support",
+              items: [
+                {
+                  id: "documentation",
+                  text: "Documentation",
+                  href: "#",
+                  external: true,
+                  externalIconAriaLabel:
+                    " (opens in new tab)"
+                },
+                { id: "support", text: "Support" },
+                {
+                  id: "feedback",
+                  text: "Feedback",
+                  href: "#",
+                  external: true,
+                  externalIconAriaLabel:
+                    " (opens in new tab)"
+                }
+              ]
+            },
+            { id: "signout", text: "Sign out", onClick: signOut }
+          ]
+        }
+      ]}
+    />
   );
 };
 
