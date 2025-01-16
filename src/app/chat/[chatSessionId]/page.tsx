@@ -43,34 +43,34 @@ const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/cha
 
 // const drawerWidth = 240;
 
-type ListBedrockAgentsResponseType = {
-    agentSummaries: {
-        agentId: string;
-        agentName: string;
-        agentStatus: string;
-        latestAgentVersion: string;
-        updatedAt: string;
-    }[];
-}
+// type ListBedrockAgentsResponseType = {
+//     agentSummaries: {
+//         agentId: string;
+//         agentName: string;
+//         agentStatus: string;
+//         latestAgentVersion: string;
+//         updatedAt: string;
+//     }[];
+// }
 
-type ListAgentIdsResponseType = {
-    agentAliasSummaries:
-    {
-        agentAliasId: string,
-        agentAliasName: string,
-        agentAliasStatus: string,
-        createdAt: string,
-        description: string,
-        routingConfiguration:
-        {
-            agentVersion: string,
-            provisionedThroughput: string
-        }[],
-        updatedAt: string
-    }[]
-    ,
-    nextToken: string
-}
+// type ListAgentIdsResponseType = {
+//     agentAliasSummaries:
+//     {
+//         agentAliasId: string,
+//         agentAliasName: string,
+//         agentAliasStatus: string,
+//         createdAt: string,
+//         description: string,
+//         routingConfiguration:
+//         {
+//             agentVersion: string,
+//             provisionedThroughput: string
+//         }[],
+//         updatedAt: string
+//     }[]
+//     ,
+//     nextToken: string
+// }
 
 const jsonParseHandleError = (jsonString: string) => {
     try {
@@ -147,25 +147,25 @@ const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSe
     )
 }
 
-const getAgentAliasId = async (agentId: string) => {
-    const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
-    // console.log('get Agent Alias Id Response: ', response.data)
-    if (!(response.data && response.data.body)) {
-        console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
-        return
-    }
-    // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
-    const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
+// const getAgentAliasId = async (agentId: string) => {
+//     const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
+//     // console.log('get Agent Alias Id Response: ', response.data)
+//     if (!(response.data && response.data.body)) {
+//         console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
+//         return
+//     }
+//     // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
+//     const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
 
-    if (!listAgnetAliasIdsResponseBody) {
-        console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
-        return
-    }
-    //Get the most recently created AliasId
-    const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
+//     if (!listAgnetAliasIdsResponseBody) {
+//         console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
+//         return
+//     }
+//     //Get the most recently created AliasId
+//     const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
 
-    return mostRecentAliasId
-}
+//     return mostRecentAliasId
+// }
 
 // const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr2: Array<Schema["ChatMessage"]["type"]>) => {
 const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
@@ -193,7 +193,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false);
-    const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
+    // const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
 
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
@@ -534,14 +534,15 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                         {
                             [
                                 ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
-                                ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
+                                // ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
                             ]
                                 .map((agent) => (
                                     <MenuItem
                                         key={agent.agentName}
                                         onClick={async () => {
-                                            const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
-                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
+                                            // const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
+                                            
+                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId } })
                                         }}
                                     >
                                         <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>

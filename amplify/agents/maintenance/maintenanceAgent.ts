@@ -76,7 +76,9 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         
     });
     maintDb.secret?.addRotationSchedule('RotationSchedule', {
-        hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser(),
+        hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
+            functionName: `SecretRotationMaintDb-${stackUUID}`
+          }),
         automaticallyAfter: cdk.Duration.days(30)
     });
     const writerNode = maintDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance // Set this as a dependency to cause a resource to wait until the database is queriable

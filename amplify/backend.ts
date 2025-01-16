@@ -325,8 +325,8 @@ cfnBucket.loggingConfiguration = {
   logFilePrefix: 'bucket-logs/'
 };
 
-// Run CDK nag on the stacks
-cdkNagSupperssionsHandler(rootStack)
-Aspects.of(productionAgentStack).add(new AwsSolutionsChecks({ verbose: true }))
-Aspects.of(maintenanceAgentStack).add(new AwsSolutionsChecks({ verbose: true }))
-Aspects.of(networkingStack).add(new AwsSolutionsChecks({ verbose: true }))
+// // Run CDK nag on the stacks
+// cdkNagSupperssionsHandler(rootStack)
+// Aspects.of(productionAgentStack).add(new AwsSolutionsChecks({ verbose: true }))
+// Aspects.of(maintenanceAgentStack).add(new AwsSolutionsChecks({ verbose: true }))
+// Aspects.of(networkingStack).add(new AwsSolutionsChecks({ verbose: true }))

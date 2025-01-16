@@ -38,7 +38,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     const metadataField = 'metadata'
     const vectorDimensions = 1024
 
-    const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
+    const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
@@ -48,8 +48,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     //If a database cluster is not supplied in the props, create one
     this.vectorStorePostgresCluster = props.vectorStorePostgresCluster ? props.vectorStorePostgresCluster :
-      new rds.DatabaseCluster(scope, `VectorStoreAuroraCluster-${id}`, {
-        // const vectorStorePostgresCluster = new rds.DatabaseCluster(scope, 'VectorStoreAuroraCluster-1', {
+      new rds.DatabaseCluster(scope, `VectorStore-${id}`, {
         engine: rds.DatabaseClusterEngine.auroraPostgres({
           version: rds.AuroraPostgresEngineVersion.VER_16_4,
         }),
@@ -67,10 +66,12 @@ export class AuroraBedrockKnoledgeBase extends Construct {
         port: 2000,
         removalPolicy: cdk.RemovalPolicy.DESTROY
       });
-      this.vectorStorePostgresCluster.secret?.addRotationSchedule('RotationSchedule', {
-              hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser(),
-              automaticallyAfter: cdk.Duration.days(30)
-          });
+    this.vectorStorePostgresCluster.secret?.addRotationSchedule('RotationSchedule', {
+      hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
+        functionName: `SecretRotation-${id}`
+      }),
+      automaticallyAfter: cdk.Duration.days(30),
+    });
     // Wait until this writer node is created before running sql queries against the db
     this.vectorStoreWriterNode = this.vectorStorePostgresCluster.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
@@ -149,7 +150,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
       actions: ['secretsmanager:GetSecretValue'],
       resources: [this.vectorStorePostgresCluster.secret!.secretArn],
     }))
-    
+
 
     // Create a Custom Resource that invokes the lambda function
     const prepVectorStore = new cr.AwsCustomResource(scope, `PrepVectorStoreCluster-${id}`, {
@@ -173,7 +174,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     prepVectorStore.node.addDependency(this.vectorStoreWriterNode)
 
-    const knoledgeBaseRole = new iam.Role(this, `KbRole-${id}`,{//'sqlTableKbRole', {
+    const knoledgeBaseRole = new iam.Role(this, `KbRole-${id}`, {//'sqlTableKbRole', {
       assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
       inlinePolicies: {
         'KnowledgeBasePolicies': new iam.PolicyDocument({
@@ -210,7 +211,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     })
 
     this.knowledgeBase = new bedrock.CfnKnowledgeBase(this, "KnowledgeBase", {
-      name: `${id.slice(0,60)}-${stackUUID}`,
+      name: `${id.slice(0, 60)}-${stackUUID}`,
       roleArn: knoledgeBaseRole.roleArn,
       description: 'This knowledge base stores sql table definitions',
       knowledgeBaseConfiguration: {

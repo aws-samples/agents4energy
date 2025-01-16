@@ -2,7 +2,6 @@
 import { stringify } from "yaml"
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib'
-import { Stack, Fn, Aws, Token} from 'aws-cdk-lib';
 import {
     aws_bedrock as bedrock,
     aws_iam as iam,
@@ -47,14 +46,14 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
     const stackName = cdk.Stack.of(scope).stackName
-    const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
-    
+    const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
+
     // console.log("Produciton Stack UUID Long: ", stackUUIDLong)
     console.log("Production Stack UUID: ", stackUUID)
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
-    
+
     // Lambda function to apply a promp to a pdf file
     const lambdaLlmAgentRole = new iam.Role(scope, 'LambdaExecutionRole', {
         assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
@@ -220,9 +219,11 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         removalPolicy: cdk.RemovalPolicy.DESTROY
     });
     hydrocarbonProductionDb.secret?.addRotationSchedule('RotationSchedule', {
-                  hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser(),
-                  automaticallyAfter: cdk.Duration.days(30)
-              });
+        hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
+            functionName: `SecretRotationProdDb-${stackUUID}`
+          }),
+        automaticallyAfter: cdk.Duration.days(30)
+    });
     const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
     //Allow inbound traffic from the default SG in the VPC
@@ -295,7 +296,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     },
     // });
 
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefinitionBedrockKnoledgeBase", {
+    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "TableDef", {
         vpc: props.vpc,
         bucket: props.s3Bucket,
         schemaName: 'bedrock_integration'
@@ -431,7 +432,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     ////////////////////////////////////////////////////////////
     const configureProdDbFunction = new NodejsFunction(scope, 'configureProdDbFunction', {
         runtime: lambda.Runtime.NODEJS_LATEST,
-        entry: path.join(__dirname, '..', '..',  'functions', 'configureProdDb', 'index.ts'),
+        entry: path.join(__dirname, '..', '..', 'functions', 'configureProdDb', 'index.ts'),
         timeout: cdk.Duration.seconds(300),
         environment: {
             CLUSTER_ARN: hydrocarbonProductionDb.clusterArn,
