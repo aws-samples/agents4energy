@@ -12,13 +12,12 @@ export default function ChatUIMessageList(props: ChatUIMessageListProps) {
 
   return (
     <SpaceBetween direction="vertical" size="m">
-      {messages.map((message, idx) => (
+      {messages.map((message) => (
         <ChatUIMessage
-          key={idx}
+          key={message.id}
           message={message}
-          allMessages={messages}
           showCopyButton={props.showCopyButton}
-          messages={messages}
+          messages={messages.slice(0, messages.indexOf(message))}
         />
       ))}
     </SpaceBetween>

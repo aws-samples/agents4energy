@@ -29,7 +29,7 @@ export interface AppConfiguratorProps {
   hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
   defaultProdDatabaseName: string,
   athenaWorkgroup: cdk.aws_athena.CfnWorkGroup,
-  athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
+  // athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
   s3Bucket: cdk.aws_s3.IBucket
   preSignUpFunction: lambda.IFunction
   cognitoUserPool: cdk.aws_cognito.IUserPool
@@ -41,8 +41,6 @@ export interface AppConfiguratorProps {
 export class AppConfigurator extends Construct {
   constructor(scope: Construct, id: string, props: AppConfiguratorProps) {
     super(scope, id);
-
-
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')

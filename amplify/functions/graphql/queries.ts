@@ -10,12 +10,14 @@ type GeneratedQuery<InputType, OutputType> = string & {
 
 export const getChatMessage = /* GraphQL */ `query GetChatMessage($id: ID!) {
   getChatMessage(id: $id) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -130,12 +132,14 @@ export const invokePlanAndExecuteAgent = /* GraphQL */ `query InvokePlanAndExecu
 >;
 export const invokeProductionAgent = /* GraphQL */ `query InvokeProductionAgent(
   $chatSessionId: String
+  $doNotSendResponseComplete: Boolean
   $lastMessageText: String!
   $messageOwnerIdentity: String
   $usePreviousMessageContext: Boolean
 ) {
   invokeProductionAgent(
     chatSessionId: $chatSessionId
+    doNotSendResponseComplete: $doNotSendResponseComplete
     lastMessageText: $lastMessageText
     messageOwnerIdentity: $messageOwnerIdentity
     usePreviousMessageContext: $usePreviousMessageContext
@@ -184,12 +188,14 @@ export const listChatMessageByChatSessionIdAndCreatedAt = /* GraphQL */ `query L
     sortDirection: $sortDirection
   ) {
     items {
+      chainOfThought
       chatSessionId
       chatSessionIdDashFieldName
       content
       createdAt
       id
       owner
+      responseComplete
       role
       tool_call_id
       tool_calls
@@ -223,12 +229,14 @@ export const listChatMessageByChatSessionIdDashFieldNameAndCreatedAt = /* GraphQ
     sortDirection: $sortDirection
   ) {
     items {
+      chainOfThought
       chatSessionId
       chatSessionIdDashFieldName
       content
       createdAt
       id
       owner
+      responseComplete
       role
       tool_call_id
       tool_calls
@@ -252,12 +260,14 @@ export const listChatMessages = /* GraphQL */ `query ListChatMessages(
 ) {
   listChatMessages(filter: $filter, limit: $limit, nextToken: $nextToken) {
     items {
+      chainOfThought
       chatSessionId
       chatSessionIdDashFieldName
       content
       createdAt
       id
       owner
+      responseComplete
       role
       tool_call_id
       tool_calls

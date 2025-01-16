@@ -17,13 +17,19 @@ import { remove } from 'aws-amplify/storage';
 import { withAuth } from '@/components/WithAuth';
 import { S3Asset, onFetchObjects } from "@/utils/amplify-utils";
 
-import { StorageManager } from '@aws-amplify/ui-react-storage';
+// import { StorageManager } from '@aws-amplify/ui-react-storage';
+import { FileUploader } from '@aws-amplify/ui-react-storage';
 
 import '@aws-amplify/ui-react/styles.css';
 
 const addSlashIfDefined = (path: string): string => {
   if (!path) return path;
   return path.endsWith('/') ? path : path + '/';
+};
+
+const formatFileSize = (bytes: number | undefined): string => {
+  if (bytes === undefined) return '';
+  return bytes.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
 function Page() {
@@ -100,7 +106,7 @@ function Page() {
             <thead>
               <tr>
                 <th>Name (click to open)</th>
-                <th>Size</th>
+                <th style={{ textAlign: 'right', paddingRight: '16px' }}>Size</th>
                 <th></th>
               </tr>
             </thead>
@@ -108,7 +114,7 @@ function Page() {
               {s3Assets.map((item, index) => (
                 <tr key={index}>
                   <td>{displayFolderOrObject({ item })}</td>
-                  <td>{item.Size}</td>
+                  <td style={{ textAlign: 'right', paddingRight: '16px' }}>{formatFileSize(item.Size)}</td>
                   <td>
                     {!item.IsFolder ?
                       <button onClick={() => onRemoveObject(item.Key)}>Remove File</button>
@@ -129,7 +135,7 @@ function Page() {
             placeholder="Optional: Name of folder"
           />
         </FormField>
-        <StorageManager
+        <FileUploader
           acceptedFileTypes={['*']}
           path={s3PathSegments.join("") + addSlashIfDefined(additionalS3PrefixSegment)}
           maxFileCount={1000}

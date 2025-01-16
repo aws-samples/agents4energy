@@ -1,13 +1,13 @@
 import { validate } from 'jsonschema';
+import { stringify } from 'yaml';
+
 import { Amplify } from 'aws-amplify';
-import { generateClient, Client } from 'aws-amplify/data';
+import { generateClient } from 'aws-amplify/data';
 import * as APITypes from "../graphql/API";
-import { listChatMessageByChatSessionIdAndCreatedAt, getChatSession } from "../graphql/queries"
+import { listChatMessageByChatSessionIdAndCreatedAt, listChatMessageByChatSessionIdDashFieldNameAndCreatedAt, getChatSession } from "../graphql/queries"
 import { Schema } from '../../data/resource';
 
-import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage, MessageContentText, MessageContentImageUrl } from "@langchain/core/messages";
-
-// import { getInfoFromPdf, listBedrockAgents } from '../graphql/queries'
+import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
 
 // Create a GraphQL query for messages in the chat session
 type GeneratedMutation<InputType, OutputType> = string & {
@@ -21,6 +21,8 @@ $input: CreateChatMessageInput!
 createChatMessage(condition: $condition, input: $input) {
   role
   chatSessionId
+  chatSessionIdDashFieldName
+  chainOfThought
   content
   createdAt
   id
@@ -29,7 +31,7 @@ createChatMessage(condition: $condition, input: $input) {
   tool_calls
   tool_name
   updatedAt
-  trace
+  responseComplete
   __typename
 }
 }
@@ -56,6 +58,14 @@ export function getLangChainMessageTextContent(message: HumanMessage | AIMessage
 
     return messageTextContent
 
+}
+export function stringifyLimitStringLength(obj: any, maxLength: number = 200) {
+    return stringify(obj, (key, value) => {
+        if (typeof value === 'string' && value.length > maxLength) {
+            return value.substring(0, maxLength) + '...';
+        }
+        return value;
+    }, 2);
 }
 
 export interface FieldDefinition {
@@ -85,7 +95,7 @@ export async function correctStructuredOutputResponse(
 ) {
     for (let attempt = 0; attempt < 3; attempt++) {
         const validationReslut = validate(response.parsed, targetJsonSchema);
-        console.log(`Data validation result (${attempt}): `, validationReslut.valid);
+        // console.log(`Data validation result (${attempt}): `, validationReslut.valid);
         if (validationReslut.valid) break
 
         console.log("Data validation error:", validationReslut.errors.join('\n'));
@@ -102,7 +112,14 @@ export async function correctStructuredOutputResponse(
     return response
 }
 
-export type PublishMessageCommandInput = { chatSessionId: string, owner: string, message: HumanMessage | AIMessage | ToolMessage }
+export type PublishMessageCommandInput = { 
+    chatSessionId: string, 
+    fieldName?: string, 
+    owner: string, 
+    message: HumanMessage | AIMessage | ToolMessage, 
+    responseComplete?: boolean,
+    chainOfThought?: boolean
+}
 
 type GeneratedClient = ReturnType<typeof generateClient<Schema>>;
 export class AmplifyClientWrapper {
@@ -110,11 +127,13 @@ export class AmplifyClientWrapper {
     public amplifyClient: GeneratedClient;
     public chatMessages: BaseMessage[];
     public chatSessionId: string
+    public fieldName?: string
 
-    constructor(props:{env: any, chatSessionId?: string}) {
+    constructor(props:{env: any, chatSessionId?: string, fieldName?: string}) {
         this.chatMessages = [];
         this.chatSessionId = props.chatSessionId || "";
-        console.log('AMPLIFY_DATA_GRAPHQL_ENDPOINT from env: ', props.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
+        this.fieldName = props.fieldName || "";
+        // console.log('AMPLIFY_DATA_GRAPHQL_ENDPOINT from env: ', props.env.AMPLIFY_DATA_GRAPHQL_ENDPOINT)
         //   this.env = env;
         Amplify.configure(
             {
@@ -143,8 +162,6 @@ export class AmplifyClientWrapper {
                 },
             }
         );
-
-
         this.amplifyClient = generateClient<Schema>()
     }
 
@@ -161,12 +178,15 @@ export class AmplifyClientWrapper {
 
         let input: APITypes.CreateChatMessageInput = {
             chatSessionId: props.chatSessionId,
+            chatSessionIdDashFieldName: `${props.chatSessionId}-${props.fieldName}`,
             content: messageTextContent || "AI Message:\n",
+            chainOfThought: props.chainOfThought || false,
             // contentBlocks: JSON.stringify(props.message.content), //The images are too big for DDB error:  ValidationException: The model returned the following errors: Input is too long for requested model.
             owner: props.owner,
             tool_calls: "[]",
             tool_call_id: "",
-            tool_name: ""
+            tool_name: "",
+            responseComplete: props.responseComplete || false
         }
 
         if (props.message instanceof HumanMessage) {
@@ -182,9 +202,9 @@ export class AmplifyClientWrapper {
             }
         }
 
-        console.log('Publishing mesage with input: ', input)
+        // console.log('Publishing mesage with input: ', input)
 
-        await this.amplifyClient.graphql({
+        const publishMessageResponse = await this.amplifyClient.graphql({
             query: createChatMessage,
             variables: {
                 input: input,
@@ -193,6 +213,8 @@ export class AmplifyClientWrapper {
             .catch((err: any) => {
                 console.error('GraphQL Error: ', err);
             });
+        
+        console.log('Publish message response: \n', stringifyLimitStringLength(publishMessageResponse))
     }
 
     // If you use the amplifyClient: Client type, you get the error below
@@ -210,13 +232,32 @@ export class AmplifyClientWrapper {
             variables: {
                 limit: 20,
                 chatSessionId: this.chatSessionId,
-                sortDirection: APITypes.ModelSortDirection.DESC
+                sortDirection: APITypes.ModelSortDirection.DESC,
+                filter: {
+                    chainOfThought: {
+                        eq: true
+                    }
+                }
             }
         })
 
+        // // Get the chat messages from the chat session for the agent
+        // const chatSessionMessages = await this.amplifyClient.graphql({ //listChatMessageByChatSessionIdAndCreatedAt
+        //     query: listChatMessageByChatSessionIdDashFieldNameAndCreatedAt,
+        //     variables: {
+        //         limit: 20,
+        //         chatSessionIdDashFieldName: `${this.chatSessionId}-${this.fieldName}`,
+        //         sortDirection: APITypes.ModelSortDirection.DESC
+        //     }
+        // })
+
+        console.log(`Retrieved ${chatSessionMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items.length} messages`)
+        // console.log('ChatSessionMessageQueryResponse: ', stringifyLimitStringLength(chatSessionMessages))
         // console.log('messages from gql query: ', chatSessionMessages)
 
+        // const sortedMessages = chatSessionMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items.reverse()
         const sortedMessages = chatSessionMessages.data.listChatMessageByChatSessionIdAndCreatedAt.items.reverse()
+        
 
         // Remove all of the messages before the first message with the role of human
         const firstHumanMessageIndex = sortedMessages.findIndex((message) => message.role === 'human');
@@ -226,6 +267,7 @@ export class AmplifyClientWrapper {
         const messages: BaseMessage[] = sortedMessagesStartingWithHumanMessage.map((message) => {
             if (message.role === 'human') {
                 return new HumanMessage({
+                    id: message.id,
                     content: message.content,
                 })
             } else if (message.role === 'ai') {
@@ -267,7 +309,7 @@ export class AmplifyClientWrapper {
             console.log('Last message in query is a human message')
         }
 
-        console.log("mesages in langchain form: ", messages)
+        // console.log("mesages in langchain form: ", messages)
         // return messages
         this.chatMessages = messages
         // }

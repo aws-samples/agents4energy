@@ -16,11 +16,12 @@ import remarkGfm from "remark-gfm";
 import ReactMarkdown from "react-markdown";
 
 import { formatDate } from "@/utils/date-utils";
-import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
+import { amplifyClient, invokeBedrockModelParseBodyGetText, isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
 
 import styles from "@/styles/chat-ui.module.scss";
+
 import React, { useState, useEffect } from "react";
-import { Message, messageContentType, ToolMessageContentType } from "../../utils/types";
+import { Message } from "../../utils/types";
 
 // import PlotComponent from '../PlotComponent'
 import { Scatter } from 'react-chartjs-2';
@@ -60,17 +61,8 @@ export interface ChatUIMessageProps {
   // message: Schema["ChatMessage"]["type"];
   message: Message;
   messages: Message[];
-  allMessages: Message[];
   showCopyButton?: boolean;
 }
-
-// // Define types for annotations
-// interface AnnotationData {
-//   additionalInfo: string;
-//   title?: string;
-//   description?: string;
-//   // Add any other custom data fields you need
-// }
 
 //https://json-schema.org/understanding-json-schema/reference/array
 const getDataQualityCheckSchema = {
@@ -91,36 +83,38 @@ const getDataQualityCheckSchema = {
   required: ['dataChecks'],
 };
 
-function isValidJSON(str: string): boolean {
+// function isValidJSON(str: string): boolean {
+//   try {
+//     JSON.parse(str);
+//     return true;
+//   } catch {
+//     return false;
+//   }
+// }
+
+const jsonParseHandleError = (jsonString: string) => {
   try {
-    JSON.parse(str);
-    return true;
+    return JSON.parse(jsonString)
   } catch {
-    return false;
+    console.warn(`Could not parse string: ${jsonString}`)
   }
 }
-
-// function zipLists<T, U>(list1: T[], list2: U[]): { x: T, y: U }[] {
-//   const minLength = Math.min(list1.length, list2.length);
-//   const result: { x: T, y: U }[] = [];
-
-//   for (let i = 0; i < minLength; i++) {
-//     result.push({ x: list1[i], y: list2[i] });
-//   }
-
-//   return result;
-// }
 
 function transformListToObject<T extends Record<string, string | number>>(
   list: T[]
 ): { [K in keyof T]: T[K][] } {
   return Object.keys(list[0]).reduce((acc, key) => {
+    // if (list.some(item => !item || !(key in item))) throw new Error(`Key ${key} not found in all items`)
+    // if (list.some(item => !item || !(key in item))) return {}
     return {
       ...acc,
-      [key]: list.map(item => item[key as keyof T])
+      [key]: list.map(item => {
+        if (item && key in item) return item[key as keyof T]
+      })
     };
   }, {}) as { [K in keyof T]: T[K][] };
 }
+
 type RowDataInput = {
   [key: string]: (string | number)
 }[];
@@ -135,29 +129,22 @@ function generateColor(index: number): string {
   return `hsl(${hue}, 70%, 60%)`;
 }
 
-function getMessageCatigory(message: Message): messageContentType {
-  if (!message.tool_name) {
-    //This is an AI message
-    return 'ai'
-  } else if (!isValidJSON(message.content)) {
-    //This is a markdown tool message
-    return 'tool_markdown'
-  } else {
-    return (JSON.parse(message.content) as ToolMessageContentType).messageContentType
-  }
-}
-
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
   const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
-  const [messagePlot, setMessagePlot] = useState<React.FC>()
-  const [messageTable, setMessageTable] = useState<React.FC>()
+  const [MessagePlot, setMessagePlot] = useState<() => React.JSX.Element>()
+  // const [MessagePlot, setMessagePlot] = useState<React.ElementType>(() => (<div></div>))
+  const [MessageTable, setMessageTable] = useState<React.FC>()
   if (!props.message.createdAt) throw new Error("Message createdAt missing");
 
   const messageContentCategory = getMessageCatigory(props.message);
 
+  const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
+
+  // Set the plot and table messages
   useEffect(() => {
+    // console.log("Number of Previous Messages: ", previousMessages.length)
     const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation', 'includeScore']
     switch (messageContentCategory) {
       case 'tool_plot':
@@ -167,15 +154,22 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           numberOfPreviousTablesToInclude: number
         }
 
-        const toolResponseMessages = props.messages.filter(
-          (message) => "tool_call_id" in message && message.tool_call_id && JSON.parse(message.content as string).messageContentType === 'tool_table'
+        // //Limit messages to those before the plot message
+        // const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
+
+        const toolResponseMessages = previousMessages.filter(
+          (message) =>
+            "tool_call_id" in message &&
+            message.tool_call_id &&
+            jsonParseHandleError(message.content as string) &&
+            JSON.parse(message.content as string).messageContentType === 'tool_table'
         )
 
-        console.log('Tool Response Messages:\n', toolResponseMessages)
+        // console.log('Tool Response Messages:\n', toolResponseMessages)
 
         const selectedToolMessages = toolResponseMessages.slice(-1 * numberOfPreviousTablesToInclude)
 
-        console.log("Selected messages: ", selectedToolMessages)
+        // console.log("Selected messages: ", selectedToolMessages)
 
         if (selectedToolMessages.length === 0) return
 
@@ -247,14 +241,14 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               break
             case 'trend':
               const xAxisIsNumberNotDate = !isNaN(Number(chartDataObject[chartTrendNames[0]][0]))
-              console.log('xAxisIsNumberNotDate: ', xAxisIsNumberNotDate)
+              // console.log('xAxisIsNumberNotDate: ', xAxisIsNumberNotDate)
               const newData: ChartData<'scatter', ScatterDataPoint[]> = {
                 datasets: chartTrendNames
                   .slice(1) // The first column will be used for the x axis
                   .filter((columnName) => (!isNaN(Number(chartDataObject[columnName][0]))))
                   .map((columnName, index) => ({
                     data: chartDataObject[chartTrendNames[0]].map((xValue, i) => ({
-                      x: (xAxisIsNumberNotDate)?  new Number(xValue) as number: new Date(xValue), // Convert to Date object if xValue is a string
+                      x: (xAxisIsNumberNotDate) ? new Number(xValue) as number : new Date(xValue), // Convert to Date object if xValue is a string
                       y: Number(chartDataObject[columnName][i])
                     })),
                     mode: 'lines+markers',
@@ -280,17 +274,18 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           return chartTrendNames[0]
         })
 
-
+        if (!data.datasets[0]) return //No data sets found in query
 
         // console.log('chart data:\n', data)
 
-        console.log("First X data Point: ", data.datasets[0].data[0].x)
-        console.log("First X data Point Is Date: ", data.datasets[0].data[0].x instanceof Date)
+
+        // console.log("First X data Point: ", data.datasets[0].data[0].x)
+        // console.log("First X data Point Is Date: ", data.datasets[0].data[0].x instanceof Date)
 
         const options: ChartOptions<'scatter'> = {
           // responsive: true,
           scales: {//If the first x data point is a number an not a date, use a number x axis
-            x: (data.datasets[0].data[0].x instanceof Date)? {
+            x: (data.datasets[0].data[0].x instanceof Date) ? {
               type: 'time' as const,
               time: {
                 unit: 'day' as const,
@@ -308,7 +303,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   locale: enUS,
                 },
               },
-            }: {//Here is the title if the x axis is numberic
+            } : {//Here is the title if the x axis is numberic
               title: {
                 display: true,
                 text: xAxisLabels.join('\n'),
@@ -386,24 +381,36 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           }
         };
 
-        setMessagePlot(() => (
-          <>
-            {/* <pre
-              style={{ //Wrap long lines
-                whiteSpace: 'pre-wrap',
-                wordWrap: 'break-word',
-                overflowWrap: 'break-word',
-              }}
-            >
-              {stringify(chartDataObject)}
-            </pre> */}
-            <Scatter
-              data={data}
-              options={options}
-            />
-          </>
+        const newMessagePlot = () => <>
+          {/* <pre
+            style={{ //Wrap long lines
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+            }}
+          >
+            {stringify(chartDataObject)}
+          </pre> */}
+          <Scatter
+            data={data}
+            options={options}
+          />
+        </>
+        
+        // console.log("Number of table tool response messages: ", toolResponseMessages.length)
+        // console.log("New Data: ", newMessagePlot().props.children?.props?.data)
+        // console.log("Previous Data: ", MessagePlot && MessagePlot().props.children?.props?.data)
+        if (
+          !MessagePlot || 
+          JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data) 
+        )  {
+          console.log("Number of datasets: ", data.datasets.length)
+          console.log("Number of table tool response messages: ", toolResponseMessages)
+          console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
+          console.log('New Message Plot Props: ', newMessagePlot().props.children?.props)
+          setMessagePlot(() => newMessagePlot)
+        }
 
-        ))
       case 'tool_table':
         // https://mui.com/x/react-data-grid/
         // const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
@@ -414,7 +421,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           return
         }
 
-        console.log('Query Response Data: ', queryResponseData)
+        // console.log('Query Response Data: ', queryResponseData)
         if (!queryResponseData[0]) {
           console.warn('No query response data')
           return
@@ -422,7 +429,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         const columnNames = Object.keys(queryResponseData[0])
 
-        console.log('Column Names: ', columnNames)
+        // console.log('Column Names: ', columnNames)
 
 
 
@@ -451,16 +458,19 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             headerName: 'Document Links',
             flex: 1,
             minWidth: 150,
-            renderCell: (params) => (
-              <Box display='flex' flexDirection='column'>
-                <Link href={`/files/${params.value.slice(0, -5)}`} target="_blank" rel="noopener">
-                  pdf link
-                </Link>
-                <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
-                  yaml link
-                </Link>
-              </Box>
-            ),
+            renderCell: (params) => {
+              if (!params.value) return
+              return (
+                <Box display='flex' flexDirection='column'>
+                  <Link href={`/files/${params.value.slice(0, -5)}`} target="_blank" rel="noopener">
+                    pdf link
+                  </Link>
+                  <Link href={`/files/${params.value}`} target="_blank" rel="noopener">
+                    yaml link
+                  </Link>
+                </Box>
+              )
+            },
 
           })
         }
@@ -470,9 +480,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           ...item
         }))
 
-        console.log('Row Data: ', rowData)
-
-        setMessageTable(() => (
+        // console.log('Row Data: ', rowData)
+        const newMessageTable = () => (
           <>
             {/* <pre
               style={{ //Wrap long lines
@@ -520,10 +529,16 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             />
           </>
 
-        ))
+        )
+
+        if (!MessageTable) {
+          setMessageTable(() => newMessageTable)
+
+        }
+
 
     }
-  }, [props.message, props.messages, messageContentCategory])
+  }, [props.message, previousMessages, messageContentCategory, MessageTable, MessagePlot])
 
   // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
   async function getGlossary(message: Message) {
@@ -567,6 +582,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
 
   }
+
+  // console.log('messagePlot:', MessagePlot);
+  // console.log('Type of messagePlot:', typeof MessagePlot);
+  // console.log('Is valid React element:', React.isValidElement(MessagePlot));
 
   return (
     <div>
@@ -698,21 +717,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             switch (messageContentCategory) {
               case 'tool_plot':
                 return <>
-                  {/* <pre
-                    style={{ //Wrap long lines
-                      whiteSpace: 'pre-wrap',
-                      wordWrap: 'break-word',
-                      overflowWrap: 'break-word',
-                    }}
-                  >
-                    {JSON.stringify(datasets, null, 2)}
-                  </pre> */}
-
-                  {messagePlot ? messagePlot : null}
+                  {/* <MessagePlot/> */}
+                  {MessagePlot && <MessagePlot/>}
                 </>
               case 'tool_table':
                 return <>
-                  {messageTable ? messageTable : null}
+                  {MessageTable && <MessageTable/>}
                 </>
               case 'tool_json':
                 return <pre
@@ -728,12 +738,14 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                       props.message.content
                   }
                 </pre>/* Render as YAML */;
-              default: //Default will be to render markdown
-                return <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                >
-                  {props.message.content}
-                </ReactMarkdown>;
+              default:
+                return <div className="prose !max-w-none w-full" >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                  >
+                    {props.message.content}
+                  </ReactMarkdown>
+                </div>;
             }
           })()}
 

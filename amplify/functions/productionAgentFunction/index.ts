@@ -1,43 +1,29 @@
 import { Schema } from '../../data/resource';
-// import { env } from '$amplify/env/production-agent-function';
+import { env } from '$amplify/env/production-agent-function';
+import { stringify } from 'yaml'
 
 import { ChatBedrockConverse } from "@langchain/aws";
-import { HumanMessage, AIMessage, ToolMessage, AIMessageChunk } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, ToolMessage, BaseMessage, AIMessageChunk } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-// import { Pregel } from "@langchain/langgraph/pregel";
+import { RetryPolicy } from "@langchain/langgraph"
 
-import { AmplifyClientWrapper, getLangChainMessageTextContent } from '../utils/amplifyUtils'
-import { publishResponseStreamChunk } from '../graphql/mutations'
+import { AmplifyClientWrapper, getLangChainMessageTextContent, stringifyLimitStringLength } from '../utils/amplifyUtils'
+import { publishResponseStreamChunk, updateChatMessage } from '../graphql/mutations'
 
-import { 
-    calculatorTool, 
-    wellTableToolBuilder, 
-    getTableDefinitionsTool, 
-    executeSQLQueryTool, 
-    plotTableFromToolResponseTool, 
-    getWellFileInfoTool 
+import { Calculator } from "@langchain/community/tools/calculator";
+
+import {
+    queryKnowledgeBase,
+    wellTableTool,
+    getTableDefinitionsTool,
+    executeSQLQueryTool,
+    plotTableFromToolResponseTool,
+    getS3KeyConentsTool,
 } from './toolBox';
 
-async function retryOperation<T>(
-    operation: () => Promise<T>,
-    retries: number = 3,
-    delay: number = 1000 // delay in milliseconds
-): Promise<T> {
-    let attempt = 0;
-    while (attempt < retries) {
-        try {
-            return await operation();
-        } catch (error) {
-            attempt++;
-            if (attempt >= retries) {
-                throw error;
-            }
-            console.warn(`Retrying... Attempt ${attempt}/${retries}`);
-            await new Promise(res => setTimeout(res, delay));
-        }
-    }
-    // Fallback, should not be reached
-    throw new Error("Operation failed after maximum retries");
+function insertBeforeLast<T>(arr: T[], element: T): T[] {
+    arr.splice(-1, 0, element);
+    return arr;
 }
 
 export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async (event) => {
@@ -49,10 +35,10 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
     // const amplifyClientWrapper = generateAmplifyClientWrapper(process.env)
 
-    
-
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
+
+    const fieldName = "invokeProductionAgent" //event.info.fieldName
 
     const chatMessageOwnerIdentity = ('sub' in event.identity) ? event.identity.sub : event.arguments.messageOwnerIdentity
 
@@ -60,26 +46,49 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
     const amplifyClientWrapper = new AmplifyClientWrapper({
         chatSessionId: event.arguments.chatSessionId,
+        fieldName: fieldName,
         env: process.env
     })
 
     const agentTools = [
-        calculatorTool,
-        wellTableToolBuilder(amplifyClientWrapper),
-        getWellFileInfoTool,
+        new Calculator,
+        wellTableTool,
+        getS3KeyConentsTool,
         getTableDefinitionsTool,
         executeSQLQueryTool,
-        plotTableFromToolResponseTool
+        plotTableFromToolResponseTool,
     ];
 
     try {
 
         // If the usePreviousMessageContent field is true or undefined, get the messages. If not set the latest message text as the only message.
-        if( !("usePreviousMessageContext" in event.arguments) || event.arguments.usePreviousMessageContext ) {
+        if (
+            !("usePreviousMessageContext" in event.arguments) || 
+            event.arguments.usePreviousMessageContext === undefined || 
+            event.arguments.usePreviousMessageContext === null || 
+            event.arguments.usePreviousMessageContext
+        ) {
             console.log('Getting messages for chat session: ', event.arguments.chatSessionId)
             await amplifyClientWrapper.getChatMessageHistory({
                 latestHumanMessageText: event.arguments.lastMessageText
             })
+            // console.log("messages in langchain form: ", stringifyLimitStringLength(amplifyClientWrapper.chatMessages))
+
+            // const lastMessageId = amplifyClientWrapper.chatMessages[amplifyClientWrapper.chatMessages.length - 1].id
+
+            // if (lastMessageId) {
+            //     //Add the latest human message to the chain of thought
+            //     amplifyClientWrapper.amplifyClient.graphql({
+            //         query: updateChatMessage,
+            //         variables: {
+            //             input: {
+            //                 id: lastMessageId,
+            //                 chainOfThought: true
+            //             }
+            //         }
+            //     })
+            // }
+
         } else {
             amplifyClientWrapper.chatMessages = [
                 new HumanMessage({
@@ -87,7 +96,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 })
             ]
         }
-        
+
         // console.log("mesages in langchain form: ", amplifyClientWrapper.chatMessages)
 
         const agentModel = new ChatBedrockConverse({
@@ -95,23 +104,49 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             temperature: 0
         });
 
-
-        //Add retry to the agent
-        const agent = await retryOperation(async () => createReactAgent({
+        const agent = createReactAgent({
             llm: agentModel,
             tools: agentTools,
-        }));
+        });
 
-        // agent.nodes['agent'] = langchainNodeWithRetry(agent.nodes['agent'], 3, 1000);
+        //Add retry to the agent
+        agent.nodes['agent'].retryPolicy = { maxAttempts: 3 } as RetryPolicy
 
-        const input = {
-            messages: amplifyClientWrapper.chatMessages,
-        }
+        // const agentWithRag = ragPrompt.pipe(agent);
 
         // https://js.langchain.com/v0.2/docs/how_to/chat_streaming/#stream-events
         // https://js.langchain.com/v0.2/docs/how_to/streaming/#using-stream-events
-        const stream = agent.streamEvents(input, { version: "v2" });
+        // const stream = agent.streamEvents(input, { version: "v2" });
 
+        const messages = amplifyClientWrapper.chatMessages
+
+        console.log("Invoking Production Agent. Latest Message:\n", stringify(messages[messages.length - 1].content))
+
+        const ragContext = await queryKnowledgeBase({
+            knowledgeBaseId: env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID,
+            query: getLangChainMessageTextContent(messages[messages.length - 1]) || ""
+        })
+
+        console.log("Rag context:\n", stringifyLimitStringLength(ragContext))
+
+        insertBeforeLast(messages,
+            new HumanMessage("What are a few relevant oil and gas concepts?")
+        )
+
+        insertBeforeLast(messages, // If there is no result from the knowledge base, use a dummy result
+            new AIMessage(ragContext?.map(retrievalResult => retrievalResult.content?.text).join('\n\n') || "Safety is the top priority.")
+        )
+
+        console.log("Messages with rag:\n", stringifyLimitStringLength(messages))
+
+        const stream = agent.streamEvents(
+            {
+                messages: messages,
+            },
+            { version: "v2" }
+        )
+
+        let currentChunkIndex = 0
         console.log('Listening for stream events')
         for await (const streamEvent of stream) {
             // console.log(`${JSON.stringify(streamEvent, null, 2)}\n---`);
@@ -120,15 +155,16 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 // console.log('Message Chunk: ', streamEvent.data.chunk)
 
                 const streamChunk = streamEvent.data.chunk as AIMessageChunk
-
                 // const chunkContent = streamEvent.data.chunk.kwargs.content
                 const chunkContent = getLangChainMessageTextContent(streamChunk)
                 // console.log("chunkContent: ", chunkContent)
                 if (chunkContent) {
+                    process.stdout.write(chunkContent || "") //Write the chunk to the log
                     await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
                         query: publishResponseStreamChunk,
                         variables: {
                             chatSessionId: event.arguments.chatSessionId,
+                            index: currentChunkIndex++,
                             chunk: chunkContent
                         }
                     })
@@ -139,8 +175,10 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
                 // console.log('Tool Output: ', streamChunk)
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
+                    fieldName: fieldName,
                     owner: chatMessageOwnerIdentity,
-                    message: streamChunk
+                    message: streamChunk,
+                    chainOfThought: true
                 })
 
             } else if (streamEvent.event === "on_chat_model_end") { //When there is a full response from the chat model
@@ -158,8 +196,11 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
 
                 await amplifyClientWrapper.publishMessage({
                     chatSessionId: event.arguments.chatSessionId,
+                    fieldName: fieldName,
+                    chainOfThought: true,
                     owner: chatMessageOwnerIdentity,
-                    message: streamChunkAIMessage
+                    message: streamChunkAIMessage,
+                    responseComplete: !(event.arguments.doNotSendResponseComplete || (streamChunk.tool_calls && streamChunk.tool_calls.length > 0))
                 })
 
             }
@@ -177,6 +218,8 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
             const AIErrorMessage = new AIMessage({ content: error.message + `\n model id: ${process.env.MODEL_ID}` })
             await amplifyClientWrapper.publishMessage({
                 chatSessionId: event.arguments.chatSessionId,
+                fieldName: fieldName,
+                chainOfThought: true,
                 owner: chatMessageOwnerIdentity,
                 message: AIErrorMessage
             })

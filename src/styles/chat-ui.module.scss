@@ -94,3 +94,9 @@
 .hiddenRow {
   display: none; /* Hides the row */
 }
+
+.prose {
+  flex: 1;
+  overflow-y: auto; /* If you want scrolling when content overflows */
+}
+

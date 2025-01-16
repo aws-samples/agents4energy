@@ -13,12 +13,14 @@ export const onCreateChatMessage = /* GraphQL */ `subscription OnCreateChatMessa
   $owner: String
 ) {
   onCreateChatMessage(filter: $filter, owner: $owner) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -79,12 +81,14 @@ export const onDeleteChatMessage = /* GraphQL */ `subscription OnDeleteChatMessa
   $owner: String
 ) {
   onDeleteChatMessage(filter: $filter, owner: $owner) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -145,12 +149,14 @@ export const onUpdateChatMessage = /* GraphQL */ `subscription OnUpdateChatMessa
   $owner: String
 ) {
   onUpdateChatMessage(filter: $filter, owner: $owner) {
+    chainOfThought
     chatSessionId
     chatSessionIdDashFieldName
     content
     createdAt
     id
     owner
+    responseComplete
     role
     session {
       createdAt
@@ -210,6 +216,7 @@ export const recieveResponseStreamChunk = /* GraphQL */ `subscription RecieveRes
   recieveResponseStreamChunk(chatSessionId: $chatSessionId) {
     chatSessionId
     chunk
+    index
     __typename
   }
 }

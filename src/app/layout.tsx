@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 
 import ConfigureAmplify from '@/components/ConfigureAmplify';
-import Providers from '@/components/providers';
+import Providers from '@/components/ContextProviders';
 
 // import TopNavBar from '@/components/TopNavBar';
 import ClientLayout from '@/components/ClientLayout';
@@ -20,7 +20,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "A4E",
+  title: "Agents4Energy",
   description: "Use AI to improve energy operations",
 };
 

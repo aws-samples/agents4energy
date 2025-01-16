@@ -24,66 +24,12 @@ import {
 const drawerWidth = 240;
 
 interface SideBarProps {
-    drawerContent: ReactNode;
+    // drawerContent: ReactNode;
     children: ReactNode;
     anchor: "right" | "left";
     initiallyOpen?: boolean;
     floatingButton?: boolean;
 }
-
-// const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
-//     open?: boolean;
-// }>(({ theme, open }) => ({
-//     flexGrow: 1,
-//     padding: theme.spacing(3),
-//     transition: theme.transitions.create('margin', {
-//         easing: theme.transitions.easing.sharp,
-//         duration: theme.transitions.duration.leavingScreen,
-//     }),
-//     marginRight: -drawerWidth,
-//     ...(open && {
-//         transition: theme.transitions.create('margin', {
-//             easing: theme.transitions.easing.easeOut,
-//             duration: theme.transitions.duration.enteringScreen,
-//         }),
-//         marginRight: 0,
-//     }),
-// }));
-
-const Main = styled('main', { 
-    shouldForwardProp: (prop) => !['open', 'anchor'].includes(prop as string) 
-})<{
-    open?: boolean;
-    anchor?: 'left' | 'right';
-}>(({ theme, open, anchor }) => ({
-    flexGrow: 1,
-    padding: theme.spacing(3),
-    transition: theme.transitions.create('margin', {
-        easing: theme.transitions.easing.sharp,
-        duration: theme.transitions.duration.leavingScreen,
-    }),
-    ...(anchor === 'left' ? {
-        // marginLeft: -drawerWidth,
-        marginLeft: 0,
-        ...(open && {
-            transition: theme.transitions.create('margin', {
-                easing: theme.transitions.easing.easeOut,
-                duration: theme.transitions.duration.enteringScreen,
-            }),
-            // marginLeft: 0,
-            marginLeft: drawerWidth,
-        }),
-    } : {
-        marginRight: -drawerWidth*2,
-        ...(open && {
-            transition: theme.transitions.create('margin', {
-                easing: theme.transitions.easing.easeOut,
-                duration: theme.transitions.duration.enteringScreen,
-            }),
-            marginRight: -drawerWidth,
-        }),
-    }),
-}));
 
 const DrawerHeader = styled('div')(({ theme }) => ({
     display: 'flex',
@@ -114,7 +60,7 @@ export const FloatingHamburger = styled(IconButton, {
     padding: theme.spacing(1),
   }));
 
-const AddSideBar: React.FC<SideBarProps> = ({ children, anchor, drawerContent, initiallyOpen = true, floatingButton = true }: SideBarProps) => {
+const SideBar: React.FC<SideBarProps> = ({ children, anchor, initiallyOpen = true, floatingButton = true }: SideBarProps) => {
     const [open, setOpen] = useState(initiallyOpen);
 
     const handleDrawerOpen = () => {
@@ -126,15 +72,11 @@ const AddSideBar: React.FC<SideBarProps> = ({ children, anchor, drawerContent, i
     };
 
     return (
-        <Box sx={{ display: 'flex' }}>
-            
-            <Main 
-            open={open}
-            anchor={anchor}
-            >
-                <DrawerHeader />
-                {children}
-            </Main>
+        <Box sx={{ 
+            display: 'flex', 
+            width: (open ? drawerWidth: '30px'), 
+            position: 'relative' 
+            }}>
 
             {!open && floatingButton && (
                 <FloatingHamburger
@@ -152,7 +94,7 @@ const AddSideBar: React.FC<SideBarProps> = ({ children, anchor, drawerContent, i
             <Drawer
                 sx={{
                     width: drawerWidth,
-                    flexShrink: 0,
+                    flexShrink: 1,
                     '& .MuiDrawer-paper': {
                         width: drawerWidth,
                     },
@@ -167,11 +109,11 @@ const AddSideBar: React.FC<SideBarProps> = ({ children, anchor, drawerContent, i
                         <ChevronLeftIcon /> {/* Changed to chevron icon */}
                     </IconButton>
                 </DrawerHeader>
-                {drawerContent}
+                {children}
             </Drawer>
         </Box>
     )
 
 }
 
-export default AddSideBar;
+export default SideBar;
