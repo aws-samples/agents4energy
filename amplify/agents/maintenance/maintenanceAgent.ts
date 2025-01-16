@@ -1,4 +1,4 @@
-
+// Agents4Energy - Maintenance Agent
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib';
 import { Stack, Fn, Aws, Token } from 'aws-cdk-lib';
@@ -15,7 +15,6 @@ import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { addLlmAgentPolicies } from '../../functions/utils/cdkUtils'
-import { createTablesSQL01, insertDataSQL } from './sqlStatementsCMMS';
 
 interface AgentProps {
     vpc: ec2.Vpc,
