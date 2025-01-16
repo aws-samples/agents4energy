@@ -48,7 +48,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     //If a database cluster is not supplied in the props, create one
     this.vectorStorePostgresCluster = props.vectorStorePostgresCluster ? props.vectorStorePostgresCluster :
-      new rds.DatabaseCluster(scope, `VectorStore-${id}`, {
+      new rds.DatabaseCluster(scope, `VectorStore-${id}-${stackUUID}`, {
         engine: rds.DatabaseClusterEngine.auroraPostgres({
           version: rds.AuroraPostgresEngineVersion.VER_16_4,
         }),
@@ -68,7 +68,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
       });
     this.vectorStorePostgresCluster.secret?.addRotationSchedule('RotationSchedule', {
       hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
-        functionName: `SecretRotation-${id}`
+        functionName: `SecretRotation-${id}-${stackUUID}`
       }),
       automaticallyAfter: cdk.Duration.days(30),
     });
