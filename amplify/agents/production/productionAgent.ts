@@ -675,6 +675,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         tracingEnabled: true,
         logs: {
             destination: new logs.LogGroup(scope, 'CrawlerStateMachineLogs', {
+                logGroupName: `/aws/vendedlogs/states/${rootStack.stackName}-CrawlerStateMachineLogs`,
+                removalPolicy: cdk.RemovalPolicy.DESTROY,
                 retention: logs.RetentionDays.ONE_MONTH,
             }),
             level: sfn.LogLevel.ALL,
