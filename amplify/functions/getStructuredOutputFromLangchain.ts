@@ -43,7 +43,7 @@ Amplify.configure(
 const amplifyClient = generateClient<Schema>();
 
 interface FieldDefinition {
-    type: string;
+    type: string  | Array<string>;
     description: string;
     format?: string;
     pattern?: string;
@@ -54,7 +54,7 @@ interface FieldDefinition {
 }
 
 interface JsonSchema {
-    title: string;
+    title: string | Array<string>;
     description: string;
     type: string;
     properties: Record<string, FieldDefinition>;

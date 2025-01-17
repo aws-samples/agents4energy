@@ -296,7 +296,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     },
     // });
 
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "TableDef", {
+    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "TableDefinition", {
         vpc: props.vpc,
         bucket: props.s3Bucket,
         schemaName: 'bedrock_integration'
@@ -675,7 +675,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         tracingEnabled: true,
         logs: {
             destination: new logs.LogGroup(scope, 'CrawlerStateMachineLogs', {
-                logGroupName: `/aws/vendedlogs/states/${rootStack.stackName}-CrawlerStateMachineLogs`,
+                logGroupName: `/aws/vendedlogs/states/${rootStack.stackName}-CrawlerStateMachineLogs-${stackUUID}`,
                 removalPolicy: cdk.RemovalPolicy.DESTROY,
                 retention: logs.RetentionDays.ONE_MONTH,
             }),

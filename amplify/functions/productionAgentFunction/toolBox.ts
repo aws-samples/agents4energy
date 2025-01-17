@@ -316,6 +316,8 @@ export const getS3KeyConentsTool = tool(
 //////// PDF Reports to Table Tool ///////
 //////////////////////////////////////////
 
+const jsonSchemaTypes = z.enum(['string', 'integer', 'date', 'number', 'boolean', 'null'])
+
 export const wellTableSchema = z.object({
     dataToExclude: z.string().optional().describe("List of criteria to exclude data from the table"),
     dataToInclude: z.string().optional().describe("List of criteria to include data in the table"),
@@ -323,7 +325,10 @@ export const wellTableSchema = z.object({
         columnName: z.string().describe('The name of a column'),
         columnDescription: z.string().describe('A description of the information which this column contains.'),
         columnDataDefinition: z.object({
-            type: z.enum(['string', 'integer', 'date', 'number', 'boolean']).describe('The data type of the column.'),
+            type: z.union([
+                jsonSchemaTypes,
+                z.array(jsonSchemaTypes)
+            ]),
             format: z.string().describe('The format of the column.').optional(),
             enum: z.array(z.string()).optional(),
             pattern: z.string().describe('The regex pattern for the column.').optional(),
@@ -473,9 +478,9 @@ export const wellTableTool = tool(
             // Here add in the default table columns date and excludeRow 
             tableColumns.unshift({
                 columnName: 'date',
-                columnDescription: `The date of the event in YYYY-MM-DD format.`,
+                columnDescription: `The date of the event in YYYY-MM-DD format. Can be null if no date is available.`,
                 columnDataDefinition: {
-                    type: 'string',
+                    type: ['string', 'null'],
                     format: 'date',
                     pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
                 }
@@ -534,7 +539,7 @@ export const wellTableTool = tool(
                 description: "Fill out these arguments based on the image data",
                 type: "object",
                 properties: fieldDefinitions,
-                required: Object.keys(fieldDefinitions),
+                required: Object.keys(fieldDefinitions).filter(key => key !== 'date'),
             };
 
             // console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))

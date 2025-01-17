@@ -69,7 +69,7 @@ export function stringifyLimitStringLength(obj: any, maxLength: number = 200) {
 }
 
 export interface FieldDefinition {
-    type: string;
+    type: string | Array<string>;
     description: string;
     format?: string;
     pattern?: string;

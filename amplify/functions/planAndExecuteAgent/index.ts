@@ -277,6 +277,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
                     Once you have a result for this task, respond with that result.
                     Tool messages can contain visualizations, query results and tables.
+                    When creating a table, never use the HTML format.
                     If the tool message says it contains information which completes the task, return a summary to the user.
                     `)],
             };

@@ -629,7 +629,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   // console.log('Is valid React element:', React.isValidElement(MessagePlot));
 
   return (
-    <div>
+    <div
+      key={props.message.id}
+      id={props.message.content}
+    >
       {props.message?.role != 'human' && (
         <Container>
           <div className={styles.btn_chabot_message_copy}>
