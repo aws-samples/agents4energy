@@ -766,6 +766,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 </>
               case 'tool_table':
                 return <>
+                  {/* <pre>{props.message.content}</pre> */}
                   {MessageTable && <MessageTable/>}
                 </>
               case 'tool_json':

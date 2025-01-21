@@ -1,4 +1,4 @@
-// import { stringify } from 'yaml'
+import { stringify } from 'yaml'
 import { z } from "zod";
 
 import { BedrockAgentRuntimeClient, RetrieveCommand } from "@aws-sdk/client-bedrock-agent-runtime";
@@ -477,16 +477,6 @@ export const wellTableTool = tool(
             tableColumns = tableColumns.filter(column => !(column.columnName.toLowerCase().includes('date')))
             // Here add in the default table columns date and excludeRow 
             tableColumns.unshift({
-                columnName: 'date',
-                columnDescription: `The date of the event in YYYY-MM-DD format. Can be null if no date is available.`,
-                columnDataDefinition: {
-                    type: ['string', 'null'],
-                    format: 'date',
-                    pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
-                }
-            })
-
-            tableColumns.unshift({
                 columnName: 'includeScore',
                 columnDescription: `
                     If the JSON object contains information related to [${dataToExclude}], give a score of 1.
@@ -516,6 +506,16 @@ export const wellTableTool = tool(
                 }
             })
 
+            tableColumns.unshift({
+                columnName: 'date',
+                columnDescription: `The date of the event in YYYY-MM-DD format. Can be null if no date is available.`,
+                columnDataDefinition: {
+                    type: ['string', 'null'],
+                    format: 'date',
+                    pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
+                }
+            })
+
             // console.log('Input Table Columns: ', tableColumns)
 
             // const correctedColumnNameMap = tableColumns.map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
@@ -535,18 +535,20 @@ export const wellTableTool = tool(
                 };
             }
             const jsonSchema = {
-                title: "getKeyInformationFromImages",
-                description: "Fill out these arguments based on the image data",
+                title: "getKeyInformation",
+                description: "Fill out these arguments based on text extracted from a form",
                 type: "object",
                 properties: fieldDefinitions,
                 required: Object.keys(fieldDefinitions).filter(key => key !== 'date'),
             };
 
-            // console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))
+            console.log('target json schema for row:\n', stringify(jsonSchema))
 
             let columnNames = tableColumns.map(column => column.columnName)
             //Add in the source and relevanceScore columns
             columnNames.push('s3Key')
+
+            console.log('Generating column names: ', columnNames)
 
             const s3Prefix = `production-agent/well-files/field=SanJuanEast/api=${wellApiNumber}/`;
             const wellFiles = await listFilesUnderPrefix({
@@ -602,31 +604,10 @@ export const wellTableTool = tool(
                         `
 
                         const fileDataResponse = await getStructuredOutputResponse({
-                            messages:[ new HumanMessage({ content: messageText })],
+                            messages: [new HumanMessage({ content: messageText })],
                             outputStructure: jsonSchema,
                             modelId: env.MODEL_ID
                         })
-
-                        // const fileDataResponse = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-                        //     query: invokeBedrockWithStructuredOutput,
-                        //     variables: {
-                        //         chatSessionId: 'dummy',
-                        //         lastMessageText: messageText,
-                        //         outputStructure: JSON.stringify(jsonSchema),
-                        //     }
-                        // })
-
-                        // If the GQL query returns an error, return the error to the agent
-                        // if (fileDataResponse.errors) throw new Error(fileDataResponse.errors.map((error) => error.message).join('\n\n'))
-                        // if (fileDataResponse.errors) {
-                        //     throw new Error("")
-                        //     return {
-                        //         messageContentType: 'tool_json',
-                        //         error: fileDataResponse.errors.map((error) => error.message).join('\n\n')
-                        //     } as ToolMessageContentType
-                        // }
-
-                        // const fileData = JSON.parse("")
 
                         //Replace the keys in file Data with those from correctedColumnNameMap
                         Object.keys(fileDataResponse).forEach(key => {
@@ -637,8 +618,11 @@ export const wellTableTool = tool(
                             }
                         })
 
+                        //Preserve ordering of columns
+                        const sortedFileDataResponse = Object.fromEntries(columnNames.map(colName => [colName, fileDataResponse[colName]]))
+
                         const fileResponseData: Record<string, any> = {
-                            ...fileDataResponse,
+                            ...sortedFileDataResponse,
                             s3Key: s3Key
                         }
 
