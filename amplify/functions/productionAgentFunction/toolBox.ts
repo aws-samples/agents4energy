@@ -658,7 +658,12 @@ export const wellTableTool = tool(
             // console.log('data Rows: ', dataRows)
 
             //Sort the data rows by date (first column)
-            dataRows.sort((a, b) => a?.date.localeCompare(b?.date));
+            dataRows.sort((a, b) => {
+                if (!a || !a.date) return 0
+                if (!b || !b.date) return 1
+
+                return a?.date.localeCompare(b?.date)
+            });
 
             // console.log('data Rows: ', dataRows)
 
