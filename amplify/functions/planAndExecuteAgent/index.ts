@@ -275,10 +275,13 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                     ${stringify(task)}
                     </task>
 
-                    Once you have a result for this task, respond with that result.
-                    Tool messages can contain visualizations, query results and tables.
+                    To make plots or tables, use the queryGQL tool.
                     When creating a table, never use the HTML format.
+                    
+                    Tool messages can contain visualizations, query results and tables.
                     If the tool message says it contains information which completes the task, return a summary to the user.
+                    
+                    Once you have a result for this task, respond with that result.
                     `)],
             };
             const { messages } = await agentExecutor.invoke(inputs, config);
