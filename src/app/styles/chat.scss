@@ -8,8 +8,6 @@
   flex-direction: column;
   gap: cs.$space-static-l;
 
-  min-block-size: 100%;
-
   &:not(.classic) {
     @media only screen and (min-width: 688px) and (max-width: 1280px) {
       padding-inline: 60px;

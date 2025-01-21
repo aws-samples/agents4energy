@@ -29,3 +29,22 @@ body {
 .awsui_tabs-header-list_14rmt_1xftp_298.awsui_tabs-header-list_1acwa_dp0cl_5 {
   justify-content: center;
 }
+
+
+.chat-container {
+  height: calc(100vh - 180px);
+}
+
+.steps:not(:has(.steps)) {
+  margin-left: 40px;
+  text-indent: -20px!important;
+  cursor: pointer!important;
+
+  span {
+    word-break: break-word!important;
+  }
+}
+.step-container:not(:last-child)::after {
+  content: "|";
+  padding-left: 3px;
+}

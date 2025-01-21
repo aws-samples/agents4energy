@@ -42,8 +42,8 @@ export default function Messages({ messages = [] }: { messages: Array<Message> }
           <ChatBubble
             key={message.authorId + message.timestamp}
             avatar={<ChatBubbleAvatar {...author} loading={message.avatarLoading} />}
-            ariaLabel={`${author.name} at ${message.timestamp}`}
-            type={author.type === 'gen-ai' ? 'incoming' : 'outgoing'}
+            ariaLabel={`${author?.name ?? 'Unknown'} at ${message.timestamp}`}
+            type={author?.type === 'gen-ai' ? 'incoming' : 'outgoing'}
             hideAvatar={message.hideAvatar}
             actions={message.actions}
           >
