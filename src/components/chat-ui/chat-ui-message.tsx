@@ -43,7 +43,6 @@ import {
 import zoomPlugin from 'chartjs-plugin-zoom';
 import 'chartjs-adapter-date-fns';
 import { enUS } from 'date-fns/locale';
-import { DateRangeTwoTone } from '@mui/icons-material';
 
 ChartJS.register(
   LinearScale,
