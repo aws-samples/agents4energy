@@ -264,7 +264,8 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
             - The CMMS database is the system of record.  Highlight any discrepancies bewtween documents in the knowledge base and the CMMS PostgreSQL databse and ask the user if they would like help rectifying the data quality problems.
             - ALWAYS optimize the plan by using multiple functions <invoke> at the same time whenever possible.
             - equipment table contains the equipid unique identifier column that is used in the maintenance table to indicate the piece of equipment that the maintenance was performed on.
-            - locationid column in the locations table is the wellid value that can be used to query daily production data for wells.  Get the wellid from locations, then use that if user provides the well name instead of the ID.
+            - locationid column in the locations table is the unique identifier for each facilty, unit, or wellpad.
+            - Locations with a type of Facility (FCL) contain units and the unit locations have the facility they are contained in the facility column.  For example, the Biodiesel Unit is at the Sandy Point Refilery (Location 928)
             - NEVER attempt to join equipid ON locationid or installlocationid as these fields are different values and data types.
             - ALWAYS preface the table name with the schema when writing SQL.
             - Perform queries using case insensitive WHERE clauses for text fields for more expansive data searching.
