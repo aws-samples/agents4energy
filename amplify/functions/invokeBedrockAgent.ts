@@ -66,6 +66,8 @@ export const handler: Schema["invokeBedrockAgent"]["functionHandler"] = async (e
                             index: 0,
                             chunk: orchestrationTraceRationale
                         }
+                    }).catch((error) => {
+                        console.error('publishResponseStreamChunk error: ', error)
                     })
                 }
                 
