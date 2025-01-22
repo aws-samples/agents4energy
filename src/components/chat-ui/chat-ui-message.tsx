@@ -231,7 +231,18 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
           if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
 
-          const chartDataObject = transformListToObject(chartContent.queryResponseData)
+          const chartQueryResponsesWithDate = chartContent.queryResponseData
+          .filter(dataRow => { //If the data row has a date key, the value must be a date
+            if (dataRow.date ) {
+              if (!isNaN((new Date(dataRow.date)).getTime())) return true
+              else return false
+            }
+            else return true
+          })
+
+          console.log('chart query responses with date: ', chartQueryResponsesWithDate)
+
+          const chartDataObject = transformListToObject(chartQueryResponsesWithDate)
 
           // console.log('chart data: ', chartDataObject)
 
