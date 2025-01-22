@@ -250,11 +250,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
           const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
 
-          console.log('table type: ', tableType)
+          // console.log('table type: ', tableType)
 
           switch (tableType) {
             case 'events':
-              console.log('chartQueryResponsesWithDate:\n', stringify(chartQueryResponsesWithDate))
+              // console.log('chartQueryResponsesWithDate:\n', stringify(chartQueryResponsesWithDate))
               const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
                 // labels: ['event'.repeat(chartDataObject[chartTrendNames[0]].length)],
                 datasets: [
@@ -457,10 +457,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           !MessagePlot ||
           JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data)
         ) {
-          console.log("Number of datasets: ", data.datasets.length)
-          console.log("Number of table tool response messages: ", toolResponseMessages)
-          console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
-          console.log('New Message Plot Props: ', newMessagePlot().props.children?.props)
+          // console.log("Number of datasets: ", data.datasets.length)
+          // console.log("Number of table tool response messages: ", toolResponseMessages)
+          // console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
+          // console.log('New Message Plot Props: ', newMessagePlot().props.children?.props)
           setMessagePlot(() => newMessagePlot)
         }
 
@@ -470,7 +470,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         const queryResponseData: RowDataInput = JSON.parse(props.message.content as string).queryResponseData
 
         if (!queryResponseData || queryResponseData.length === 0) {
-          console.log('no query response data')
+          // console.log('no query response data')
           return
         }
 

@@ -239,10 +239,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         // console.log("initialActiveChatSession hash: ", createHash('md5').update("dasf").digest('hex'))
         console.log("Messages: ", messages)
-        console.log("initialActiveChatSession: ", initialActiveChatSession)
+        // console.log("initialActiveChatSession: ", initialActiveChatSession)
 
-        console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
-        console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
+        // console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
+        // console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
 
         //Reset the character stream when we get a new message
         setCharacterStream(() => {
