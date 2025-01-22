@@ -11,6 +11,7 @@ const client = new BedrockAgentRuntimeClient();
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const handler: Schema["invokeBedrockAgent"]["functionHandler"] = async (event) => {
+    console.log('Event: ', event)
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
     if (!('sub' in event.identity)) throw new Error("Event does not contain user");
@@ -20,7 +21,19 @@ export const handler: Schema["invokeBedrockAgent"]["functionHandler"] = async (e
         env: process.env
     })
 
-    console.log('Amplify Env: ', env)
+    // Give the user an intial response
+    amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
+        query: publishResponseStreamChunk,
+        variables: {
+            chatSessionId: event.arguments.chatSessionId,
+            index: 0,
+            chunk: 'Invoking Amazon Bedrock Agent...'
+        }
+    }).catch((error) => {
+        console.error('Initial Invoke error: ', error)
+    })
+
+    // console.log('Amplify Env: ', env)
 
     const params = {
         agentId: event.arguments.agentId,
