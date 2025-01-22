@@ -240,7 +240,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             else return true
           })
 
-          console.log('chart query responses with date: ', chartQueryResponsesWithDate)
+          // console.log('chart query responses with date: ', chartQueryResponsesWithDate)
 
           const chartDataObject = transformListToObject(chartQueryResponsesWithDate)
 
