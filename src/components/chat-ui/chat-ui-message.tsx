@@ -43,6 +43,7 @@ import {
 import zoomPlugin from 'chartjs-plugin-zoom';
 import 'chartjs-adapter-date-fns';
 import { enUS } from 'date-fns/locale';
+import { DateRangeTwoTone } from '@mui/icons-material';
 
 ChartJS.register(
   LinearScale,
@@ -148,7 +149,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation', 'includeScore']
     switch (messageContentCategory) {
       case 'tool_plot':
-        const { chartTitle, includePreviousEventTable, includePreviousDataTable} = JSON.parse(props.message.content) as {
+        const { chartTitle, includePreviousEventTable, includePreviousDataTable } = JSON.parse(props.message.content) as {
           // columnNameFromQueryForXAxis: string,
           chartTitle: string | undefined,
           // numberOfPreviousTablesToInclude: number,
@@ -232,13 +233,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
 
           const chartQueryResponsesWithDate = chartContent.queryResponseData
-          .filter(dataRow => { //If the data row has a date key, the value must be a date
-            if (dataRow.date ) {
-              if (!isNaN((new Date(dataRow.date)).getTime())) return true
-              else return false
-            }
-            else return true
-          })
+            .filter(dataRow => { //The first key in the object must contain a date
+              const dateCandidate = dataRow[Object.keys(dataRow)[0]]
+              // console.log('dateCandidate: ', dateCandidate)
+              return (dateCandidate !== null) &&
+                !isNaN((new Date(dateCandidate)).getTime())
+            })
 
           // console.log('chart query responses with date: ', chartQueryResponsesWithDate)
 
@@ -254,6 +254,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
           switch (tableType) {
             case 'events':
+              console.log('chartQueryResponsesWithDate:\n', stringify(chartQueryResponsesWithDate))
               const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
                 // labels: ['event'.repeat(chartDataObject[chartTrendNames[0]].length)],
                 datasets: [
@@ -448,14 +449,14 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             options={options}
           />
         </>
-        
+
         // console.log("Number of table tool response messages: ", toolResponseMessages.length)
         // console.log("New Data: ", newMessagePlot().props.children?.props?.data)
         // console.log("Previous Data: ", MessagePlot && MessagePlot().props.children?.props?.data)
         if (
-          !MessagePlot || 
-          JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data) 
-        )  {
+          !MessagePlot ||
+          JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data)
+        ) {
           console.log("Number of datasets: ", data.datasets.length)
           console.log("Number of table tool response messages: ", toolResponseMessages)
           console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
@@ -773,12 +774,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               case 'tool_plot':
                 return <>
                   {/* <MessagePlot/> */}
-                  {MessagePlot && <MessagePlot/>}
+                  {MessagePlot && <MessagePlot />}
                 </>
               case 'tool_table':
                 return <>
                   {/* <pre>{props.message.content}</pre> */}
-                  {MessageTable && <MessageTable/>}
+                  {MessageTable && <MessageTable />}
                 </>
               case 'tool_json':
                 return <pre
