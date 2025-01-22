@@ -35,7 +35,7 @@ import { withAuth } from '@/components/WithAuth';
 
 import dynamic from 'next/dynamic'
 
-import { createHash } from 'crypto';
+// import { createHash } from 'crypto';
 
 const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
     ssr: false,
