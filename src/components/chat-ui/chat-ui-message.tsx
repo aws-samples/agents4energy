@@ -348,8 +348,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             datalabels: {
               display: 'auto', //Hide overlapped data
               color: 'black',
-              backgroundColor: 'white',
-              borderRadius: 4,
+              // backgroundColor: 'white',
+              // borderRadius: 4,
               font: {
                 weight: "bold"
               },
@@ -591,7 +591,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     <div>
       {props.message?.role != 'human' && (
         <Container>
-          <div className={styles.btn_chabot_message_copy}>
+          {/* <div className={styles.btn_chabot_message_copy}>
             <Popover
               size="medium"
               position="top"
@@ -611,9 +611,9 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 }}
               />
             </Popover>
-          </div>
+          </div> */}
 
-          {props.message.chatSessionId ? (
+          {/* {props.message.chatSessionId ? (
             <>
               <div className={styles.btn_chabot_message_copy}>
                 <Popover
@@ -656,7 +656,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               </div>
             </>
           ) : null
-          }
+          } */}
 
           {props.message.trace ? (
             <div className={styles.btn_chabot_message_copy}>

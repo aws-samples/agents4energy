@@ -607,7 +607,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     return (
+        <div className='page-container'>
         <Tabs
+            disableContentPaddings
             tabs={[
                 {
                     label: "Chat Agents",
@@ -674,7 +676,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                     }}
                                     items={[{
                                         type: 'link', text:
-                                            <Box sx={{ overflow: 'auto' }}>
+                                            <Box>
                                                 {
                                                     chatSessions
                                                         .slice()
@@ -795,6 +797,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 }
             ]}
         />
+        </div>
     );
 };
 
