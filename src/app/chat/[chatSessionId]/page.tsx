@@ -200,54 +200,58 @@ const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => 
     });
 })
 
-const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
-    if (!value || value.length === 0 || isGenAiResponseLoading) {
-        return;
-    }
-
-    const newMessage: Message = {
-        type: 'chat-bubble',
-        authorId: 'user-jane-doe',
-        content: value,
-        timestamp: new Date().toLocaleTimeString(),
-    };
-
-    setMessages(prevMessages => [...prevMessages, newMessage]);
-    setPrompt('');
-
-    const waitTimeBeforeLoading = 300;
-
-    // Show loading state
-    setTimeout(() => {
-        setIsGenAiResponseLoading(true);
-        setMessages(prevMessages => [...prevMessages, getLoadingMessage()]);
-    }, waitTimeBeforeLoading);
-
-    const lowerCasePrompt = value.toLowerCase();
-
-    const isLoadingPrompt = validLoadingPrompts.includes(lowerCasePrompt);
-
-    // The loading state will be shown for 4 seconds for loading prompt and 1.5 seconds for rest of the prompts
-    const waitTimeBeforeResponse = isLoadingPrompt ? 4000 : 1500;
-
-    // Send Gen-AI response, replacing the loading chat bubble
-    setTimeout(() => {
-        const validPrompt = VALID_PROMPTS.find(({ prompt }) => prompt.includes(lowerCasePrompt));
-
-        setMessages(prevMessages => {
-            const response = validPrompt ? validPrompt.getResponse() : getInvalidPromptResponse();
-            prevMessages.splice(prevMessages.length - 1, 1, { ...response, type: 'chat-bubble' });
-            return prevMessages;
-        });
-        setIsGenAiResponseLoading(false);
-    }, waitTimeBeforeResponse + waitTimeBeforeLoading);
-};
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["createType"]>>([]);
     const messagesContainerRef = React.useRef<HTMLDivElement>(null);
     const [prompt, setPrompt] = useState('');
     const [isGenAiResponseLoading, setIsGenAiResponseLoading] = useState(false);
+
+
+    const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
+        if (!value || value.length === 0 || isGenAiResponseLoading) {
+            return;
+        }
+
+        const newMessage: Message = {
+            // type: 'chat-bubble',
+            // authorId: 'user-jane-doe',
+            // type: '',
+            role: 'user',
+            content: value,
+            createdAt: new Date().toLocaleTimeString(),
+        };
+
+        setMessages(prevMessages => [...prevMessages, newMessage]);
+        setPrompt('');
+
+        const waitTimeBeforeLoading = 300;
+
+        // Show loading state
+        setTimeout(() => {
+            setIsGenAiResponseLoading(true);
+            setMessages(prevMessages => [...prevMessages, getLoadingMessage()]);
+        }, waitTimeBeforeLoading);
+
+        const lowerCasePrompt = value.toLowerCase();
+
+        const isLoadingPrompt = validLoadingPrompts.includes(lowerCasePrompt);
+
+        // The loading state will be shown for 4 seconds for loading prompt and 1.5 seconds for rest of the prompts
+        const waitTimeBeforeResponse = isLoadingPrompt ? 4000 : 1500;
+
+        // Send Gen-AI response, replacing the loading chat bubble
+        setTimeout(() => {
+            const validPrompt = VALID_PROMPTS.find(({ prompt }) => prompt.includes(lowerCasePrompt));
+
+            setMessages(prevMessages => {
+                const response = validPrompt ? validPrompt.getResponse() : getInvalidPromptResponse();
+                prevMessages.splice(prevMessages.length - 1, 1, { ...response, type: 'chat-bubble' });
+                return prevMessages;
+            });
+            setIsGenAiResponseLoading(false);
+        }, waitTimeBeforeResponse + waitTimeBeforeLoading);
+    };
 
     // const [messages, setMessages] = useState<Array<Message>>([]);
 
@@ -399,11 +403,17 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     owner: { contains: user.userId }
                 }
             }).subscribe({
-                next: (data) => setChatSessions(data.items)
+                next: (data) => {
+                    if (initialActiveChatSession) { // If there is an active chat session, show the other chat sessions with the same ai bot
+                        setChatSessions(data.items.filter(item => item.aiBotInfo?.aiBotName === initialActiveChatSession?.aiBotInfo?.aiBotName))
+                    } else {
+                        setChatSessions(data.items)
+                    }
+                }
             })
         }
 
-    }, [user])
+    }, [user, initialActiveChatSession])
 
     // Subscribe to messages of the active chat session
     useEffect(() => {
@@ -678,12 +688,14 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                                     setValue(detail.value);
                                                                     router.push(`/chat/${session.id}`);
                                                                 }}
-                                                                value={value}
+                                                                value={params!.chatSessionId}
+                                                                
                                                                 items={[
                                                                     {
                                                                         label: session.firstMessageSummary?.slice(0, 50),
                                                                         description: `${formatDate(session.createdAt)} - AI: ${session.aiBotInfo?.aiBotName || 'Unknown'}`,
                                                                         value: session.id
+
                                                                     }]}
                                                             />
                                                         ))
@@ -741,20 +753,22 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                             variant="icon"
                             ariaLabel="Query actions for first tab"
                             items={[
-                                { id: "save", text: "Maintenance Agent" },
-                                { id: "save", text: "Production Agent" },
-                                { id: "save", text: "Foundation Model" },
-                                { id: "save", text: "Plan and Execute" },
-                                { id: "save", text: "A4E - Maintenance - f62" },
-                                { id: "save", text: "A4E - Maintenance - fe1" },
-                                { id: "save", text: "Company" },
-                                { id: "save", text: "Glossary Agent" },
-                                { id: "save", text: "Maintenance" },
-                                { id: "save", text: "Operational" },
-                                { id: "save", text: "Operations" },
-                                { id: "save", text: "Petrophysics Agent" },
-                                { id: "save", text: "Production" },
-                                { id: "save", text: "Regulatory" }
+                                // ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
+                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ id: agentId, text: agentInfo.name })),
+                                // { id: "save", text: "Maintenance Agent" },
+                                // { id: "save", text: "Production Agent" },
+                                // { id: "save", text: "Foundation Model" },
+                                // { id: "save", text: "Plan and Execute" },
+                                // { id: "save", text: "A4E - Maintenance - f62" },
+                                // { id: "save", text: "A4E - Maintenance - fe1" },
+                                // { id: "save", text: "Company" },
+                                // { id: "save", text: "Glossary Agent" },
+                                // { id: "save", text: "Maintenance" },
+                                // { id: "save", text: "Operational" },
+                                // { id: "save", text: "Operations" },
+                                // { id: "save", text: "Petrophysics Agent" },
+                                // { id: "save", text: "Production" },
+                                // { id: "save", text: "Regulatory" }
                             ]}
                             expandToViewport={true}
                         />
@@ -767,7 +781,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 {
                     label: "Reasoning",
                     id: "third",
-                    content: "Third tab content area",
+                    content: "Reasoning Tab Content",
                 },
                 {
                     label: "Links",

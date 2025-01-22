@@ -139,8 +139,9 @@ type AuthorsType = {
   [key: string]: AuthorAvatarProps;
 };
 export const AUTHORS: AuthorsType = {
-  'user-jane-doe': { type: 'user', name: 'Jane Doe', initials: 'JD' },
-  'gen-ai': { type: 'gen-ai', name: 'Generative AI assistant' },
+  'human': { type: 'user', name: 'Jane Doe', initials: 'JD' },
+  'ai': { type: 'gen-ai', name: 'Generative AI assistant' },
+  'tool': { type: 'gen-ai', name: 'Generative AI assistant' },
 };
 
 const CitationPopover = ({ count, href }: { count: number; href: string }) => (

@@ -34,6 +34,7 @@ const TopNavBar = () => {
   };
 
   return (
+    <>
     <TopNavigation
       identity={{
         href: "/",
@@ -76,11 +77,12 @@ const TopNavBar = () => {
                 }
               ]
             },
-            { id: "signout", text: "Sign out", onClick: signOut }
+            { id: "signout", text: "Sign out", onChange: signOut }
           ]
         }
       ]}
     />
+    </>
   );
 };
 
