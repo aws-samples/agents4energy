@@ -72,3 +72,9 @@ body {
 .awsui_message-area_cdujn_18ie7_45:not(#\9) {
   width: 100%;
 }
+.dark-mode-toggle {
+  position: absolute;
+  top: 70px;
+  right: 30px;
+  z-index: 1000;
+}
