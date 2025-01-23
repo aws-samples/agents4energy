@@ -83,6 +83,8 @@ export default function Chat() {
     }, waitTimeBeforeResponse + waitTimeBeforeLoading);
   };
 
+  
+
   return (
     <div className={`chat-container ${!isVisualRefresh && 'classic'}`}>
       {showAlert && (
@@ -119,7 +121,7 @@ export default function Chat() {
               {/* In the meantime, changing aria labels of prompt input and action button to reflect this. */}
               <PromptInput
                 onChange={({ detail }) => setPrompt(detail.value)}
-                onAction={onPromptSend}
+                onAction={addUserChatMessage}
                 value={prompt}
                 actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
                 actionButtonIconName="send"

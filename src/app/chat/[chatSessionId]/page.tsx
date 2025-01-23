@@ -217,7 +217,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             // type: 'chat-bubble',
             // authorId: 'user-jane-doe',
             // type: '',
-            role: 'user',
+            role: 'human',
             content: value,
             createdAt: new Date().toLocaleTimeString(),
         };
@@ -554,15 +554,16 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         }
 
     }
-
-    async function addUserChatMessage(body: string) {
+    
+    // const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
+    async function addUserChatMessage({ detail: { value } }: { detail: { value: string } }) {
         if (!messages.length) {
             console.log("This is the initial message. Getting summary for chat session")
             if (!initialActiveChatSession) throw new Error("No active chat session")
-            setChatSessionFirstMessageSummary(body, initialActiveChatSession)
+            setChatSessionFirstMessageSummary(value, initialActiveChatSession)
         }
         // await addChatMessage({ body: body, role: "human" })
-        sendMessageToChatBot(body);
+        sendMessageToChatBot(value);
     }
 
     async function sendMessageToChatBot(prompt: string) {
@@ -734,7 +735,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
                                                 <PromptInput
                                                     onChange={({ detail }) => setPrompt(detail.value)}
-                                                    onAction={onPromptSend}
+                                                    onAction={addUserChatMessage}
                                                     value={prompt}
                                                     actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
                                                     actionButtonIconName="send"
@@ -745,7 +746,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                             </FormField>
                                         }
                                     >
-                                        <Messages messages={messages} />
+                                        <Messages messages={[
+                                            ...messages,
+                                            ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                                            ]} />
                                     </Container>
                                 </div>
                             }
