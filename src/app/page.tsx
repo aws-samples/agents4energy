@@ -6,7 +6,7 @@ import Grid from "@cloudscape-design/components/grid";
 import Container from "@cloudscape-design/components/container";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Button from "@cloudscape-design/components/button";
-import HeroImg from '@/hero-img.jpg'; 
+import HeroImg from '@/hero-img.png'; 
 
 
 export default function Home() {
@@ -28,7 +28,7 @@ export default function Home() {
       defaultPadding
       disableOverlap
       headerBackgroundStyle={() =>
-      `top center/cover url(${HeroImg.src})`
+      `bottom center/cover url(${HeroImg.src})`
       }
       header={
         <Box padding={{ vertical: "xxxl" }}>
