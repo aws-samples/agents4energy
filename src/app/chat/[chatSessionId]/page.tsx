@@ -11,6 +11,11 @@ import {
     Header,
     Link,
     SideNavigation,
+    Cards,
+    SpaceBetween,
+    Button,
+    TextFilter
+    // ListItem
 } from '@cloudscape-design/components';
 import Tabs from "@cloudscape-design/components/tabs";
 import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
@@ -38,14 +43,14 @@ import { Message } from '@/utils/types'
 import '@aws-amplify/ui-react/styles.css'
 
 import {
-    Typography,
+    // Typography,
     Box,
-    MenuItem,
-    IconButton,
-    Card,
-    CardContent,
-    CardActions,
-    Button,
+    // MenuItem,
+    // IconButton,
+    // Card,
+    // CardContent,
+    // CardActions,
+    // Button,
     Tooltip
 } from '@mui/material';
 
@@ -207,51 +212,66 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const [prompt, setPrompt] = useState('');
     const [isGenAiResponseLoading, setIsGenAiResponseLoading] = useState(false);
 
+    const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
+    const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
+    const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
+    const [isLoading, setIsLoading] = useState(false);
+    // const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
+    const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
+    const { user } = useAuthenticator((context) => [context.user]);
+    const router = useRouter();
 
-    const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
-        if (!value || value.length === 0 || isGenAiResponseLoading) {
-            return;
-        }
+    const [navigationOpen, setNavigationOpen] = useState(true);
+    const [value, setValue] = React.useState("item1");
 
-        const newMessage: Message = {
-            // type: 'chat-bubble',
-            // authorId: 'user-jane-doe',
-            // type: '',
-            role: 'human',
-            content: value,
-            createdAt: new Date().toLocaleTimeString(),
-        };
 
-        setMessages(prevMessages => [...prevMessages, newMessage]);
-        setPrompt('');
+    // const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
+    //     if (!value || value.length === 0 || isGenAiResponseLoading) {
+    //         return;
+    //     }
 
-        const waitTimeBeforeLoading = 300;
+    //     const newMessage: Message = {
+    //         // type: 'chat-bubble',
+    //         // authorId: 'user-jane-doe',
+    //         // type: '',
+    //         role: 'human',
+    //         content: value,
+    //         createdAt: new Date().toLocaleTimeString(),
+    //     };
 
-        // Show loading state
-        setTimeout(() => {
-            setIsGenAiResponseLoading(true);
-            setMessages(prevMessages => [...prevMessages, getLoadingMessage()]);
-        }, waitTimeBeforeLoading);
+    //     setMessages(prevMessages => [...prevMessages, newMessage]);
+    //     setPrompt('');
 
-        const lowerCasePrompt = value.toLowerCase();
+    //     const waitTimeBeforeLoading = 300;
 
-        const isLoadingPrompt = validLoadingPrompts.includes(lowerCasePrompt);
+    //     // Show loading state
+    //     setTimeout(() => {
+    //         setIsGenAiResponseLoading(true);
+    //         // setMessages(prevMessages => [...prevMessages, getLoadingMessage()]);
+    //         setMessages(prevMessages => [...prevMessages]);
+    //     }, waitTimeBeforeLoading);
 
-        // The loading state will be shown for 4 seconds for loading prompt and 1.5 seconds for rest of the prompts
-        const waitTimeBeforeResponse = isLoadingPrompt ? 4000 : 1500;
+    //     const lowerCasePrompt = value.toLowerCase();
 
-        // Send Gen-AI response, replacing the loading chat bubble
-        setTimeout(() => {
-            const validPrompt = VALID_PROMPTS.find(({ prompt }) => prompt.includes(lowerCasePrompt));
+    //     const isLoadingPrompt = validLoadingPrompts.includes(lowerCasePrompt);
 
-            setMessages(prevMessages => {
-                const response = validPrompt ? validPrompt.getResponse() : getInvalidPromptResponse();
-                prevMessages.splice(prevMessages.length - 1, 1, { ...response, type: 'chat-bubble' });
-                return prevMessages;
-            });
-            setIsGenAiResponseLoading(false);
-        }, waitTimeBeforeResponse + waitTimeBeforeLoading);
-    };
+    //     // The loading state will be shown for 4 seconds for loading prompt and 1.5 seconds for rest of the prompts
+    //     const waitTimeBeforeResponse = isLoadingPrompt ? 4000 : 1500;
+
+    //     // Send Gen-AI response, replacing the loading chat bubble
+    //     setTimeout(() => {
+    //         const validPrompt = VALID_PROMPTS.find(({ prompt }) => prompt.includes(lowerCasePrompt));
+
+    //         setMessages(prevMessages => {
+    //             const response = validPrompt ? validPrompt.getResponse() : getInvalidPromptResponse();
+    //             prevMessages.splice(prevMessages.length - 1, 1, { ...response, type: 'chat-bubble' });
+    //             return prevMessages;
+    //         });
+    //         setIsGenAiResponseLoading(false);
+    //     }, waitTimeBeforeResponse + waitTimeBeforeLoading);
+    // };
 
     // const [messages, setMessages] = useState<Array<Message>>([]);
 
@@ -259,19 +279,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         content: "\n\n\n",
         index: -1
     }]);
-    const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
-    const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
-    const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
-    const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
-    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
-    const [isLoading, setIsLoading] = useState(false);
-    const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
 
-    const { user } = useAuthenticator((context) => [context.user]);
-    const router = useRouter();
-
-    const [navigationOpen, setNavigationOpen] = useState(true);
-    const [value, setValue] = React.useState("item1");
 
 
     //Set the chat session from params
@@ -317,8 +325,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         console.log("Messages: ", messages)
         console.log("initialActiveChatSession: ", initialActiveChatSession)
 
-        console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
-        console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
+        // console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
+        // console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
 
         //Reset the character stream when we get a new message
         setCharacterStream(() => {
@@ -485,27 +493,27 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }, [initialActiveChatSession])
 
-    // List the available bedrock agents
-    useEffect(() => {
-        const fetchListBedrockAgents = async () => {
-            const response = await amplifyClient.queries.listBedrockAgents()
-            console.log('List Agents Response: ', response.data)
-            if (!(response.data && response.data.body)) {
-                console.log('No response from listing bedrock agents')
-                return
-            }
-            // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
-            const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
-            if (!listAgentsResponseBody) {
-                console.log('Could not parse response body from listing bedrock agents')
-                return
-            }
-            console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
-            setBedrockAgents(listAgentsResponseBody)
-            // return listAgentsResponseBody
-        }
-        fetchListBedrockAgents()
-    }, [])
+    // // List the available bedrock agents
+    // useEffect(() => {
+    //     const fetchListBedrockAgents = async () => {
+    //         const response = await amplifyClient.queries.listBedrockAgents()
+    //         console.log('List Agents Response: ', response.data)
+    //         if (!(response.data && response.data.body)) {
+    //             console.log('No response from listing bedrock agents')
+    //             return
+    //         }
+    //         // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
+    //         const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
+    //         if (!listAgentsResponseBody) {
+    //             console.log('Could not parse response body from listing bedrock agents')
+    //             return
+    //         }
+    //         console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
+    //         setBedrockAgents(listAgentsResponseBody)
+    //         // return listAgentsResponseBody
+    //     }
+    //     fetchListBedrockAgents()
+    // }, [])
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
         setMessages([])
@@ -554,7 +562,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         }
 
     }
-    
+
     // const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
     async function addUserChatMessage({ detail: { value } }: { detail: { value: string } }) {
         if (!messages.length) {
@@ -564,6 +572,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         }
         // await addChatMessage({ body: body, role: "human" })
         sendMessageToChatBot(value);
+        setPrompt("")
     }
 
     async function sendMessageToChatBot(prompt: string) {
@@ -607,200 +616,243 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         }
     }
 
+    async function getGlossary(message: Message) {
+    
+        if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
+    
+        if (message.chatSessionId in glossaryBlurbs) return
+    
+        const getGlossaryPrompt = `
+        Return a glossary for terms found in the text blurb below:
+    
+        ${message.content}
+        `
+        const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
+        if (!newBlurb) throw new Error("No glossary blurb returned")
+        setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
+      }
+
     return (
         <div className='page-container'>
-        <Tabs
-            disableContentPaddings
-            tabs={[
-                {
-                    label: "Chat Agents",
-                    id: "first",
-                    content:
-                        <AppLayout
-                            navigationOpen={navigationOpen}
-                            onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
-                            tools={
-                                <HelpPanel
-                                    header={
-                                        <h2>Plan and Execute Steps</h2>
-                                    }>
-                                    {LiveUpdateActiveChatSession?.pastSteps?.map((step) => {
-                                        try {
-                                            const stepContent = JSON.parse(step as string)
-                                            return (
-                                                <Tooltip
-                                                    key={step as string}
-                                                    title={<pre
-                                                        style={{ //Wrap long lines
-                                                            whiteSpace: 'pre-wrap',
-                                                            wordWrap: 'break-word',
-                                                            overflowWrap: 'break-word',
+            <Tabs
+                disableContentPaddings
+                tabs={[
+                    {
+                        label: "Chat Agents",
+                        id: "first",
+                        content:
+                            <AppLayout
+                                navigationOpen={navigationOpen}
+                                onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
+                                tools={
+                                    <HelpPanel
+                                        header={
+                                            <h2>Plan and Execute Steps</h2>
+                                        }>
+                                        {/* <pre>
+                                            {JSON.stringify(LiveUpdateActiveChatSession, null, 2)}
+                                        </pre> */}
+                                        {[
+                                            ...(LiveUpdateActiveChatSession?.pastSteps?.map((step) => ({ stepType: 'past', content: step })) ?? []),
+                                            ...(LiveUpdateActiveChatSession?.planSteps?.map((step) => ({ stepType: 'plan', content: step })) ?? []),
+                                        ].map((step) => {
+                                            try {
+                                                const stepContent = JSON.parse(step.content as string)
+                                                return (
+                                                    <Tooltip
+                                                        key={step.content as string}
+                                                        title={<pre
+                                                            style={{ //Wrap long lines
+                                                                whiteSpace: 'pre-wrap',
+                                                                wordWrap: 'break-word',
+                                                                overflowWrap: 'break-word',
+                                                            }}
+                                                        >
+                                                            {stringify(stepContent)}
+                                                        </pre>}
+                                                        arrow
+                                                        placement="left"
+                                                        slotProps={{
+                                                            tooltip: {
+                                                                sx: {
+                                                                    maxWidth: 2000,
+                                                                },
+                                                            },
                                                         }}
                                                     >
-                                                        {stringify(stepContent)}
-                                                    </pre>}
-                                                    arrow
-                                                    placement="left"
-                                                    slotProps={{
-                                                        tooltip: {
-                                                            sx: {
-                                                                maxWidth: 2000,
-                                                            },
-                                                        },
-                                                    }}
+
+                                                        <div className="step-container" key={step.content as string}>
+                                                            <Steps
+                                                                // className='steps'
+                                                                steps={[
+                                                                    {
+                                                                        status: (step.stepType === 'past' ? "success" : "loading"),
+                                                                        header: stepContent.title,
+                                                                        statusIconAriaLabel: (step.stepType === 'past' ? "Success" : "Loading")
+                                                                    }
+                                                                ]}
+                                                            />
+                                                        </div>
+                                                    </Tooltip>
+                                                )
+                                            } catch {
+                                                return <p>{step.content}</p>
+                                            }
+                                        })}
+                                    </HelpPanel>}
+                                navigation={
+                                    <SideNavigation
+                                        header={{
+                                            href: '#',
+                                            text: 'Sessions',
+                                        }}
+                                        items={[{
+                                            type: 'link', text: "dummy", info:
+                                                <Box>
+                                                    {
+                                                        chatSessions
+                                                            .slice()
+                                                            .sort((a, b) => {
+                                                                if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
+                                                                return a.createdAt < b.createdAt ? 1 : -1
+                                                            })
+                                                            .map((session) => (
+                                                                <Tiles
+                                                                    onChange={({ detail }) => {
+                                                                        setValue(detail.value);
+                                                                        router.push(`/chat/${session.id}`);
+                                                                    }}
+                                                                    value={params!.chatSessionId}
+
+                                                                    items={[
+                                                                        {
+                                                                            label: session.firstMessageSummary?.slice(0, 50),
+                                                                            description: `${formatDate(session.createdAt)} - AI: ${session.aiBotInfo?.aiBotName || 'Unknown'}`,
+                                                                            value: session.id
+
+                                                                        }]}
+                                                                />
+                                                            ))
+                                                    }
+                                                </Box>
+                                            , href: `#`
+                                        }]}
+                                    />
+
+                                }
+                                content={
+                                    <div className='chat-container'>
+                                        <Container
+                                            header={<Header variant="h3">Generative AI chat</Header>}
+                                            fitHeight
+                                            disableContentPaddings
+                                            footer={
+                                                <FormField
+                                                    stretch
+                                                    constraintText={
+                                                        <>
+                                                            Use of this service is subject to the{' '}
+                                                            <Link href="#" external variant="primary" fontSize="inherit">
+                                                                AWS Responsible AI Policy
+                                                            </Link>
+                                                            .
+                                                        </>
+                                                    }
                                                 >
 
-                                                    <div className="step-container" key={step as string}>
-                                                        <Steps
-                                                            className='steps'
-                                                            steps={[
-                                                                {
-                                                                    status: "success",
-                                                                    header: stepContent.title,
-                                                                    statusIconAriaLabel: "Success"
-                                                                }
-                                                            ]}
-                                                        />
-                                                    </div>
-                                                </Tooltip>
-                                            )
-                                        } catch {
-                                            return <p>{step}</p>
-                                        }
-                                    })}
-                                </HelpPanel>}
-                            navigation={
-                                <SideNavigation
-                                    header={{
-                                        href: '#',
-                                        text: 'Sessions',
-                                    }}
-                                    items={[{
-                                        type: 'link', text:
-                                            <Box>
-                                                {
-                                                    chatSessions
-                                                        .slice()
-                                                        .sort((a, b) => {
-                                                            if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-                                                            return a.createdAt < b.createdAt ? 1 : -1
-                                                        })
-                                                        .map((session) => (
-                                                            <Tiles
-                                                                onChange={({ detail }) => {
-                                                                    setValue(detail.value);
-                                                                    router.push(`/chat/${session.id}`);
-                                                                }}
-                                                                value={params!.chatSessionId}
-                                                                
-                                                                items={[
-                                                                    {
-                                                                        label: session.firstMessageSummary?.slice(0, 50),
-                                                                        description: `${formatDate(session.createdAt)} - AI: ${session.aiBotInfo?.aiBotName || 'Unknown'}`,
-                                                                        value: session.id
+                                                    {/* During loading, action button looks enabled but functionality is disabled. */}
+                                                    {/* This will be fixed once prompt input receives an update where the action button can receive focus while being disabled. */}
+                                                    {/* In the meantime, changing aria labels of prompt input and action button to reflect this. */}
 
-                                                                    }]}
-                                                            />
-                                                        ))
-                                                }
-                                            </Box>
-                                        , href: `#`
-                                    }]}
-                                />
+                                                    <PromptInput
+                                                        onChange={({ detail }) => setPrompt(detail.value)}
+                                                        onAction={addUserChatMessage}
+                                                        value={prompt}
+                                                        actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
+                                                        actionButtonIconName="send"
+                                                        ariaLabel={isGenAiResponseLoading ? 'Prompt input - suppressed' : 'Prompt input'}
+                                                        placeholder="Ask a question"
+                                                        autoFocus
+                                                    />
+                                                </FormField>
+                                            }
+                                        >
+                                            <Messages 
+                                            messages={[
+                                                ...messages,
+                                                ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                                            ]} 
+                                            getGlossary={getGlossary}
+                                            />
+                                        </Container>
+                                    </div>
+                                }
+                            />,
+                        action:
+                            <ButtonDropdown
+                                variant="icon"
+                                ariaLabel="Query actions for first tab"
+                                items={[
+                                    // ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
+                                    ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ id: agentId, text: agentInfo.name })),
+                                    // { id: "save", text: "Maintenance Agent" },
+                                    // { id: "save", text: "Production Agent" },
+                                    // { id: "save", text: "Foundation Model" },
+                                    // { id: "save", text: "Plan and Execute" },
+                                    // { id: "save", text: "A4E - Maintenance - f62" },
+                                    // { id: "save", text: "A4E - Maintenance - fe1" },
+                                    // { id: "save", text: "Company" },
+                                    // { id: "save", text: "Glossary Agent" },
+                                    // { id: "save", text: "Maintenance" },
+                                    // { id: "save", text: "Operational" },
+                                    // { id: "save", text: "Operations" },
+                                    // { id: "save", text: "Petrophysics Agent" },
+                                    // { id: "save", text: "Production" },
+                                    // { id: "save", text: "Regulatory" }
+                                ]}
+                                expandToViewport={true}
+                                onItemClick={async ({ detail }) => {
+                                    const agentInfo = defaultAgents[detail.id];
+                                    // const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
+                                    createChatSession({ aiBotInfo: { aiBotName: agentInfo.name, aiBotId: detail.id } })
+                                }}
 
+                            />
+                    },
+                    // {
+                    //     label: "Plan",
+                    //     id: "second",
+                    //     content: "Second tab content area"
+                    // },
+                    {
+                        label: "Reasoning",
+                        id: "third",
+                        content: <ul>
+                            {
+                                messages
+                                .filter((message) => message.trace)
+                                .map((message, index) => {
+                                    return <li key={index}>{message.trace}</li>
+                                })
                             }
-                            content={
-                                <div className='chat-container'>
-                                    <Container
-                                        header={<Header variant="h3">Generative AI chat</Header>}
-                                        fitHeight
-                                        disableContentPaddings
-                                        footer={
-                                            <FormField
-                                                stretch
-                                                constraintText={
-                                                    <>
-                                                        Use of this service is subject to the{' '}
-                                                        <Link href="#" external variant="primary" fontSize="inherit">
-                                                            AWS Responsible AI Policy
-                                                        </Link>
-                                                        .
-                                                    </>
-                                                }
-                                            >
-
-                                                {/* During loading, action button looks enabled but functionality is disabled. */}
-                                                {/* This will be fixed once prompt input receives an update where the action button can receive focus while being disabled. */}
-                                                {/* In the meantime, changing aria labels of prompt input and action button to reflect this. */}
-
-                                                <PromptInput
-                                                    onChange={({ detail }) => setPrompt(detail.value)}
-                                                    onAction={addUserChatMessage}
-                                                    value={prompt}
-                                                    actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
-                                                    actionButtonIconName="send"
-                                                    ariaLabel={isGenAiResponseLoading ? 'Prompt input - suppressed' : 'Prompt input'}
-                                                    placeholder="Ask a question"
-                                                    autoFocus
-                                                />
-                                            </FormField>
-                                        }
-                                    >
-                                        <Messages messages={[
-                                            ...messages,
-                                            ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
-                                            ]} />
-                                    </Container>
-                                </div>
-                            }
-                        />,
-                    action:
-                        <ButtonDropdown
-                            variant="icon"
-                            ariaLabel="Query actions for first tab"
-                            items={[
-                                // ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
-                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ id: agentId, text: agentInfo.name })),
-                                // { id: "save", text: "Maintenance Agent" },
-                                // { id: "save", text: "Production Agent" },
-                                // { id: "save", text: "Foundation Model" },
-                                // { id: "save", text: "Plan and Execute" },
-                                // { id: "save", text: "A4E - Maintenance - f62" },
-                                // { id: "save", text: "A4E - Maintenance - fe1" },
-                                // { id: "save", text: "Company" },
-                                // { id: "save", text: "Glossary Agent" },
-                                // { id: "save", text: "Maintenance" },
-                                // { id: "save", text: "Operational" },
-                                // { id: "save", text: "Operations" },
-                                // { id: "save", text: "Petrophysics Agent" },
-                                // { id: "save", text: "Production" },
-                                // { id: "save", text: "Regulatory" }
-                            ]}
-                            expandToViewport={true}
-                        />
-                },
-                {
-                    label: "Plan",
-                    id: "second",
-                    content: "Second tab content area"
-                },
-                {
-                    label: "Reasoning",
-                    id: "third",
-                    content: "Reasoning Tab Content",
-                },
-                {
-                    label: "Links",
-                    id: "fourth",
-                    content: "Third tab content area",
-                },
-                {
-                    label: "Glossary",
-                    id: "fifth",
-                    content: "Third tab content area",
-                }
-            ]}
-        />
+                        </ul>,
+                    },
+                    {
+                        label: "Links",
+                        id: "fourth",
+                        content: "Third tab content area",
+                    },
+                    {
+                        label: "Glossary",
+                        id: "fifth",
+                        content: <ul>
+                        {
+                            Object.values(glossaryBlurbs).map((blurb, index) => (<li key={index}>{blurb}</li>))
+                        }
+                    </ul>,
+                    }
+                ]}
+            />
         </div>
     );
 };

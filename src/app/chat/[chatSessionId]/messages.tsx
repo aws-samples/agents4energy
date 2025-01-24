@@ -21,7 +21,7 @@ import ChatUIMessage from '@/components/chat-ui/chat-ui-message'
 
 import '../../styles/chat.scss';
 
-export default function Messages({ messages = [] }: { messages: Array<Message> }) {
+export default function Messages({ messages = [], getGlossary }: { messages: Array<Message>, getGlossary: (message: Message) => void }) {
   const latestMessage: Message = messages[messages.length - 1];
 
   return (
@@ -67,6 +67,24 @@ export default function Messages({ messages = [] }: { messages: Array<Message> }
               <ButtonGroup
                 ariaLabel="Chat bubble actions"
                 variant="icon"
+                onItemClick={({ detail }) => {
+                  //TODO: Impliment user feedback
+                  // ["like", "dislike"].includes(detail.id) &&
+                  // setFeedback(detail.pressed ? detail.id : "")
+
+                  switch (detail.id) {
+                    case "copy":
+                        navigator.clipboard.writeText(message.content)
+                        break
+                    case "glossary":
+                      getGlossary(message);
+                      break;
+                    case "check":
+                      console.log("check");
+                      break;
+                  
+                  }
+                }}
                 items={[
                   {
                     type: "group",
@@ -107,11 +125,11 @@ export default function Messages({ messages = [] }: { messages: Array<Message> }
                     id: "glossary",
                     iconName: "transcript",
                     text: "Glossary",
-                    popoverFeedback: (
-                      <StatusIndicator type="success">
-                        Message copied
-                      </StatusIndicator>
-                    )
+                    // popoverFeedback: (
+                    //   <StatusIndicator type="success">
+                    //     Message copied
+                    //   </StatusIndicator>
+                    // )
                   },
                   {
                     type: "icon-button",
