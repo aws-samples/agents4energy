@@ -347,7 +347,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             },
             datalabels: {
               display: 'auto', //Hide overlapped data
-              color: 'black',
+              color: 'initial',
               // backgroundColor: 'white',
               // borderRadius: 4,
               font: {
@@ -445,7 +445,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 whiteSpace: 'normal',
                 wordWrap: 'break-word',
                 lineHeight: 'normal',
-                width: '100%'
+                width: '100%',
               }}>
                 {params.value}
               </div>
@@ -514,17 +514,20 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   padding: '12px',
                   display: 'flex',
                   alignItems: 'center',
+                  color: 'initial',
                 },
                 '& .MuiDataGrid-row': {
                   maxHeight: 'none !important',
+                  color: 'initial',
                 },
                 '& .MuiDataGrid-renderingZone': {
                   maxHeight: 'none !important',
+                  color: 'initial',
                 },
                 '& .MuiDataGrid-virtualScroller': {
                   // Disable virtual scrolling
                   overflowY: 'visible !important',
-                },
+                }
               }}
             />
           </>
@@ -730,6 +733,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                     whiteSpace: 'pre-wrap',
                     wordWrap: 'break-word',
                     overflowWrap: 'break-word',
+                    color: 'initial',
                   }}
                 >
                   {

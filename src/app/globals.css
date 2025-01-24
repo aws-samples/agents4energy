@@ -1,6 +1,6 @@
-@tailwind base;
+/* @tailwind base;
 @tailwind components;
-@tailwind utilities;
+@tailwind utilities; */
 
 /* :root {
   --background: #ffffff;
@@ -40,7 +40,7 @@ body {
 }
 
 .steps:not(:has(.steps)) {
-  margin-left: 40px;
+  margin-left: 58px;
   text-indent: -20px!important;
   cursor: pointer!important;
 
@@ -50,7 +50,9 @@ body {
 }
 .step-container:not(:last-child)::after {
   content: "|";
-  padding-left: 3px;
+  padding-left: 2px;
+  display: block;
+  margin: -9px 0px;
 }
 
 .awsui_tabs-content-wrapper_14rmt_1xftp_575.awsui_with-paddings_14rmt_1xftp_575 > .awsui_tabs-content_14rmt_1xftp_551:not(#\9) {
@@ -77,4 +79,16 @@ body {
   top: 70px;
   right: 30px;
   z-index: 1000;
+}
+.css-imrjgg-MuiButtonBase-root-MuiCheckbox-root {
+  color: inherit!important;
+}
+.css-1gak8h1-MuiToolbar-root-MuiTablePagination-toolbar {
+  color: initial!important;
+}
+.css-de9k3v-MuiDataGrid-selectedRowCount {
+  color: initial!important;
+}
+.awsui_message-area_cdujn_18ie7_45.awsui_chat-bubble-type-incoming_cdujn_18ie7_62:not(#\9) {
+  width: calc(100% - 40px);
 }
