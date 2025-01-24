@@ -707,7 +707,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                             text: 'Sessions',
                                         }}
                                         items={[{
-                                            type: 'link', text: "dummy", info:
+                                            type: 'link', text: "", info:
                                                 <Box>
                                                     {
                                                         chatSessions
@@ -743,7 +743,21 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                 content={
                                     <div className='chat-container'>
                                         <Container
-                                            header={<Header variant="h3">Generative AI chat</Header>}
+                                            header={
+                                                <>
+                                                <Header variant="h3">Generative AI chat - {initialActiveChatSession?.aiBotInfo?.aiBotName}</Header>
+                                                <ButtonDropdown
+                                                    variant="icon"
+                                                    ariaLabel="Suggested Prompts"
+                                                    items={[
+                                                        ...suggestedPrompts.map((prompt) => ({ id: prompt, text: prompt })),
+                                                    ]}
+                                                    onItemClick={({ detail }) => {
+                                                        addUserChatMessage({detail: {value: detail.id}});
+                                                    }}
+                                                />
+                                                </>
+                                        }
                                             fitHeight
                                             disableContentPaddings
                                             footer={
