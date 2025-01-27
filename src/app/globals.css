@@ -92,3 +92,20 @@ body {
 .awsui_message-area_cdujn_18ie7_45.awsui_chat-bubble-type-incoming_cdujn_18ie7_62:not(#\9) {
   width: calc(100% - 40px);
 }
+.awsui_header_14iqq_irvl0_346.awsui_with-paddings_14iqq_irvl0_389:not(#\9) {
+  display: flex;
+  align-items: center;
+}
+.awsui_tools_hyvsj_lgv7x_981 > .awsui_animated-content_hyvsj_lgv7x_816:not(#\9) {
+  margin-bottom: 130px;
+}
+[data-amplify-authenticator] {
+  padding: 60px 40px;
+}
+.prompt-label {
+  text-align: right;
+  margin-right: 9px;
+  max-width: 150px;
+  font-style: italic;
+  line-height: 15px;
+}

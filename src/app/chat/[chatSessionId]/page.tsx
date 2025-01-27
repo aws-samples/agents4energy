@@ -746,8 +746,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                             header={
                                                 <>
                                                 <Header variant="h3">Generative AI chat - {initialActiveChatSession?.aiBotInfo?.aiBotName}</Header>
+                                                <span className='prompt-label'>Try one of these example prompts</span>
                                                 <ButtonDropdown
-                                                    variant="icon"
                                                     ariaLabel="Suggested Prompts"
                                                     items={[
                                                         ...suggestedPrompts.map((prompt) => ({ id: prompt, text: prompt })),
