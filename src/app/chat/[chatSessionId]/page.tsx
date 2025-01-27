@@ -36,6 +36,7 @@ import { useRouter } from 'next/navigation';
 import { formatDate } from "@/utils/date-utils";
 import DropdownMenu from '@/components/DropDownMenu';
 import SideBar from '@/components/SideBar';
+import { StorageBrowser } from '@/components/StorageBrowser';
 
 import { defaultAgents, BedrockAgent } from '@/utils/config'
 import { Message } from '@/utils/types'
@@ -722,7 +723,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                                         setValue(detail.value);
                                                                         router.push(`/chat/${session.id}`);
                                                                     }}
-                                                                    value={params!.chatSessionId}
+                                                                    value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
 
                                                                     items={[
                                                                         {
@@ -854,7 +855,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     {
                         label: "Links",
                         id: "fourth",
-                        content: "Third tab content area",
+                        content: <StorageBrowser/>,
                     },
                     {
                         label: "Glossary",
