@@ -625,6 +625,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         if (message.chatSessionId in glossaryBlurbs) return
 
+        setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: "Generating Glossary Entry for message..." })) //TODO fix this
+
         const getGlossaryPrompt = `
         Return a glossary for terms found in the text blurb below:
     
