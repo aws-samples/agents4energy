@@ -14,7 +14,8 @@ import {
     Cards,
     SpaceBetween,
     Button,
-    TextFilter
+    TextFilter,
+    SideNavigationProps
     // ListItem
 } from '@cloudscape-design/components';
 import Tabs from "@cloudscape-design/components/tabs";
@@ -416,7 +417,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 next: (data) => {
                     if (initialActiveChatSession) { // If there is an active chat session, show the other chat sessions with the same ai bot
                         setChatSessions(data.items.filter(item => item.aiBotInfo?.aiBotName === initialActiveChatSession?.aiBotInfo?.aiBotName))
-                    } else {
+                    } else if (!params?.chatSessionId) { //If no chat session is supplied, list all chat sessions.
                         setChatSessions(data.items)
                     }
                 }
@@ -634,6 +635,36 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
     }
 
+    // Helper function to group chat sessions by month
+    const groupChatsByMonth = (chats: Array<Schema["ChatSession"]["type"]>): SideNavigationProps.Item[] => {
+        const grouped = chats.reduce((acc: { [key: string]: Array<Schema["ChatSession"]["type"]> }, chat) => {
+            if (!chat.createdAt) throw new Error("Chat session missing createdAt timestamp");
+            
+            const date = new Date(chat.createdAt);
+            const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            if (!acc[monthYear]) {
+                acc[monthYear] = [];
+            }
+            acc[monthYear].push(chat);
+            return acc;
+        }, {});
+    
+        return Object.entries(grouped).map(([monthYear, chats]): SideNavigationProps.Item => ({
+            type: "section",
+            text: monthYear,
+            items: chats.map(chat => ({
+                type: "link",
+                text: chat.firstMessageSummary || `Chat ${chat.id}`,
+                href: `/chat/${chat.id}`,
+                // Add a style property to bold when selected
+                style: chat.id === params?.chatSessionId ? 
+                    { fontWeight: 'bold' } : 
+                    { fontWeight: 'normal' }
+            }))
+        }));
+    };
+
     return (
         <div className='page-container'>
             <Tabs
@@ -708,37 +739,44 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                             href: '#',
                                             text: 'Sessions',
                                         }}
-                                        items={[{
-                                            type: 'link', text: "", info:
-                                                <Box>
-                                                    {
-                                                        chatSessions
-                                                            .slice()
-                                                            .sort((a, b) => {
-                                                                if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-                                                                return a.createdAt < b.createdAt ? 1 : -1
-                                                            })
-                                                            .map((session) => (
-                                                                <Tiles
-                                                                    onChange={({ detail }) => {
-                                                                        setValue(detail.value);
-                                                                        router.push(`/chat/${session.id}`);
-                                                                    }}
-                                                                    value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
 
-                                                                    items={[
-                                                                        {
-                                                                            label: session.firstMessageSummary?.slice(0, 50),
-                                                                            description: `${formatDate(session.createdAt)} - AI: ${session.aiBotInfo?.aiBotName || 'Unknown'}`,
-                                                                            value: session.id
 
-                                                                        }]}
-                                                                />
-                                                            ))
-                                                    }
-                                                </Box>
-                                            , href: `#`
-                                        }]}
+                                        items={groupChatsByMonth(chatSessions)}
+
+                                        // items={[{
+                                        //     type: 'link', text: "", info:
+                                        //         <Box>
+                                        //             {
+                                        //                 chatSessions
+                                        //                     .slice()
+                                        //                     .sort((a, b) => {
+                                        //                         if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
+                                        //                         return a.createdAt < b.createdAt ? 1 : -1
+                                        //                     })
+                                        //                     .map((session) => (
+                                        //                         <Tiles
+                                        //                             onChange={({ detail }) => {
+                                        //                                 setValue(detail.value);
+                                        //                                 router.push(`/chat/${session.id}`);
+                                        //                             }}
+                                        //                             value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
+
+                                        //                             items={[
+                                        //                                 {
+                                        //                                     label: session.firstMessageSummary?.slice(0, 50),
+                                        //                                     description: `${formatDate(session.createdAt)} - AI: ${session.aiBotInfo?.aiBotName || 'Unknown'}`,
+                                        //                                     value: session.id
+
+                                        //                                 }]}
+                                        //                         />
+                                        //                     ))
+                                        //             }
+                                        //         </Box>
+                                        //     , href: `#`
+                                        // }]}
+
+
+
                                     />
 
                                 }

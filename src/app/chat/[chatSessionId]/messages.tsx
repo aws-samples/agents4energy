@@ -45,7 +45,7 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
 
   const scrollToBottom = () => {
     const element = messagesRef.current;
-    if (element) {
+    if (element && isAtBottom()) {
       const lastChild = element.lastElementChild;
       lastChild?.scrollIntoView({ behavior: 'auto', block: 'end' });
     }
@@ -71,7 +71,7 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
       console.log('Triggering scroll to bottom due to new message');
       scrollToBottom();
     }
-  }, [messages]);
+  }, [messages.length]);
 
   return (
     <div
