@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 
 import { stringify } from 'yaml'
 
@@ -11,21 +11,82 @@ import ButtonGroup from "@cloudscape-design/components/button-group";
 import StatusIndicator from "@cloudscape-design/components/status-indicator";
 import Avatar from "@cloudscape-design/chat-components/avatar";
 
+import AutoScrollContainer from "@/components/ScrollableContainer"
+
 import { ChatBubbleAvatar } from './common-components';
 import { AUTHORS } from './config'; //Message
 
 import type { Schema } from '../../../../amplify/data/resource';
-type Message = Schema["ChatMessage"]["createType"] 
+type Message = Schema["ChatMessage"]["createType"]
 
 import ChatUIMessage from '@/components/chat-ui/chat-ui-message'
 
 import '../../styles/chat.scss';
 
 export default function Messages({ messages = [], getGlossary }: { messages: Array<Message>, getGlossary: (message: Message) => void }) {
-  const latestMessage: Message = messages[messages.length - 1];
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const wasAtBottom = useRef(true);
+
+  const isAtBottom = () => {
+    const element = messagesRef.current;
+    if (!element) return false;
+
+    const { scrollHeight, scrollTop, clientHeight } = element;
+    const diff = Math.abs(scrollHeight - scrollTop - clientHeight);
+    console.log('Scroll position check:', {
+      scrollHeight,
+      scrollTop,
+      clientHeight,
+      diff,
+      isBottom: diff < 1
+    });
+    return diff < 1;
+  };
+
+  const scrollToBottom = () => {
+    const element = messagesRef.current;
+    if (element) {
+      const lastChild = element.lastElementChild;
+      lastChild?.scrollIntoView({ behavior: 'auto', block: 'end' });
+    }
+  };
+
+  // useEffect(() => {
+  //   const element = messagesRef.current;
+
+  //   const handleScroll = () => {
+  //     const wasBottom = isAtBottom();
+  //     console.log('Scroll event detected, wasBottom:', wasBottom);
+  //     wasAtBottom.current = wasBottom;
+  //   };
+
+  //   console.log('Setting up scroll listener');
+  //   element?.addEventListener('scroll', handleScroll);
+  //   return () => element?.removeEventListener('scroll', handleScroll);
+  // }, []);
+
+  useEffect(() => {
+    console.log('Messages changed, wasAtBottom:', wasAtBottom.current);
+    if (wasAtBottom.current) {
+      console.log('Triggering scroll to bottom due to new message');
+      scrollToBottom();
+    }
+  }, [messages]);
 
   return (
-    <div className="messages" role="region" aria-label="Chat">
+    <div
+      className="messages"
+      role="region"
+      aria-label="Chat"
+      ref={messagesRef}
+      style={{
+        overflowY: 'auto',
+        maxHeight: '100%', // Constrain to parent height
+        height: '100%',    // Take full height
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
       {/* <LiveRegion hidden={true} assertive={latestMessage?.type === 'alert'}>
         {latestMessage?.type === 'alert' && latestMessage.header}
         {latestMessage?.content}
@@ -74,15 +135,15 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
 
                   switch (detail.id) {
                     case "copy":
-                        navigator.clipboard.writeText(message.content)
-                        break
+                      navigator.clipboard.writeText(message.content)
+                      break
                     case "glossary":
                       getGlossary(message);
                       break;
                     case "check":
                       console.log("check");
                       break;
-                  
+
                   }
                 }}
                 items={[
@@ -144,14 +205,14 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
                   }
                 ]}
               />
-            : null}
+              : null}
           >
             <ChatUIMessage
-                      key={message.id}
-                      message={message}
-                      showCopyButton={false}
-                      messages={messages.slice(0, messages.indexOf(message))}
-                    />
+              key={message.id}
+              message={message}
+              showCopyButton={false}
+              messages={messages.slice(0, messages.indexOf(message))}
+            />
           </ChatBubble>
         );
       })}

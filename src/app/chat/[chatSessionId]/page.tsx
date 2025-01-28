@@ -37,6 +37,7 @@ import { formatDate } from "@/utils/date-utils";
 import DropdownMenu from '@/components/DropDownMenu';
 import SideBar from '@/components/SideBar';
 import { StorageBrowser } from '@/components/StorageBrowser';
+import AutoScrollContainer from '@/components/ScrollableContainer'
 
 import { defaultAgents, BedrockAgent } from '@/utils/config'
 import { Message } from '@/utils/types'
@@ -618,11 +619,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     async function getGlossary(message: Message) {
-    
+
         if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
-    
+
         if (message.chatSessionId in glossaryBlurbs) return
-    
+
         const getGlossaryPrompt = `
         Return a glossary for terms found in the text blurb below:
     
@@ -631,7 +632,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
         if (!newBlurb) throw new Error("No glossary blurb returned")
         setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
-      }
+    }
 
     return (
         <div className='page-container'>
@@ -746,19 +747,19 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                         <Container
                                             header={
                                                 <>
-                                                <Header variant="h3">Generative AI chat - {initialActiveChatSession?.aiBotInfo?.aiBotName}</Header>
-                                                <span className='prompt-label'>Try one of these example prompts</span>
-                                                <ButtonDropdown
-                                                    ariaLabel="Suggested Prompts"
-                                                    items={[
-                                                        ...suggestedPrompts.map((prompt) => ({ id: prompt, text: prompt })),
-                                                    ]}
-                                                    onItemClick={({ detail }) => {
-                                                        addUserChatMessage({detail: {value: detail.id}});
-                                                    }}
-                                                />
+                                                    <Header variant="h3">Generative AI chat - {initialActiveChatSession?.aiBotInfo?.aiBotName}</Header>
+                                                    <span className='prompt-label'>Try one of these example prompts</span>
+                                                    <ButtonDropdown
+                                                        ariaLabel="Suggested Prompts"
+                                                        items={[
+                                                            ...suggestedPrompts.map((prompt) => ({ id: prompt, text: prompt })),
+                                                        ]}
+                                                        onItemClick={({ detail }) => {
+                                                            addUserChatMessage({ detail: { value: detail.id } });
+                                                        }}
+                                                    />
                                                 </>
-                                        }
+                                            }
                                             fitHeight
                                             disableContentPaddings
                                             footer={
@@ -792,12 +793,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                 </FormField>
                                             }
                                         >
-                                            <Messages 
-                                            messages={[
-                                                ...messages,
-                                                ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
-                                            ]} 
-                                            getGlossary={getGlossary}
+                                            <Messages
+                                                messages={[
+                                                    ...messages,
+                                                    ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                                                ]}
+                                                getGlossary={getGlossary}
                                             />
                                         </Container>
                                     </div>
@@ -845,26 +846,26 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                         content: <ul>
                             {
                                 messages
-                                .filter((message) => message.trace)
-                                .map((message, index) => {
-                                    return <li key={index}>{message.trace}</li>
-                                })
+                                    .filter((message) => message.trace)
+                                    .map((message, index) => {
+                                        return <li key={index}>{message.trace}</li>
+                                    })
                             }
                         </ul>,
                     },
                     {
                         label: "Links",
                         id: "fourth",
-                        content: <StorageBrowser/>,
+                        content: <StorageBrowser />,
                     },
                     {
                         label: "Glossary",
                         id: "fifth",
                         content: <ul>
-                        {
-                            Object.values(glossaryBlurbs).map((blurb, index) => (<li key={index}>{blurb}</li>))
-                        }
-                    </ul>,
+                            {
+                                Object.values(glossaryBlurbs).map((blurb, index) => (<li key={index}>{blurb}</li>))
+                            }
+                        </ul>,
                     }
                 ]}
             />
