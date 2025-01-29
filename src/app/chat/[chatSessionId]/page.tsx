@@ -38,7 +38,7 @@ import { formatDate } from "@/utils/date-utils";
 import DropdownMenu from '@/components/DropDownMenu';
 import SideBar from '@/components/SideBar';
 import { StorageBrowser } from '@/components/StorageBrowser';
-import AutoScrollContainer from '@/components/ScrollableContainer'
+// import AutoScrollContainer from '@/components/ScrollableContainer'
 
 import { defaultAgents, BedrockAgent } from '@/utils/config'
 import { Message } from '@/utils/types'
@@ -638,32 +638,47 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     // Helper function to group chat sessions by month
-    const groupChatsByMonth = (chats: Array<Schema["ChatSession"]["type"]>): SideNavigationProps.Item[] => {
-        const grouped = chats.reduce((acc: { [key: string]: Array<Schema["ChatSession"]["type"]> }, chat) => {
-            if (!chat.createdAt) throw new Error("Chat session missing createdAt timestamp");
-            
-            const date = new Date(chat.createdAt);
+    const groupChatsByMonth = (chatSessions: Array<Schema["ChatSession"]["type"]>): SideNavigationProps.Item[] => {
+        const grouped = chatSessions.reduce((acc: { [key: string]: Array<Schema["ChatSession"]["type"]> }, session) => {
+            if (!session.createdAt) throw new Error("Chat session missing createdAt timestamp");
+
+            const date = new Date(session.createdAt);
             const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
-            
+
             if (!acc[monthYear]) {
                 acc[monthYear] = [];
             }
-            acc[monthYear].push(chat);
+            acc[monthYear].push(session);
             return acc;
         }, {});
-    
-        return Object.entries(grouped).map(([monthYear, chats]): SideNavigationProps.Item => ({
+
+        return Object.entries(grouped).map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
             type: "section",
             text: monthYear,
-            items: chats.map(chat => ({
-                type: "link",
-                text: chat.firstMessageSummary || `Chat ${chat.id}`,
-                href: `/chat/${chat.id}`,
-                // Add a style property to bold when selected
-                style: chat.id === params?.chatSessionId ? 
-                    { fontWeight: 'bold' } : 
-                    { fontWeight: 'normal' }
-            }))
+            items: [{type: "link", href: `/chat`, text: "", info: <Tiles
+                onChange={({ detail }) => {
+                    setValue(detail.value);
+                    router.push(`/chat/${detail.value}`);
+                }}
+                value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
+
+                items={
+                    groupedChatSessions.map((groupedChatSession) => ({
+                        label: groupedChatSession.firstMessageSummary?.slice(0, 50),
+                        description: `${formatDate(groupedChatSession.createdAt)} - AI: ${groupedChatSession.aiBotInfo?.aiBotName || 'Unknown'}`,
+                        value: groupedChatSession.id
+                    }))
+                }
+            />}]
+            // items: chats.map(chat => ({
+            //     type: "link",
+            //     text: chat.firstMessageSummary || `Chat ${chat.id}`,
+            //     href: `/chat/${chat.id}`,
+            //     // Add a style property to bold when selected
+            //     style: chat.id === params?.chatSessionId ? 
+            //         { fontWeight: 'bold' } : 
+            //         { fontWeight: 'normal' }
+            // }))
         }));
     };
 
@@ -745,37 +760,37 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
                                         items={groupChatsByMonth(chatSessions)}
 
-                                        // items={[{
-                                        //     type: 'link', text: "", info:
-                                        //         <Box>
-                                        //             {
-                                        //                 chatSessions
-                                        //                     .slice()
-                                        //                     .sort((a, b) => {
-                                        //                         if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-                                        //                         return a.createdAt < b.createdAt ? 1 : -1
-                                        //                     })
-                                        //                     .map((session) => (
-                                        //                         <Tiles
-                                        //                             onChange={({ detail }) => {
-                                        //                                 setValue(detail.value);
-                                        //                                 router.push(`/chat/${session.id}`);
-                                        //                             }}
-                                        //                             value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
+                                    // items={[{
+                                    //     type: 'link', text: "", info:
+                                    //         <Box>
+                                    //             {
+                                    //                 chatSessions
+                                    //                     .slice()
+                                    //                     .sort((a, b) => {
+                                    //                         if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
+                                    //                         return a.createdAt < b.createdAt ? 1 : -1
+                                    //                     })
+                                    //                     .map((session) => (
+                                    // <Tiles
+                                    //     onChange={({ detail }) => {
+                                    //         setValue(detail.value);
+                                    //         router.push(`/chat/${session.id}`);
+                                    //     }}
+                                    //     value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
 
-                                        //                             items={[
-                                        //                                 {
-                                        //                                     label: session.firstMessageSummary?.slice(0, 50),
-                                        //                                     description: `${formatDate(session.createdAt)} - AI: ${session.aiBotInfo?.aiBotName || 'Unknown'}`,
-                                        //                                     value: session.id
+                                    //     items={[
+                                    //         {
+                                    //             label: session.firstMessageSummary?.slice(0, 50),
+                                    //             description: `${formatDate(session.createdAt)} - AI: ${session.aiBotInfo?.aiBotName || 'Unknown'}`,
+                                    //             value: session.id
 
-                                        //                                 }]}
-                                        //                         />
-                                        //                     ))
-                                        //             }
-                                        //         </Box>
-                                        //     , href: `#`
-                                        // }]}
+                                    //         }]}
+                                    // />
+                                    //                     ))
+                                    //             }
+                                    //         </Box>
+                                    //     , href: `#`
+                                    // }]}
 
 
 
@@ -851,20 +866,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                 items={[
                                     // ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
                                     ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ id: agentId, text: agentInfo.name })),
-                                    // { id: "save", text: "Maintenance Agent" },
-                                    // { id: "save", text: "Production Agent" },
-                                    // { id: "save", text: "Foundation Model" },
-                                    // { id: "save", text: "Plan and Execute" },
-                                    // { id: "save", text: "A4E - Maintenance - f62" },
-                                    // { id: "save", text: "A4E - Maintenance - fe1" },
-                                    // { id: "save", text: "Company" },
-                                    // { id: "save", text: "Glossary Agent" },
-                                    // { id: "save", text: "Maintenance" },
-                                    // { id: "save", text: "Operational" },
-                                    // { id: "save", text: "Operations" },
-                                    // { id: "save", text: "Petrophysics Agent" },
-                                    // { id: "save", text: "Production" },
-                                    // { id: "save", text: "Regulatory" }
                                 ]}
                                 expandToViewport={true}
                                 onItemClick={async ({ detail }) => {
