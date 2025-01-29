@@ -897,7 +897,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     {
                         label: "Links",
                         id: "fourth",
-                        content: <StorageBrowser />,
+                        content: 
+                        <div className='links-container'>
+                            <Container>
+                                <StorageBrowser />
+                            </Container>
+                        </div>,
                     },
                     {
                         label: "Glossary",
