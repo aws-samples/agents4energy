@@ -13,7 +13,7 @@ export function ChatBubbleAvatar({ type, name, initials, loading }: AuthorAvatar
     return <Avatar color="gen-ai" iconName="gen-ai" tooltipText={name} ariaLabel={name} loading={loading} />;
   }
 
-  return <Avatar initials={initials} tooltipText={name} ariaLabel={name} />;
+  return <Avatar tooltipText={name} ariaLabel={name} />;
 }
 
 export function CodeViewActions() {
