@@ -1,4 +1,4 @@
-// import { stringify } from 'yaml'
+import { stringify } from 'yaml'
 import { z } from "zod";
 
 import { BedrockAgentRuntimeClient, RetrieveCommand } from "@aws-sdk/client-bedrock-agent-runtime";
@@ -241,18 +241,22 @@ export const executeSQLQueryTool = tool(
 
 const plotTableFromToolResponseSchema = z.object({
     chartTitle: z.string().describe("The title of the plot."),
-    numberOfPreviousTablesToInclude: z.number().int().optional().describe("The number of previous tables to include in the plot. Use at least 2 to include produciton and event data tables."),
+    includePreviousDataTable: z.boolean().optional().describe("If true, the last table in the plot will be the data table. If false, the last table in the plot will be the event data table. Default is true."),
+    includePreviousEventTable: z.boolean().optional().describe("If true, the last table in the plot will be the event data table. If false, the last table in the plot will be the data table. Default is true.")
+    // numberOfPreviousTablesToInclude: z.number().int().optional().describe("The number of previous tables to include in the plot. Use at least 2 to include produciton and event data tables."),
 });
 
 
 export const plotTableFromToolResponseTool = tool(
-    async ({ chartTitle, numberOfPreviousTablesToInclude = 2 }) => {
+    async ({ chartTitle, includePreviousDataTable = true, includePreviousEventTable = true }) => {
 
         return {
             messageContentType: 'tool_plot',
             // columnNameFromQueryForXAxis: columnNameFromQueryForXAxis,
             chartTitle: chartTitle,
-            numberOfPreviousTablesToInclude: numberOfPreviousTablesToInclude
+            // numberOfPreviousTablesToInclude: numberOfPreviousTablesToInclude,
+            includePreviousDataTable: includePreviousDataTable,
+            includePreviousEventTable: includePreviousEventTable
             // chartData: queryResponseData
         } as ToolMessageContentType
 
@@ -312,6 +316,8 @@ export const getS3KeyConentsTool = tool(
 //////// PDF Reports to Table Tool ///////
 //////////////////////////////////////////
 
+const jsonSchemaTypes = z.enum(['string', 'integer', 'date', 'number', 'boolean', 'null'])
+
 export const wellTableSchema = z.object({
     dataToExclude: z.string().optional().describe("List of criteria to exclude data from the table"),
     dataToInclude: z.string().optional().describe("List of criteria to include data in the table"),
@@ -319,7 +325,10 @@ export const wellTableSchema = z.object({
         columnName: z.string().describe('The name of a column'),
         columnDescription: z.string().describe('A description of the information which this column contains.'),
         columnDataDefinition: z.object({
-            type: z.enum(['string', 'integer', 'date', 'number', 'boolean']).describe('The data type of the column.'),
+            type: z.union([
+                jsonSchemaTypes,
+                z.array(jsonSchemaTypes)
+            ]),
             format: z.string().describe('The format of the column.').optional(),
             enum: z.array(z.string()).optional(),
             pattern: z.string().describe('The regex pattern for the column.').optional(),
@@ -468,16 +477,6 @@ export const wellTableTool = tool(
             tableColumns = tableColumns.filter(column => !(column.columnName.toLowerCase().includes('date')))
             // Here add in the default table columns date and excludeRow 
             tableColumns.unshift({
-                columnName: 'date',
-                columnDescription: `The date of the event in YYYY-MM-DD format.`,
-                columnDataDefinition: {
-                    type: 'string',
-                    format: 'date',
-                    pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
-                }
-            })
-
-            tableColumns.unshift({
                 columnName: 'includeScore',
                 columnDescription: `
                     If the JSON object contains information related to [${dataToExclude}], give a score of 1.
@@ -507,6 +506,16 @@ export const wellTableTool = tool(
                 }
             })
 
+            tableColumns.unshift({
+                columnName: 'date',
+                columnDescription: `The date of the event in YYYY-MM-DD format. Can be null if no date is available.`,
+                columnDataDefinition: {
+                    type: ['string', 'null'],
+                    format: 'date',
+                    pattern: "^(?:\\d{4})-(?:(0[1-9]|1[0-2]))-(?:(0[1-9]|[12]\\d|3[01]))$"
+                }
+            })
+
             // console.log('Input Table Columns: ', tableColumns)
 
             // const correctedColumnNameMap = tableColumns.map(column => [removeSpaceAndLowerCase(column.columnName), column.columnName])
@@ -526,18 +535,20 @@ export const wellTableTool = tool(
                 };
             }
             const jsonSchema = {
-                title: "getKeyInformationFromImages",
-                description: "Fill out these arguments based on the image data",
+                title: "getKeyInformation",
+                description: "Fill out these arguments based on text extracted from a form",
                 type: "object",
                 properties: fieldDefinitions,
-                required: Object.keys(fieldDefinitions),
+                required: Object.keys(fieldDefinitions).filter(key => key !== 'date'),
             };
 
-            // console.log('target json schema for row:\n', JSON.stringify(jsonSchema, null, 2))
+            console.log('target json schema for row:\n', stringify(jsonSchema))
 
             let columnNames = tableColumns.map(column => column.columnName)
             //Add in the source and relevanceScore columns
             columnNames.push('s3Key')
+
+            console.log('Generating column names: ', columnNames)
 
             const s3Prefix = `production-agent/well-files/field=SanJuanEast/api=${wellApiNumber}/`;
             const wellFiles = await listFilesUnderPrefix({
@@ -593,31 +604,10 @@ export const wellTableTool = tool(
                         `
 
                         const fileDataResponse = await getStructuredOutputResponse({
-                            messages:[ new HumanMessage({ content: messageText })],
+                            messages: [new HumanMessage({ content: messageText })],
                             outputStructure: jsonSchema,
-                            modelId: env.MODEL_ID
+                            modelId: env.STRUCTURED_OUTPUT_MODEL_ID
                         })
-
-                        // const fileDataResponse = await amplifyClientWrapper.amplifyClient.graphql({ //To stream partial responces to the client
-                        //     query: invokeBedrockWithStructuredOutput,
-                        //     variables: {
-                        //         chatSessionId: 'dummy',
-                        //         lastMessageText: messageText,
-                        //         outputStructure: JSON.stringify(jsonSchema),
-                        //     }
-                        // })
-
-                        // If the GQL query returns an error, return the error to the agent
-                        // if (fileDataResponse.errors) throw new Error(fileDataResponse.errors.map((error) => error.message).join('\n\n'))
-                        // if (fileDataResponse.errors) {
-                        //     throw new Error("")
-                        //     return {
-                        //         messageContentType: 'tool_json',
-                        //         error: fileDataResponse.errors.map((error) => error.message).join('\n\n')
-                        //     } as ToolMessageContentType
-                        // }
-
-                        // const fileData = JSON.parse("")
 
                         //Replace the keys in file Data with those from correctedColumnNameMap
                         Object.keys(fileDataResponse).forEach(key => {
@@ -628,8 +618,11 @@ export const wellTableTool = tool(
                             }
                         })
 
+                        //Preserve ordering of columns
+                        const sortedFileDataResponse = Object.fromEntries(columnNames.map(colName => [colName, fileDataResponse[colName]]))
+
                         const fileResponseData: Record<string, any> = {
-                            ...fileDataResponse,
+                            ...sortedFileDataResponse,
                             s3Key: s3Key
                         }
 
@@ -649,7 +642,12 @@ export const wellTableTool = tool(
             // console.log('data Rows: ', dataRows)
 
             //Sort the data rows by date (first column)
-            dataRows.sort((a, b) => a?.date.localeCompare(b?.date));
+            dataRows.sort((a, b) => {
+                if (!a || !a.date) return 0
+                if (!b || !b.date) return 1
+
+                return a?.date.localeCompare(b?.date)
+            });
 
             // console.log('data Rows: ', dataRows)
 

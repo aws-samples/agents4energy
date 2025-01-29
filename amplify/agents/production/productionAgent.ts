@@ -2,7 +2,6 @@
 import { stringify } from "yaml"
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib'
-import { Stack, Fn, Aws, Token} from 'aws-cdk-lib';
 import {
     aws_bedrock as bedrock,
     aws_iam as iam,
@@ -18,6 +17,8 @@ import {
     aws_sqs as sqs,
     aws_glue as glue,
     aws_events as events,
+    aws_logs as logs,
+    aws_secretsmanager as secretsmanager,
     aws_events_targets as eventsTargets,
     custom_resources as cr
 } from 'aws-cdk-lib';
@@ -45,14 +46,14 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
     const stackName = cdk.Stack.of(scope).stackName
-    const stackUUID = cdk.Names.uniqueResourceName(scope, {maxLength: 3}).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
-    
+    const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
+
     // console.log("Produciton Stack UUID Long: ", stackUUIDLong)
     console.log("Production Stack UUID: ", stackUUID)
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
-    
+
     // Lambda function to apply a promp to a pdf file
     const lambdaLlmAgentRole = new iam.Role(scope, 'LambdaExecutionRole', {
         assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
@@ -134,6 +135,27 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
     });
 
+    // Add a queue policy to enforce HTTPS
+    for (const queue of [pdfDlQueue, pdfProcessingQueue]) {
+        queue.addToResourcePolicy(
+            new iam.PolicyStatement({
+                sid: 'DenyUnsecureTransport',
+                effect: iam.Effect.DENY,
+                principals: [new iam.AnyPrincipal()],
+                actions: [
+                    'sqs:*'
+                ],
+                resources: [queue.queueArn],
+                conditions: {
+                    'Bool': {
+                        'aws:SecureTransport': 'false'
+                    }
+                }
+            })
+        )
+    }
+
+
     // Grant the Lambda permission to read from the queue
     pdfProcessingQueue.grantConsumeMessages(convertPdfToYamlFunction);
 
@@ -184,6 +206,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }),
         defaultDatabaseName: defaultProdDatabaseName,
         enableDataApi: true,
+        iamAuthentication: true,
+        storageEncrypted: true,
         writer: rds.ClusterInstance.serverlessV2('writer'),
         serverlessV2MinCapacity: 0.5,
         serverlessV2MaxCapacity: 2,
@@ -193,6 +217,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         vpc: props.vpc,
         port: 5432,
         removalPolicy: cdk.RemovalPolicy.DESTROY
+    });
+    hydrocarbonProductionDb.secret?.addRotationSchedule('RotationSchedule', {
+        hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
+            functionName: `SecretRotationProdDb-${stackUUID}`
+          }),
+        automaticallyAfter: cdk.Duration.days(30)
     });
     const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
@@ -266,7 +296,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     },
     // });
 
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "SqlTableDefinitionBedrockKnoledgeBase", {
+    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "TableDefinition", {
         vpc: props.vpc,
         bucket: props.s3Bucket,
         schemaName: 'bedrock_integration'
@@ -402,7 +432,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     ////////////////////////////////////////////////////////////
     const configureProdDbFunction = new NodejsFunction(scope, 'configureProdDbFunction', {
         runtime: lambda.Runtime.NODEJS_LATEST,
-        entry: path.join(__dirname, '..', '..',  'functions', 'configureProdDb', 'index.ts'),
+        entry: path.join(__dirname, '..', '..', 'functions', 'configureProdDb', 'index.ts'),
         timeout: cdk.Duration.seconds(300),
         environment: {
             CLUSTER_ARN: hydrocarbonProductionDb.clusterArn,
@@ -642,6 +672,15 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     const runCrawlerRecordTableDefintionStateMachine = new sfn.StateMachine(scope, 'CrawlerStateMachine', {
         definition,
         timeout: cdk.Duration.minutes(30),
+        tracingEnabled: true,
+        logs: {
+            destination: new logs.LogGroup(scope, 'CrawlerStateMachineLogs', {
+                logGroupName: `/aws/vendedlogs/states/${rootStack.stackName}-CrawlerStateMachineLogs-${stackUUID}`,
+                removalPolicy: cdk.RemovalPolicy.DESTROY,
+                retention: logs.RetentionDays.ONE_MONTH,
+            }),
+            level: sfn.LogLevel.ALL,
+        },
     });
 
     recordTableDefAndStarkKBIngestionJob.grantInvoke(runCrawlerRecordTableDefintionStateMachine);

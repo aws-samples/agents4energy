@@ -31,7 +31,7 @@ const main = async () => {
   await getLambdaEnvironmentVariables(await getDeployedResourceArn(rootStackName, 'RecordTableDefAndStartKbIngestionJob'))
 
   // const prodGlueDbName = await getDeployedResourceArn(rootStackName, 'ProdGlueDb')
-  const sampleRdsDataSource = await getDeployedResourceArn(rootStackName, 'PostgresAthenaDataSource')
+  // const sampleRdsDataSource = await getDeployedResourceArn(rootStackName, 'PostgresAthenaDataSource')
   
 
   const testEvent = {
