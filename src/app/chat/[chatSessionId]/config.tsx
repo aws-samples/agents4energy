@@ -38,8 +38,8 @@ export const getInvalidPromptResponse = (): Message => ({
   content: (
     <>
       The interactions and functionality of this demo are limited.
-      <div>1. To see how an incoming response from generative AI is displayed, ask "Show a loading state example".</div>
-      <div>2. To see an error alert that appears when something goes wrong, ask "Show an error state example".</div>
+      <div>1. To see how an incoming response from generative AI is displayed, ask &quot;Show a loading state example&quot;.</div>
+      <div>2. To see an error alert that appears when something goes wrong, ask &quot;Show an error state example&quot;.</div>
     </>
   ),
   timestamp: new Date().toLocaleTimeString(),
@@ -67,7 +67,7 @@ const getErrorStateResponseMessage = (): Message => ({
   content: (
     <SpaceBetween size="s">
       <span>
-        You don't have permission to [AWSS3:ListBuckets]. To request access, copy the following text and send it to your
+        You do not have permission to [AWSS3:ListBuckets]. To request access, copy the following text and send it to your
         AWS administrator.{' '}
         <Link href="#" external variant="primary">
           Learn more about troubleshooting access denied errors.
@@ -187,7 +187,7 @@ export const INITIAL_MESSAGES: Array<Message> = [
       <>
         Creating a configuration for Amazon S3 involves setting up a bucket and configuring its properties{' '}
         <CitationPopover count={1} href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/GetStartedWithS3.html" />
-        . Here's a step-by-step guide to help you create an S3 configuration:
+        . Here is a step-by-step guide to help you create an S3 configuration:
         <div>1. Sign in to AWS Management Console</div>
         <div>2. Access Amazon S3 console</div>
         <div>3. Create a new S3 bucket</div>

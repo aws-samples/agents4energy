@@ -8,22 +8,23 @@ import {
   Toggle
 } from "@cloudscape-design/components";
 import { applyMode, Mode } from "@cloudscape-design/global-styles";
-import logoSmallTopNavigation from '@/a4e-logo.png'; 
+import logoSmallTopNavigation from '@/a4e-logo.png';
 
 const TopNavBar = () => {
-  const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
-  const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
+  // const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
+  const { signOut } = useAuthenticator(context => [context.user]);
+  // const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
 
   const { userAttributes } = useUserAttributes();
 
-  //TODO Impliment the dropdown menu for the user menu
-  const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorElUser(event.currentTarget);
-  };
+  // //TODO Impliment the dropdown menu for the user menu
+  // const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
+  //   setAnchorElUser(event.currentTarget);
+  // };
 
-  const handleCloseUserMenu = () => {
-    setAnchorElUser(null);
-  };
+  // const handleCloseUserMenu = () => {
+  //   setAnchorElUser(null);
+  // };
 
   // To support dark mode
   const [useDarkMode, setUseDarkMode] = useState(false);
@@ -35,51 +36,54 @@ const TopNavBar = () => {
   return (
     <>
       <TopNavigation
-      identity={{
-        href: "/",
-        title: "Agents4Energy",
-        logo: {
-        src: logoSmallTopNavigation.src,
-        alt: "A4E"
-        }
-      }}
-      utilities={[
-        {
-        type: "menu-dropdown",
-        text: userAttributes?.email || "Customer Name",
-        description: userAttributes?.email || "email@example.com",
-        iconName: "user-profile",
-        items: [
-          { id: "profile", text: "Profile" },
-          { id: "preferences", text: "Preferences" },
-          { id: "security", text: "Security" },
+        identity={{
+          href: "/",
+          title: "Agents4Energy",
+          logo: {
+            src: logoSmallTopNavigation.src,
+            alt: "A4E"
+          }
+        }}
+        utilities={[
           {
-          id: "support-group",
-          text: "Support",
-          items: [
-            {
-            id: "documentation",
-            text: "Documentation",
-            href: "#",
-            external: true,
-            externalIconAriaLabel:
-              " (opens in new tab)"
+            type: "menu-dropdown",
+            text: userAttributes?.email || "Customer Name",
+            description: userAttributes?.email || "email@example.com",
+            iconName: "user-profile",
+            onItemClick: (item) => {
+              if (item.detail.id === 'signout') signOut()
             },
-            { id: "support", text: "Support" },
-            {
-            id: "feedback",
-            text: "Feedback",
-            href: "#",
-            external: true,
-            externalIconAriaLabel:
-              " (opens in new tab)"
-            }
-          ]
+            items: [
+              { id: "profile", text: "Profile" },
+              { id: "preferences", text: "Preferences" },
+              { id: "security", text: "Security" },
+              {
+                id: "support-group",
+                text: "Support",
+                items: [
+                  {
+                    id: "documentation",
+                    text: "Documentation",
+                    href: "#",
+                    external: true,
+                    externalIconAriaLabel:
+                      " (opens in new tab)"
+                  },
+                  { id: "support", text: "Support" },
+                  {
+                    id: "feedback",
+                    text: "Feedback",
+                    href: "#",
+                    external: true,
+                    externalIconAriaLabel:
+                      " (opens in new tab)"
+                  }
+                ]
+              },
+              { id: "signout", text: "Sign out"}
+            ]
           },
-          { id: "signout", text: "Sign out", onChange: signOut }
-        ]
-        }
-      ]}
+        ]}
       />
       <div className='dark-mode-toggle'>
         <Toggle

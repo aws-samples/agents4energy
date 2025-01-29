@@ -5,27 +5,27 @@ import React, { useEffect, useState } from 'react';
 
 import {
     AppLayout,
-    BreadcrumbGroup,
-    ContentLayout,
+    // BreadcrumbGroup,
+    // ContentLayout,
     HelpPanel,
     Header,
     Link,
     SideNavigation,
-    Cards,
-    SpaceBetween,
-    Button,
-    TextFilter,
+    // Cards,
+    // SpaceBetween,
+    // Button,
+    // TextFilter,
     SideNavigationProps
     // ListItem
 } from '@cloudscape-design/components';
 import Tabs from "@cloudscape-design/components/tabs";
 import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
 import Tiles from "@cloudscape-design/components/tiles";
-import Chat from "./chat"
+// import Chat from "./chat"
 import PromptInput from '@cloudscape-design/components/prompt-input';
 import Container from '@cloudscape-design/components/container';
 import FormField from '@cloudscape-design/components/form-field';
-import { ScrollableContainer } from './common-components';
+// import { ScrollableContainer } from './common-components';
 import Messages from './messages';
 import Steps from "@cloudscape-design/components/steps";
 
@@ -35,8 +35,8 @@ import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useRouter } from 'next/navigation';
 
 import { formatDate } from "@/utils/date-utils";
-import DropdownMenu from '@/components/DropDownMenu';
-import SideBar from '@/components/SideBar';
+// import DropdownMenu from '@/components/DropDownMenu';
+// import SideBar from '@/components/SideBar';
 import { StorageBrowser } from '@/components/StorageBrowser';
 // import AutoScrollContainer from '@/components/ScrollableContainer'
 
@@ -47,7 +47,7 @@ import '@aws-amplify/ui-react/styles.css'
 
 import {
     // Typography,
-    Box,
+    // Box,
     // MenuItem,
     // IconButton,
     // Card,
@@ -57,49 +57,49 @@ import {
     Tooltip
 } from '@mui/material';
 
-import DeleteIcon from '@mui/icons-material/Delete';
+// import DeleteIcon from '@mui/icons-material/Delete';
 
-import { ChatUIProps } from "@/components/chat-ui/chat-ui";
+// import { ChatUIProps } from "@/components/chat-ui/chat-ui";
 import { withAuth } from '@/components/WithAuth';
 
-import dynamic from 'next/dynamic'
+// import dynamic from 'next/dynamic'
 
-import { createHash } from 'crypto';
+// import { createHash } from 'crypto';
 
-const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
-    ssr: false,
-});
+// const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
+//     ssr: false,
+// });
 
 // const drawerWidth = 240;
 
-type ListBedrockAgentsResponseType = {
-    agentSummaries: {
-        agentId: string;
-        agentName: string;
-        agentStatus: string;
-        latestAgentVersion: string;
-        updatedAt: string;
-    }[];
-}
+// type ListBedrockAgentsResponseType = {
+//     agentSummaries: {
+//         agentId: string;
+//         agentName: string;
+//         agentStatus: string;
+//         latestAgentVersion: string;
+//         updatedAt: string;
+//     }[];
+// }
 
-type ListAgentIdsResponseType = {
-    agentAliasSummaries:
-    {
-        agentAliasId: string,
-        agentAliasName: string,
-        agentAliasStatus: string,
-        createdAt: string,
-        description: string,
-        routingConfiguration:
-        {
-            agentVersion: string,
-            provisionedThroughput: string
-        }[],
-        updatedAt: string
-    }[]
-    ,
-    nextToken: string
-}
+// type ListAgentIdsResponseType = {
+//     agentAliasSummaries:
+//     {
+//         agentAliasId: string,
+//         agentAliasName: string,
+//         agentAliasStatus: string,
+//         createdAt: string,
+//         description: string,
+//         routingConfiguration:
+//         {
+//             agentVersion: string,
+//             provisionedThroughput: string
+//         }[],
+//         updatedAt: string
+//     }[]
+//     ,
+//     nextToken: string
+// }
 
 const jsonParseHandleError = (jsonString: string) => {
     try {
@@ -176,25 +176,25 @@ const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSe
     )
 }
 
-const getAgentAliasId = async (agentId: string) => {
-    const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
-    // console.log('get Agent Alias Id Response: ', response.data)
-    if (!(response.data && response.data.body)) {
-        console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
-        return
-    }
-    // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
-    const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
+// const getAgentAliasId = async (agentId: string) => {
+//     const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
+//     // console.log('get Agent Alias Id Response: ', response.data)
+//     if (!(response.data && response.data.body)) {
+//         console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
+//         return
+//     }
+//     // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
+//     const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
 
-    if (!listAgnetAliasIdsResponseBody) {
-        console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
-        return
-    }
-    //Get the most recently created AliasId
-    const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
+//     if (!listAgnetAliasIdsResponseBody) {
+//         console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
+//         return
+//     }
+//     //Get the most recently created AliasId
+//     const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
 
-    return mostRecentAliasId
-}
+//     return mostRecentAliasId
+// }
 
 // const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr2: Array<Schema["ChatMessage"]["type"]>) => {
 const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
@@ -211,7 +211,7 @@ const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => 
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["createType"]>>([]);
-    const messagesContainerRef = React.useRef<HTMLDivElement>(null);
+    // const messagesContainerRef = React.useRef<HTMLDivElement>(null);
     const [prompt, setPrompt] = useState('');
     const [isGenAiResponseLoading, setIsGenAiResponseLoading] = useState(false);
 
@@ -220,14 +220,14 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
-    const [isLoading, setIsLoading] = useState(false);
+    // const [isLoading, setIsLoading] = useState(false);
     // const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
     const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
 
     const [navigationOpen, setNavigationOpen] = useState(true);
-    const [value, setValue] = React.useState("item1");
+    // const [value, setValue] = React.useState("item1");
 
 
     // const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
@@ -363,14 +363,14 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             messages[messages.length - 1].responseComplete
         ) {
             console.log('Ready for human response')
-            setIsLoading(false)
+            setIsGenAiResponseLoading(false)
 
             async function fetchAndSetSuggestedPrompts() {
                 setSuggestedPromptes([])
                 if (!initialActiveChatSession || !initialActiveChatSession.id) throw new Error("No active chat session")
 
                 const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
-                    chatSessionId: initialActiveChatSession?.id,
+                    chatSessionId: initialActiveChatSession.id,
                     lastMessageText: "Suggest three follow up prompts",
                     usePastMessages: true,
                     outputStructure: JSON.stringify({
@@ -401,7 +401,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
             }
             fetchAndSetSuggestedPrompts()
-        } else if (messages.length) setIsLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
+        } else if (messages.length) setIsGenAiResponseLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
 
     }, [JSON.stringify(messages), JSON.stringify(initialActiveChatSession)])
 
@@ -424,7 +424,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             })
         }
 
-    }, [user, initialActiveChatSession])
+    }, [user, initialActiveChatSession, params?.chatSessionId])
 
     // Subscribe to messages of the active chat session
     useEffect(() => {
@@ -527,11 +527,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         })
     }
 
-    async function deleteChatSession(targetSession: Schema['ChatSession']['type']) {
-        amplifyClient.models.ChatSession.delete({ id: targetSession.id })
-        // Remove the target session from the list of chat sessions
-        setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
-    }
+    // async function deleteChatSession(targetSession: Schema['ChatSession']['type']) {
+    //     amplifyClient.models.ChatSession.delete({ id: targetSession.id })
+    //     // Remove the target session from the list of chat sessions
+    //     setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
+    // }
 
     async function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string, chainOfThought?: boolean }) {
         const targetChatSessionId = initialActiveChatSession?.id;
@@ -579,7 +579,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     }
 
     async function sendMessageToChatBot(prompt: string) {
-        setIsLoading(true);
+        setIsGenAiResponseLoading(true);
         await addChatMessage({ body: prompt, role: "human" })
         if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
             await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession })
@@ -657,7 +657,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             text: monthYear,
             items: [{type: "link", href: `/chat`, text: "", info: <Tiles
                 onChange={({ detail }) => {
-                    setValue(detail.value);
+                    // setValue(detail.value);
                     router.push(`/chat/${detail.value}`);
                 }}
                 value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}

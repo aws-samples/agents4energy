@@ -1,12 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-import { applyDensity, Density, disableMotion } from '@cloudscape-design/global-styles';
+import { applyDensity, Density } from '@cloudscape-design/global-styles';
 
-import * as localStorage from './localStorage';
+// import * as localStorage from './localStorage';
 
 import '@cloudscape-design/global-styles/index.css';
 
-(window as any).disableMotionForTests = disableMotion;
+// (window as any).disableMotionForTests = disableMotion;
 
 // always `true` in this design
 export const isVisualRefresh = true;

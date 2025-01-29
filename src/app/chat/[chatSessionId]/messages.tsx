@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: MIT-0
 import React, { useRef, useEffect } from 'react';
 
-import { stringify } from 'yaml'
+// import { stringify } from 'yaml'
 
 import ChatBubble from '@cloudscape-design/chat-components/chat-bubble';
-import Alert from '@cloudscape-design/components/alert';
-import LiveRegion from '@cloudscape-design/components/live-region';
+// import Alert from '@cloudscape-design/components/alert';
+// import LiveRegion from '@cloudscape-design/components/live-region';
 import ButtonGroup from "@cloudscape-design/components/button-group";
 import StatusIndicator from "@cloudscape-design/components/status-indicator";
-import Avatar from "@cloudscape-design/chat-components/avatar";
+// import Avatar from "@cloudscape-design/chat-components/avatar";
 
-import AutoScrollContainer from "@/components/ScrollableContainer"
+// import AutoScrollContainer from "@/components/ScrollableContainer"
 
 import { ChatBubbleAvatar } from './common-components';
 import { AUTHORS } from './config'; //Message
@@ -43,13 +43,7 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
     return diff < 1;
   };
 
-  const scrollToBottom = () => {
-    const element = messagesRef.current;
-    if (element && isAtBottom()) {
-      const lastChild = element.lastElementChild;
-      lastChild?.scrollIntoView({ behavior: 'auto', block: 'end' });
-    }
-  };
+  
 
   // useEffect(() => {
   //   const element = messagesRef.current;
@@ -67,6 +61,15 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
 
   useEffect(() => {
     console.log('Messages changed, wasAtBottom:', wasAtBottom.current);
+
+    const scrollToBottom = () => {
+      const element = messagesRef.current;
+      if (element && isAtBottom()) {
+        const lastChild = element.lastElementChild;
+        lastChild?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      }
+    };
+
     if (wasAtBottom.current) {
       console.log('Triggering scroll to bottom due to new message');
       scrollToBottom();
@@ -92,7 +95,7 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
         {latestMessage?.content}
       </LiveRegion> */}
 
-      {messages.map((message, index) => {
+      {messages.map((message) => {
         // if (message.type === 'alert') {
         //   return (
         //     <Alert
