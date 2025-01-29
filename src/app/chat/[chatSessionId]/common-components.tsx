@@ -8,7 +8,7 @@ import StatusIndicator from '@cloudscape-design/components/status-indicator';
 
 import { AuthorAvatarProps } from './config';
 
-export function ChatBubbleAvatar({ type, name, initials, loading }: AuthorAvatarProps) {
+export function ChatBubbleAvatar({ type, name, loading }: AuthorAvatarProps) {
   if (type === 'gen-ai') {
     return <Avatar color="gen-ai" iconName="gen-ai" tooltipText={name} ariaLabel={name} loading={loading} />;
   }

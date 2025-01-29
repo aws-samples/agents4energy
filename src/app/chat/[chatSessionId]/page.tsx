@@ -648,28 +648,43 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             if (!acc[monthYear]) {
                 acc[monthYear] = [];
             }
-            acc[monthYear].push(session);
+
+            const insertIndex = acc[monthYear].findIndex(existingSession =>
+                existingSession.createdAt && session.createdAt &&
+                existingSession.createdAt < session.createdAt
+            );
+            // If no index found (insertIndex === -1), push to end, otherwise insert at index
+            if (insertIndex === -1) {
+                acc[monthYear].push(session);
+            } else {
+                acc[monthYear].splice(insertIndex, 0, session);
+            }
+            // acc[monthYear].push(session);
+
+
             return acc;
         }, {});
 
         return Object.entries(grouped).map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
             type: "section",
             text: monthYear,
-            items: [{type: "link", href: `/chat`, text: "", info: <Tiles
-                onChange={({ detail }) => {
-                    // setValue(detail.value);
-                    router.push(`/chat/${detail.value}`);
-                }}
-                value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
+            items: [{
+                type: "link", href: `/chat`, text: "", info: <Tiles
+                    onChange={({ detail }) => {
+                        // setValue(detail.value);
+                        router.push(`/chat/${detail.value}`);
+                    }}
+                    value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
 
-                items={
-                    groupedChatSessions.map((groupedChatSession) => ({
-                        label: groupedChatSession.firstMessageSummary?.slice(0, 50),
-                        description: `${formatDate(groupedChatSession.createdAt)} - AI: ${groupedChatSession.aiBotInfo?.aiBotName || 'Unknown'}`,
-                        value: groupedChatSession.id
-                    }))
-                }
-            />}]
+                    items={
+                        groupedChatSessions.map((groupedChatSession) => ({
+                            label: groupedChatSession.firstMessageSummary?.slice(0, 50),
+                            description: `${formatDate(groupedChatSession.createdAt)} - AI: ${groupedChatSession.aiBotInfo?.aiBotName || 'Unknown'}`,
+                            value: groupedChatSession.id
+                        }))
+                    }
+                />
+            }]
             // items: chats.map(chat => ({
             //     type: "link",
             //     text: chat.firstMessageSummary || `Chat ${chat.id}`,
@@ -897,12 +912,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     {
                         label: "Links",
                         id: "fourth",
-                        content: 
-                        <div className='links-container'>
-                            <Container>
-                                <StorageBrowser />
-                            </Container>
-                        </div>,
+                        content:
+                            <div className='links-container'>
+                                <Container>
+                                    <StorageBrowser />
+                                </Container>
+                            </div>,
                     },
                     {
                         label: "Glossary",

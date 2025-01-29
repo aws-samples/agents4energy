@@ -14,8 +14,10 @@ export const { StorageBrowser } = createStorageBrowser({
   config: createAmplifyAuthAdapter(),
 });
 
-export default () => (
+const Page = () => (
   <Authenticator>
     <StorageBrowser />
   </Authenticator>
 );
+
+export default Page

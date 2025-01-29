@@ -6,7 +6,7 @@ import {
   Button,
   Container,
   Popover,
-  Spinner,
+  // Spinner,
   StatusIndicator
 } from "@cloudscape-design/components";
 
@@ -16,7 +16,9 @@ import remarkGfm from "remark-gfm";
 import ReactMarkdown from "react-markdown";
 
 import { formatDate } from "@/utils/date-utils";
-import { amplifyClient, invokeBedrockModelParseBodyGetText, isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
+// import { amplifyClient, invokeBedrockModelParseBodyGetText, isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
+import { isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
+
 
 import styles from "@/styles/chat-ui.module.scss";
 
@@ -64,24 +66,24 @@ export interface ChatUIMessageProps {
   showCopyButton?: boolean;
 }
 
-//https://json-schema.org/understanding-json-schema/reference/array
-const getDataQualityCheckSchema = {
-  title: "DataQualityCheck",
-  description: "Identify any inaccurate data",
-  type: "object",
-  properties: {
-    dataChecks: {
-      type: 'array',
-      items: {
-        type: 'string'
-      },
-      minItems: 0,
-      maxItems: 5,
-      description: "Identified issues"
-    }
-  },
-  required: ['dataChecks'],
-};
+// //https://json-schema.org/understanding-json-schema/reference/array
+// const getDataQualityCheckSchema = {
+//   title: "DataQualityCheck",
+//   description: "Identify any inaccurate data",
+//   type: "object",
+//   properties: {
+//     dataChecks: {
+//       type: 'array',
+//       items: {
+//         type: 'string'
+//       },
+//       minItems: 0,
+//       maxItems: 5,
+//       description: "Identified issues"
+//     }
+//   },
+//   required: ['dataChecks'],
+// };
 
 // function isValidJSON(str: string): boolean {
 //   try {
@@ -131,8 +133,8 @@ function generateColor(index: number): string {
 
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
-  const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
-  const [dataQualityBlurb, setDataQualityBlurb] = useState("")
+  // const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
+  // const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   const [MessagePlot, setMessagePlot] = useState<() => React.JSX.Element>()
   // const [MessagePlot, setMessagePlot] = useState<React.ElementType>(() => (<div></div>))
   const [MessageTable, setMessageTable] = useState<React.FC>()
@@ -543,48 +545,47 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     }
   }, [props.message, previousMessages, messageContentCategory, MessageTable, MessagePlot])
 
-  // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
-  async function getGlossary(message: Message) {
 
-    if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
+  // async function getGlossary(message: Message) {
 
-    if (message.chatSessionId in glossaryBlurbs) return
+  //   if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
 
-    const getGlossaryPrompt = `
-    Return a glossary for terms found in the text blurb below:
+  //   if (message.chatSessionId in glossaryBlurbs) return
 
-    ${message.content}
-    `
-    const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
-    if (!newBlurb) throw new Error("No glossary blurb returned")
-    setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
-  }
+  //   const getGlossaryPrompt = `
+  //   Return a glossary for terms found in the text blurb below:
 
-  // async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
-  async function getDataQualityCheck(message: Message) {
-    setDataQualityBlurb("")
+  //   ${message.content}
+  //   `
+  //   const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
+  //   if (!newBlurb) throw new Error("No glossary blurb returned")
+  //   setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
+  // }
 
-    if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
+  // async function getDataQualityCheck(message: Message) {
+  //   setDataQualityBlurb("")
 
-    const dataQualityCheckResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
-      chatSessionId: message.chatSessionId,
-      lastMessageText: "What data quality issues can you identify in the messages above?",
-      outputStructure: JSON.stringify(getDataQualityCheckSchema)
-    })
-    console.log("Data Quality Check Response: ", dataQualityCheckResponse)
-    if (dataQualityCheckResponse.data) {
-      const newDataQualityChecks = JSON.parse(dataQualityCheckResponse.data).dataChecks as string[]
-      if (newDataQualityChecks.length) {
-        setDataQualityBlurb(() => newDataQualityChecks.join('\n\n'))
-      } else {
-        setDataQualityBlurb(() => "No data quality issues identified")
-      }
+  //   if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
 
-
-    } else console.log('No suggested prompts found in response: ', dataQualityCheckResponse)
+  //   const dataQualityCheckResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
+  //     chatSessionId: message.chatSessionId,
+  //     lastMessageText: "What data quality issues can you identify in the messages above?",
+  //     outputStructure: JSON.stringify(getDataQualityCheckSchema)
+  //   })
+  //   console.log("Data Quality Check Response: ", dataQualityCheckResponse)
+  //   if (dataQualityCheckResponse.data) {
+  //     const newDataQualityChecks = JSON.parse(dataQualityCheckResponse.data).dataChecks as string[]
+  //     if (newDataQualityChecks.length) {
+  //       setDataQualityBlurb(() => newDataQualityChecks.join('\n\n'))
+  //     } else {
+  //       setDataQualityBlurb(() => "No data quality issues identified")
+  //     }
 
 
-  }
+  //   } else console.log('No suggested prompts found in response: ', dataQualityCheckResponse)
+
+
+  // }
 
   // console.log('messagePlot:', MessagePlot);
   // console.log('Type of messagePlot:', typeof MessagePlot);
