@@ -103,12 +103,21 @@ backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
     resources: [
       `arn:aws:bedrock:${backend.auth.stack.region}:${backend.auth.stack.account}:agent-alias/*`,
     ],
-    actions: [
-      "bedrock:InvokeAgent",
-    ],
+    actions: ["bedrock:InvokeAgent"],
   }
   )
 )
+
+//This may be unneccessary TODO figur out if this is required.
+backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    resources: [
+      `arn:aws:bedrock:${backend.auth.stack.region}::foundation-model/*`,
+      `arn:aws:bedrock:us-*::foundation-model/*`,
+    ],
+    actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+  })
+);
 
 backend.getStructuredOutputFromLangchainFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
@@ -300,30 +309,30 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
 })
 
 
-// First, create a logging bucket
-const accessLogsBucket = new s3.Bucket(networkingStack, 'accessLogs', {
-  // Enforce SSL for data in transit
-  enforceSSL: true,
-  // Block all public access
-  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-  // Enable encryption by default
-  encryption: s3.BucketEncryption.S3_MANAGED,
-  // Set a lifecycle rule to clean up old logs if desired
-  lifecycleRules: [
-    {
-      expiration: cdk.Duration.days(365), // Adjust retention period as needed
-    }
-  ],
-  removalPolicy: cdk.RemovalPolicy.RETAIN // Retain logs even if stack is destroyed
-});
+// // First, create a logging bucket
+// const accessLogsBucket = new s3.Bucket(networkingStack, 'accessLogs', {
+//   // Enforce SSL for data in transit
+//   enforceSSL: true,
+//   // Block all public access
+//   blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+//   // Enable encryption by default
+//   encryption: s3.BucketEncryption.S3_MANAGED,
+//   // Set a lifecycle rule to clean up old logs if desired
+//   lifecycleRules: [
+//     {
+//       expiration: cdk.Duration.days(365), // Adjust retention period as needed
+//     }
+//   ],
+//   removalPolicy: cdk.RemovalPolicy.RETAIN // Retain logs even if stack is destroyed
+// });
 
-// backend.storage.resources.bucket.grantReadWrite(accessLogsBucket)
+// // backend.storage.resources.bucket.grantReadWrite(accessLogsBucket)
 
-const cfnBucket = backend.storage.resources.bucket.node.defaultChild as s3.CfnBucket;
-cfnBucket.loggingConfiguration = {
-  destinationBucketName: accessLogsBucket.bucketName,
-  logFilePrefix: 'bucket-logs/'
-};
+// const cfnBucket = backend.storage.resources.bucket.node.defaultChild as s3.CfnBucket;
+// cfnBucket.loggingConfiguration = {
+//   destinationBucketName: accessLogsBucket.bucketName,
+//   logFilePrefix: 'bucket-logs/'
+// };
 
 // // Run CDK nag on the stacks
 // cdkNagSupperssionsHandler(rootStack)

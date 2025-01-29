@@ -162,7 +162,7 @@ export const getStructuredOutputResponse = async (props: {modelId: string, messa
 
 
     const chatModelWithStructuredOutput = new ChatBedrockConverse({
-        model: process.env.MODEL_ID,
+        model: props.modelId || process.env.MODEL_ID,
         temperature: 0
     }).withStructuredOutput(
         props.outputStructure, 

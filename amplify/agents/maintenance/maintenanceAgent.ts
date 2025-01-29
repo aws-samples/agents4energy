@@ -28,7 +28,8 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     const stackName = cdk.Stack.of(scope).stackName;
     const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3);
     const defaultDatabaseName = 'maintdb';
-    const foundationModel = 'anthropic.claude-3-sonnet-20240229-v1:0';
+    // const foundationModel = 'anthropic.claude-3-sonnet-20240229-v1:0';
+    const foundationModel = 'anthropic.claude-3-5-sonnet-20241022-v2:0';
     const agentName = `A4E-Maintenance-${stackUUID}`;
     const agentRoleName = `AmazonBedrockExecutionRole_A4E_Maintenance-${stackUUID}`;
     const agentDescription = 'Agent for energy industry maintenance workflows';
@@ -136,9 +137,9 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
 
     // ===== MAINTENANCE KNOWLEDGE BASE =====
     // Bedrock KB with OpenSearchServerless (OSS) vector backend
-    const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintenanceKB`, {//${stackName.slice(-5)}
+    const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `MaintKB`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
-        name: knowledgeBaseName,
+        // name: knowledgeBaseName, //Note: The knowledge base name will contain the id of this construct "MaintKB" even without this key being set
         instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to industrial facility maintenance and operations`,
         description: 'Maintenance Knowledge Base',
     });
@@ -340,11 +341,13 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
             new iam.PolicyStatement({
                 actions: ['bedrock:InvokeModel'],
                 resources: [
-                    "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0",
-                    "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
-                    "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
-                    "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0",
-                    "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0"
+                    `arn:aws:bedrock:${rootStack.region}:${rootStack.account}:inference-profile/*`,
+                    // "arn:aws:bedrock:${rootStack.region}::foundation-model/amazon.nova-lite-v1:0",
+                    // "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
+                    // "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
+                    // "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0",
+                    // "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0",
+                    `arn:aws:bedrock:us-*::foundation-model/*`,
                 ]
             }),
             new iam.PolicyStatement({

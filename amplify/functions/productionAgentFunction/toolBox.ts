@@ -606,7 +606,7 @@ export const wellTableTool = tool(
                         const fileDataResponse = await getStructuredOutputResponse({
                             messages: [new HumanMessage({ content: messageText })],
                             outputStructure: jsonSchema,
-                            modelId: env.MODEL_ID
+                            modelId: env.STRUCTURED_OUTPUT_MODEL_ID
                         })
 
                         //Replace the keys in file Data with those from correctedColumnNameMap

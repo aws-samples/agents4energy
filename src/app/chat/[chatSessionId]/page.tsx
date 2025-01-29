@@ -485,20 +485,21 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     async function sendMessageToChatBot(prompt: string) {
         setIsLoading(true);
-        await addChatMessage({ body: prompt, role: "human" })
+        // await addChatMessage({ body: prompt, role: "human" })
         if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
             await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession})
             // if (!response) throw new Error("No response from agent");
         } else {
             switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
                 case defaultAgents.FoundationModel.name:
-                    // await addChatMessage({ body: prompt, role: "human" })
+                    await addChatMessage({ body: prompt, role: "human" })
                     console.log("invoking the foundation model")
                     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
                     if (!responseText) throw new Error("No response from agent");
                     addChatMessage({ body: responseText, role: "ai" })
                     break
                 case defaultAgents.MaintenanceAgent.name:
+                    await addChatMessage({ body: prompt, role: "human" })
                     await invokeBedrockAgentParseBodyGetTextAndTrace({ 
                         prompt: prompt, 
                         chatSession: initialActiveChatSession,
@@ -509,11 +510,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     // addChatMessage({ body: response!.text!, role: "ai" })
                     break
                 case defaultAgents.ProductionAgent.name:
-                    // await addChatMessage({ body: prompt, role: "human" chainOfThought: true})
+                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true})
                     await invokeProductionAgent(prompt, initialActiveChatSession)
                     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
-                    // await addChatMessage({ body: prompt, role: "human" })
+                    await addChatMessage({ body: prompt, role: "human" })
                     const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: initialActiveChatSession.id })
                     console.log('Plan and execute response: ', planAndExecuteResponse)
                     break;
