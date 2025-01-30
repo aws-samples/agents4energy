@@ -150,8 +150,11 @@ export async function correctStructuredOutputResponse(model: { invoke: (arg0: an
             new AIMessage({ content: JSON.stringify(response.parsed) }),
             new HumanMessage({ content: `Data validation error: ${validationReslut.errors.join('\n')}. Please try again.` })
         );
+        console.log('Messages sent to model: \n', stringifyLimitStringLength(messages))
         response = await model.invoke(messages)
     }
+
+    console.log('Parsed model response: ', response.parsed)
 
     if (!response.parsed) throw new Error("No parsed response from model");
 

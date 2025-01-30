@@ -102,7 +102,10 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
         const agentModel = new ChatBedrockConverse({
             model: process.env.MODEL_ID,
             temperature: 0
-        });
+        })
+        // .withRetry({
+        //     stopAfterAttempt: 5
+        // })
 
         const agent = createReactAgent({
             llm: agentModel,
