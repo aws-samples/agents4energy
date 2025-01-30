@@ -1,3 +1,4 @@
+"use client"
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import React, { useRef, useEffect } from 'react';
@@ -23,27 +24,38 @@ import ChatUIMessage from '@/components/chat-ui/chat-ui-message'
 
 import '../../styles/chat.scss';
 
-export default function Messages({ messages = [], getGlossary }: { messages: Array<Message>, getGlossary: (message: Message) => void }) {
+export default function Messages(
+  { messages = [], getGlossary, isLoading, glossaryBlurbs }: 
+  { messages: Array<Message>, getGlossary: (message: Message) => void, isLoading: boolean, glossaryBlurbs: { [key: string]: string } }
+) {
   const messagesRef = useRef<HTMLDivElement>(null);
-  const wasAtBottom = useRef(true);
+  // const wasAtBottom = useRef(true);
 
-  const isAtBottom = () => {
-    const element = messagesRef.current;
-    if (!element) return false;
+  const isScrollToTheEnd = () => {
+    return (
+    Math.abs(
+      window.innerHeight +
+        window.scrollY -
+        document.documentElement.scrollHeight
+    ) <= 10
+  )
 
-    const { scrollHeight, scrollTop, clientHeight } = element;
-    const diff = Math.abs(scrollHeight - scrollTop - clientHeight);
-    console.log('Scroll position check:', {
-      scrollHeight,
-      scrollTop,
-      clientHeight,
-      diff,
-      isBottom: diff < 1
-    });
-    return diff < 1;
+    // const element = messagesRef.current;
+    // if (!element) return false;
+
+    // const { scrollHeight, scrollTop, clientHeight } = element;
+    // const diff = Math.abs(scrollHeight - scrollTop - clientHeight);
+    // console.log('Scroll position check:', {
+    //   scrollHeight,
+    //   scrollTop,
+    //   clientHeight,
+    //   diff,
+    //   isBottom: diff < 1
+    // });
+    // return diff < 1;
   };
 
-  
+
 
   // useEffect(() => {
   //   const element = messagesRef.current;
@@ -60,17 +72,17 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
   // }, []);
 
   useEffect(() => {
-    console.log('Messages changed, wasAtBottom:', wasAtBottom.current);
+    console.log('Messages changed. isScrollToTheEnd: ', isScrollToTheEnd());
 
     const scrollToBottom = () => {
       const element = messagesRef.current;
-      if (element && isAtBottom()) {
+      if (element) {
         const lastChild = element.lastElementChild;
         lastChild?.scrollIntoView({ behavior: 'auto', block: 'end' });
       }
     };
 
-    if (wasAtBottom.current) {
+    if (isScrollToTheEnd()) {
       console.log('Triggering scroll to bottom due to new message');
       scrollToBottom();
     }
@@ -78,147 +90,160 @@ export default function Messages({ messages = [], getGlossary }: { messages: Arr
 
   return (
     <div
-      className="messages"
-      role="region"
-      aria-label="Chat"
-      ref={messagesRef}
-      style={{
-        overflowY: 'auto',
-        maxHeight: '100%', // Constrain to parent height
-        height: '100%',    // Take full height
-        display: 'flex',
-        flexDirection: 'column'
-      }}
+      id="autoscroll-wrapper"
+      // style={{
+      //   maxHeight: '100%', // Constrain to parent height
+      //   height: '100%',    // Take full height
+      //   display: 'flex',
+      //   flexDirection: 'column-reverse',
+      //   overflow: 'auto'
+      // }}
     >
-      {/* <LiveRegion hidden={true} assertive={latestMessage?.type === 'alert'}>
-        {latestMessage?.type === 'alert' && latestMessage.header}
-        {latestMessage?.content}
-      </LiveRegion> */}
+      <div
+        className="messages"
+        role="region"
+        aria-label="Chat"
+        ref={messagesRef}
+        style={{
+          overflowY: 'auto',
+          // maxHeight: '100%', // Constrain to parent height
+          height: '100%',    // Take full height
+          // display: 'flex',
+          // flexDirection: 'column',
+          // overflow: ''
+        }}
+      >
 
-      {messages.map((message) => {
-        // if (message.type === 'alert') {
-        //   return (
-        //     <Alert
-        //       key={'error-alert' + index}
-        //       header={message.header}
-        //       type="error"
-        //       statusIconAriaLabel="Error"
-        //       data-testid={'error-alert' + index}
-        //     >
-        //       {message.content}
-        //     </Alert>
-        //   );
-        // }
+        {messages.map((message, index) => {
 
-        // if (!message.role) throw new Error(`Message does not have a role.\n${stringify(message)}`);
+          if (!message.role) return;
 
-        if (!message.role) return;
+          const author = AUTHORS[message.role];
 
-        const author = AUTHORS[message.role];
+          if (message.role === 'ai' && message.content.startsWith('## ') && !message.content.includes('\n')) return <h1>{message.content.slice(3)}</h1>
 
-        return (
-          <ChatBubble
-            // key={message.authorId + message.timestamp}
-            key={message.createdAt}
-            // avatar={<ChatBubbleAvatar {...author} loading={message.avatarLoading} />}
-            avatar={<ChatBubbleAvatar {...author} loading={false} />}
-            ariaLabel={`${author?.name ?? 'Unknown'} at ${message.createdAt}`}
-            type={author?.type === 'gen-ai' ? 'incoming' : 'outgoing'}
-            // hideAvatar={message.hideAvatar}
-            hideAvatar={false}
-            // actions={message.actions}
-            actions={author?.type === 'gen-ai' ?
-              <ButtonGroup
-                ariaLabel="Chat bubble actions"
-                variant="icon"
-                onItemClick={({ detail }) => {
-                  //TODO: Impliment user feedback
-                  // ["like", "dislike"].includes(detail.id) &&
-                  // setFeedback(detail.pressed ? detail.id : "")
 
-                  switch (detail.id) {
-                    case "copy":
-                      navigator.clipboard.writeText(message.content)
-                      break
-                    case "glossary":
-                      getGlossary(message);
-                      break;
-                    case "check":
-                      console.log("check");
-                      break;
+          return (
+            <ChatBubble
+              // key={message.authorId + message.timestamp}
+              key={message.createdAt}
+              // avatar={<ChatBubbleAvatar {...author} loading={message.avatarLoading} />}
+              avatar={<ChatBubbleAvatar {...author} loading={(messages.length === index + 1) && isLoading} />}
+              ariaLabel={`${author?.name ?? 'Unknown'} at ${message.createdAt}`}
+              type={author?.type === 'gen-ai' ? 'incoming' : 'outgoing'}
+              showLoadingBar={(messages.length === index + 1) && isLoading}
+              // hideAvatar={message.hideAvatar}
+              hideAvatar={false}
+              // actions={message.actions}
+              actions={author?.type === 'gen-ai' ?
+                <ButtonGroup
+                  ariaLabel="Chat bubble actions"
+                  variant="icon"
+                  onItemClick={({ detail }) => {
+                    //TODO: Impliment user feedback
+                    // ["like", "dislike"].includes(detail.id) &&
+                    // setFeedback(detail.pressed ? detail.id : "")
 
-                  }
-                }}
-                items={[
-                  {
-                    type: "group",
-                    text: "Feedback",
-                    items: [
-                      {
-                        type: "icon-toggle-button",
-                        id: "helpful",
-                        iconName: "thumbs-up",
-                        pressedIconName: "thumbs-up-filled",
-                        text: "Helpful",
-                        pressed: true
-                      },
-                      {
-                        type: "icon-toggle-button",
-                        id: "not-helpful",
-                        iconName: "thumbs-down",
-                        pressedIconName: "thumbs-down-filled",
-                        text: "Not helpful",
-                        pressed: false,
-                        disabled: true
-                      }
-                    ]
-                  },
-                  {
-                    type: "icon-button",
-                    id: "copy",
-                    iconName: "copy",
-                    text: "Copy to Clipboard",
-                    popoverFeedback: (
-                      <StatusIndicator type="success">
-                        Copied to clipboard
-                      </StatusIndicator>
-                    )
-                  },
-                  {
-                    type: "icon-button",
-                    id: "glossary",
-                    iconName: "transcript",
-                    text: "Glossary",
-                    // popoverFeedback: (
-                    //   <StatusIndicator type="success">
-                    //     Message copied
-                    //   </StatusIndicator>
-                    // )
-                  },
-                  {
-                    type: "icon-button",
-                    id: "check",
-                    iconName: "check",
-                    text: "Data Quality Check",
-                    popoverFeedback: (
-                      <StatusIndicator type="success">
-                        Copied to clipboard
-                      </StatusIndicator>
-                    )
-                  }
-                ]}
+                    switch (detail.id) {
+                      case "copy":
+                        navigator.clipboard.writeText(message.content)
+                        break
+                      case "glossary":
+                        getGlossary(message);
+                        
+                        break;
+                      case "check":
+                        console.log("check");
+                        break;
+
+                    }
+                  }}
+                  items={[
+                    {
+                      type: "group",
+                      text: "Feedback",
+                      items: [
+                        {
+                          type: "icon-toggle-button",
+                          id: "helpful",
+                          iconName: "thumbs-up",
+                          pressedIconName: "thumbs-up-filled",
+                          text: "Helpful",
+                          pressed: true
+                        },
+                        {
+                          type: "icon-toggle-button",
+                          id: "not-helpful",
+                          iconName: "thumbs-down",
+                          pressedIconName: "thumbs-down-filled",
+                          text: "Not helpful",
+                          pressed: false,
+                          disabled: true
+                        }
+                      ]
+                    },
+                    {
+                      type: "icon-button",
+                      id: "copy",
+                      iconName: "copy",
+                      text: "Copy to Clipboard",
+                      popoverFeedback: (
+                        <StatusIndicator type="success">
+                          Copied to clipboard
+                        </StatusIndicator>
+                      )
+                    },
+                    {
+                      type: "icon-button",
+                      id: "glossary",
+                      iconName: "transcript",
+                      text: "Glossary",
+                      popoverFeedback: 
+                        <StatusIndicator 
+                        type={(message.id && glossaryBlurbs && message.id in glossaryBlurbs && glossaryBlurbs[message.id].length > 1)? 'success' : 'loading'}
+                        >
+                          {(message.id && message.id in glossaryBlurbs) ? glossaryBlurbs[message.id] : ""}
+                        </StatusIndicator>
+                      
+                      
+                        // {(message.id && glossaryBlurbs && message.id in glossaryBlurbs) ? 
+                        //   <StatusIndicator type="success">
+                        //     {glossaryBlurbs[message.id]}
+                        //   </StatusIndicator>
+                         
+                        //   : null}
+
+
+                      //   // <StatusIndicator type="success">
+                      //   //   {message.id && glossaryBlurbs && message.id in glossaryBlurbs ? glossaryBlurbs[message.id]: null}
+                      //   // </StatusIndicator>
+                      // )
+                    },
+                    {
+                      type: "icon-button",
+                      id: "check",
+                      iconName: "check",
+                      text: "Data Quality Check",
+                      // popoverFeedback: (
+                      //   <StatusIndicator type="loading">
+                      //     Copied to clipboard
+                      //   </StatusIndicator>
+                      // )
+                    }
+                  ]}
+                />
+                : null}
+            >
+              <ChatUIMessage
+                key={message.id}
+                message={message}
+                showCopyButton={false}
+                messages={messages.slice(0, messages.indexOf(message))}
               />
-              : null}
-          >
-            <ChatUIMessage
-              key={message.id}
-              message={message}
-              showCopyButton={false}
-              messages={messages.slice(0, messages.indexOf(message))}
-            />
-          </ChatBubble>
-        );
-      })}
+            </ChatBubble>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -210,6 +210,7 @@ const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => 
 
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
+
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["createType"]>>([]);
     // const messagesContainerRef = React.useRef<HTMLDivElement>(null);
     const [prompt, setPrompt] = useState('');
@@ -625,7 +626,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         if (message.chatSessionId in glossaryBlurbs) return
 
-        setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: "Generating Glossary Entry for message..." })) //TODO fix this
+        // setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: "Generating Glossary Entry for message..." })) //TODO fix this
 
         const getGlossaryPrompt = `
         Return a glossary for terms found in the text blurb below:
@@ -775,45 +776,13 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
                                         items={groupChatsByMonth(chatSessions)}
 
-                                    // items={[{
-                                    //     type: 'link', text: "", info:
-                                    //         <Box>
-                                    //             {
-                                    //                 chatSessions
-                                    //                     .slice()
-                                    //                     .sort((a, b) => {
-                                    //                         if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-                                    //                         return a.createdAt < b.createdAt ? 1 : -1
-                                    //                     })
-                                    //                     .map((session) => (
-                                    // <Tiles
-                                    //     onChange={({ detail }) => {
-                                    //         setValue(detail.value);
-                                    //         router.push(`/chat/${session.id}`);
-                                    //     }}
-                                    //     value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
-
-                                    //     items={[
-                                    //         {
-                                    //             label: session.firstMessageSummary?.slice(0, 50),
-                                    //             description: `${formatDate(session.createdAt)} - AI: ${session.aiBotInfo?.aiBotName || 'Unknown'}`,
-                                    //             value: session.id
-
-                                    //         }]}
-                                    // />
-                                    //                     ))
-                                    //             }
-                                    //         </Box>
-                                    //     , href: `#`
-                                    // }]}
-
-
-
                                     />
 
                                 }
                                 content={
-                                    <div className='chat-container'>
+                                    <div
+                                        className='chat-container'
+                                    >
                                         <Container
                                             header={
                                                 <>
@@ -869,6 +838,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                     ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
                                                 ]}
                                                 getGlossary={getGlossary}
+                                                isLoading={isGenAiResponseLoading}
+                                                glossaryBlurbs={glossaryBlurbs}
                                             />
                                         </Container>
                                     </div>

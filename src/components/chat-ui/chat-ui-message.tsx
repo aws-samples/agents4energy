@@ -200,7 +200,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
           const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
 
-          console.log('table type: ', tableType)
+          // console.log('table type: ', tableType)
 
           switch (tableType) {
             case 'events':
@@ -538,7 +538,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         if (!MessageTable) {
           setMessageTable(() => newMessageTable)
-
         }
 
 
