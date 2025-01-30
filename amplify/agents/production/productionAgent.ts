@@ -699,7 +699,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     }
 
     // Create a Custom Resource that invokes the Step Function
-    const crawlerTriggerCustomResource = new cr.AwsCustomResource(scope, `TriggerCrawlerStateMachine-${props.s3Deployment.node.id}`, {
+    const crawlerTriggerCustomResource = new cr.AwsCustomResource(scope, `TriggerCrawler-${props.s3Deployment.node.id}`, {
         onCreate: invokeStepFunctionSDKCall,
         policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
             resources: [runCrawlerRecordTableDefintionStateMachine.stateMachineArn],

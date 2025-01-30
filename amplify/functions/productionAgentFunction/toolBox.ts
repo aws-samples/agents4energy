@@ -579,7 +579,7 @@ export const wellTableTool = tool(
 
             const dataRows = await processWithConcurrency({
                 items: wellFiles,
-                concurrency: 30,
+                concurrency: parseInt(env.FILE_PROCESSING_CONCURRENCY || '30', 10),
                 fn: async (s3Key) => {
                     try {
 
