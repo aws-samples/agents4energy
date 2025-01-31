@@ -17,7 +17,7 @@ export default function ChatUIMessageList(props: ChatUIMessageListProps) {
           key={message.id}
           message={message}
           showCopyButton={props.showCopyButton}
-          messages={messages.slice(0, messages.indexOf(message))}
+          // messages={messages.slice(0, messages.indexOf(message))}
         />
       ))}
     </SpaceBetween>

@@ -12,6 +12,7 @@ import ButtonGroup from "@cloudscape-design/components/button-group";
 import StatusIndicator from "@cloudscape-design/components/status-indicator";
 // import Avatar from "@cloudscape-design/chat-components/avatar";
 
+import ReactMarkdown from "react-markdown";
 // import AutoScrollContainer from "@/components/ScrollableContainer"
 
 import { ChatBubbleAvatar } from './common-components';
@@ -25,20 +26,20 @@ import ChatUIMessage from '@/components/chat-ui/chat-ui-message'
 import '../../styles/chat.scss';
 
 export default function Messages(
-  { messages = [], getGlossary, isLoading, glossaryBlurbs }: 
-  { messages: Array<Message>, getGlossary: (message: Message) => void, isLoading: boolean, glossaryBlurbs: { [key: string]: string } }
+  { messages = [], getGlossary, isLoading, glossaryBlurbs }:
+    { messages: Array<Message>, getGlossary: (message: Message) => void, isLoading: boolean, glossaryBlurbs: { [key: string]: string } }
 ) {
   const messagesRef = useRef<HTMLDivElement>(null);
   // const wasAtBottom = useRef(true);
 
   const isScrollToTheEnd = () => {
     return (
-    Math.abs(
-      window.innerHeight +
+      Math.abs(
+        window.innerHeight +
         window.scrollY -
         document.documentElement.scrollHeight
-    ) <= 10
-  )
+      ) <= 10
+    )
 
     // const element = messagesRef.current;
     // if (!element) return false;
@@ -91,13 +92,13 @@ export default function Messages(
   return (
     <div
       id="autoscroll-wrapper"
-      // style={{
-      //   maxHeight: '100%', // Constrain to parent height
-      //   height: '100%',    // Take full height
-      //   display: 'flex',
-      //   flexDirection: 'column-reverse',
-      //   overflow: 'auto'
-      // }}
+    // style={{
+    //   maxHeight: '100%', // Constrain to parent height
+    //   height: '100%',    // Take full height
+    //   display: 'flex',
+    //   flexDirection: 'column-reverse',
+    //   overflow: 'auto'
+    // }}
     >
       <div
         className="messages"
@@ -120,7 +121,7 @@ export default function Messages(
 
           const author = AUTHORS[message.role];
 
-          if (message.role === 'ai' && message.content.startsWith('## ') && !message.content.includes('\n')) return <h1>{message.content.slice(3)}</h1>
+          if (message.role === 'ai' && message.content.startsWith('## ') && !message.content.includes('\n')) return <h1 key={message.content}>{message.content.slice(3)}</h1>
 
 
           return (
@@ -150,7 +151,7 @@ export default function Messages(
                         break
                       case "glossary":
                         getGlossary(message);
-                        
+
                         break;
                       case "check":
                         console.log("check");
@@ -198,20 +199,23 @@ export default function Messages(
                       id: "glossary",
                       iconName: "transcript",
                       text: "Glossary",
-                      popoverFeedback: 
-                        <StatusIndicator 
-                        type={(message.id && glossaryBlurbs && message.id in glossaryBlurbs && glossaryBlurbs[message.id].length > 1)? 'success' : 'loading'}
+                      popoverFeedback:
+                        <StatusIndicator
+                          type={(message.id && glossaryBlurbs && message.id in glossaryBlurbs && glossaryBlurbs[message.id].length > 1) ? 'success' : 'loading'}
                         >
-                          {(message.id && message.id in glossaryBlurbs) ? glossaryBlurbs[message.id] : ""}
+                          <ReactMarkdown>
+                            {(message.id && message.id in glossaryBlurbs) ? glossaryBlurbs[message.id] : ""}
+                          </ReactMarkdown>
+
                         </StatusIndicator>
-                      
-                      
-                        // {(message.id && glossaryBlurbs && message.id in glossaryBlurbs) ? 
-                        //   <StatusIndicator type="success">
-                        //     {glossaryBlurbs[message.id]}
-                        //   </StatusIndicator>
-                         
-                        //   : null}
+
+
+                      // {(message.id && glossaryBlurbs && message.id in glossaryBlurbs) ? 
+                      //   <StatusIndicator type="success">
+                      //     {glossaryBlurbs[message.id]}
+                      //   </StatusIndicator>
+
+                      //   : null}
 
 
                       //   // <StatusIndicator type="success">
@@ -238,7 +242,7 @@ export default function Messages(
                 key={message.id}
                 message={message}
                 showCopyButton={false}
-                messages={messages.slice(0, messages.indexOf(message))}
+              // messages={messages.slice(0, messages.indexOf(message))}
               />
             </ChatBubble>
           );

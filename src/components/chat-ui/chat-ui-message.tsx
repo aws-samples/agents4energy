@@ -6,7 +6,7 @@ import {
   Button,
   Container,
   Popover,
-  // Spinner,
+  Spinner,
   StatusIndicator
 } from "@cloudscape-design/components";
 
@@ -16,9 +16,7 @@ import remarkGfm from "remark-gfm";
 import ReactMarkdown from "react-markdown";
 
 import { formatDate } from "@/utils/date-utils";
-// import { amplifyClient, invokeBedrockModelParseBodyGetText, isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
-import { isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
-
+import { amplifyClient, invokeBedrockModelParseBodyGetText, isValidJSON, getMessageCatigory } from '@/utils/amplify-utils';
 
 import styles from "@/styles/chat-ui.module.scss";
 
@@ -62,28 +60,28 @@ ChartJS.register(
 export interface ChatUIMessageProps {
   // message: Schema["ChatMessage"]["type"];
   message: Message;
-  messages: Message[];
+  // messages: Message[];
   showCopyButton?: boolean;
 }
 
-// //https://json-schema.org/understanding-json-schema/reference/array
-// const getDataQualityCheckSchema = {
-//   title: "DataQualityCheck",
-//   description: "Identify any inaccurate data",
-//   type: "object",
-//   properties: {
-//     dataChecks: {
-//       type: 'array',
-//       items: {
-//         type: 'string'
-//       },
-//       minItems: 0,
-//       maxItems: 5,
-//       description: "Identified issues"
-//     }
-//   },
-//   required: ['dataChecks'],
-// };
+//https://json-schema.org/understanding-json-schema/reference/array
+const getDataQualityCheckSchema = {
+  title: "DataQualityCheck",
+  description: "Identify any inaccurate data",
+  type: "object",
+  properties: {
+    dataChecks: {
+      type: 'array',
+      items: {
+        type: 'string'
+      },
+      minItems: 0,
+      maxItems: 5,
+      description: "Identified issues"
+    }
+  },
+  required: ['dataChecks'],
+};
 
 // function isValidJSON(str: string): boolean {
 //   try {
@@ -94,13 +92,13 @@ export interface ChatUIMessageProps {
 //   }
 // }
 
-const jsonParseHandleError = (jsonString: string) => {
-  try {
-    return JSON.parse(jsonString)
-  } catch {
-    console.warn(`Could not parse string: ${jsonString}`)
-  }
-}
+// const jsonParseHandleError = (jsonString: string) => {
+//   try {
+//     return JSON.parse(jsonString)
+//   } catch {
+//     console.warn(`Could not parse string: ${jsonString}`)
+//   }
+// }
 
 function transformListToObject<T extends Record<string, string | number>>(
   list: T[]
@@ -133,8 +131,8 @@ function generateColor(index: number): string {
 
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
-  // const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
-  // const [dataQualityBlurb, setDataQualityBlurb] = useState("")
+  const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
+  const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   const [MessagePlot, setMessagePlot] = useState<() => React.JSX.Element>()
   // const [MessagePlot, setMessagePlot] = useState<React.ElementType>(() => (<div></div>))
   const [MessageTable, setMessageTable] = useState<React.FC>()
@@ -142,7 +140,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
   const messageContentCategory = getMessageCatigory(props.message);
 
-  const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
+  // const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
 
   // Set the plot and table messages
   useEffect(() => {
@@ -150,26 +148,67 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation', 'includeScore']
     switch (messageContentCategory) {
       case 'tool_plot':
-        const { chartTitle, numberOfPreviousTablesToInclude } = JSON.parse(props.message.content) as {
+        const { chartTitle, includePreviousEventTable, includePreviousDataTable } = JSON.parse(props.message.content) as {
           // columnNameFromQueryForXAxis: string,
           chartTitle: string | undefined,
-          numberOfPreviousTablesToInclude: number
+          // numberOfPreviousTablesToInclude: number,
+          includePreviousEventTable: boolean,
+          includePreviousDataTable: boolean
         }
 
         // //Limit messages to those before the plot message
         // const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
 
-        const toolResponseMessages = previousMessages.filter(
-          (message) =>
-            "tool_call_id" in message &&
-            message.tool_call_id &&
-            jsonParseHandleError(message.content as string) &&
-            JSON.parse(message.content as string).messageContentType === 'tool_table'
-        )
+        // const toolResponseMessages = previousMessages.filter(
+        //   (message) =>
+        //     "tool_call_id" in message &&
+        //     message.tool_call_id &&
+        //     jsonParseHandleError(message.content as string) &&
+        //     JSON.parse(message.content as string).messageContentType === 'tool_table'
+        // )
 
-        // console.log('Tool Response Messages:\n', toolResponseMessages)
+        // // console.log('Tool Response Messages:\n', toolResponseMessages)
 
-        const selectedToolMessages = toolResponseMessages.slice(-1 * numberOfPreviousTablesToInclude)
+        // const dataTableMessages = toolResponseMessages.filter(
+        //   (message) => {
+        //     const chartContent = JSON.parse(message.content) as {
+        //       queryResponseData: RowDataInput,
+        //     }
+
+        //     if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
+
+        //     const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+        //     const chartTrendNames = Object.keys(chartDataObject)
+
+        //     const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+
+        //     return tableType === 'trend'
+        //   }
+        // )
+
+        // const eventTableMessages = toolResponseMessages.filter(
+        //   (message) => {
+        //     const chartContent = JSON.parse(message.content) as {
+        //       queryResponseData: RowDataInput,
+        //     }
+
+        //     if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
+
+        //     const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+        //     const chartTrendNames = Object.keys(chartDataObject)
+
+        //     const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+
+        //     return tableType === 'events'
+        //   }
+        // )
+
+        const selectedToolMessages = [
+          ...includePreviousDataTable ? [props.message.previousTrendTableMessage] : [],
+          ...includePreviousEventTable ? [props.message.previousEventTableMessage] : []
+        ]
 
         // console.log("Selected messages: ", selectedToolMessages)
 
@@ -185,14 +224,25 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         const data: ChartData<'scatter', ScatterDataPoint[]> = { datasets: [] }
 
         const xAxisLabels = selectedToolMessages.map((selectedToolMessage) => {
+          if (!selectedToolMessage) return
 
           const chartContent = JSON.parse(selectedToolMessage.content) as {
             queryResponseData: RowDataInput,
           }
 
-          if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
+          if (!chartContent.queryResponseData || chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
 
-          const chartDataObject = transformListToObject(chartContent.queryResponseData)
+          const chartQueryResponsesWithDate = chartContent.queryResponseData
+            .filter(dataRow => { //The first key in the object must contain a date
+              const dateCandidate = dataRow[Object.keys(dataRow)[0]]
+              // console.log('dateCandidate: ', dateCandidate)
+              return (dateCandidate !== null) &&
+                !isNaN((new Date(dateCandidate)).getTime())
+            })
+
+          // console.log('chart query responses with date: ', chartQueryResponsesWithDate)
+
+          const chartDataObject = transformListToObject(chartQueryResponsesWithDate)
 
           // console.log('chart data: ', chartDataObject)
 
@@ -204,6 +254,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
           switch (tableType) {
             case 'events':
+              // console.log('chartQueryResponsesWithDate:\n', stringify(chartQueryResponsesWithDate))
               const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
                 // labels: ['event'.repeat(chartDataObject[chartTrendNames[0]].length)],
                 datasets: [
@@ -349,9 +400,9 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             },
             datalabels: {
               display: 'auto', //Hide overlapped data
-              color: 'initial',
-              // backgroundColor: 'white',
-              // borderRadius: 4,
+              color: 'black',
+              backgroundColor: 'white',
+              borderRadius: 4,
               font: {
                 weight: "bold"
               },
@@ -391,35 +442,36 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               overflowWrap: 'break-word',
             }}
           >
-            {stringify(chartDataObject)}
+            {stringify(props.message)}
           </pre> */}
           <Scatter
             data={data}
             options={options}
           />
         </>
-        
+
         // console.log("Number of table tool response messages: ", toolResponseMessages.length)
         // console.log("New Data: ", newMessagePlot().props.children?.props?.data)
         // console.log("Previous Data: ", MessagePlot && MessagePlot().props.children?.props?.data)
         if (
-          !MessagePlot || 
-          JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data) 
-        )  {
-          console.log("Number of datasets: ", data.datasets.length)
-          console.log("Number of table tool response messages: ", toolResponseMessages)
-          console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
-          console.log('New Message Plot Props: ', newMessagePlot().props.children?.props)
+          !MessagePlot ||
+          JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data)
+        ) {
+          // console.log("Number of datasets: ", data.datasets.length)
+          // console.log("Number of table tool response messages: ", toolResponseMessages)
+          // console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
+          // console.log('New Message Plot Props: ', newMessagePlot().props.children?.props)
           setMessagePlot(() => newMessagePlot)
         }
 
-      case 'tool_table':
+      case 'tool_table_events':
+      case 'tool_table_trend':
         // https://mui.com/x/react-data-grid/
         // const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
         const queryResponseData: RowDataInput = JSON.parse(props.message.content as string).queryResponseData
 
         if (!queryResponseData || queryResponseData.length === 0) {
-          console.log('no query response data')
+          // console.log('no query response data')
           return
         }
 
@@ -447,7 +499,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 whiteSpace: 'normal',
                 wordWrap: 'break-word',
                 lineHeight: 'normal',
-                width: '100%',
+                width: '100%'
               }}>
                 {params.value}
               </div>
@@ -516,20 +568,17 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   padding: '12px',
                   display: 'flex',
                   alignItems: 'center',
-                  color: 'initial',
                 },
                 '& .MuiDataGrid-row': {
                   maxHeight: 'none !important',
-                  color: 'initial',
                 },
                 '& .MuiDataGrid-renderingZone': {
                   maxHeight: 'none !important',
-                  color: 'initial',
                 },
                 '& .MuiDataGrid-virtualScroller': {
                   // Disable virtual scrolling
                   overflowY: 'visible !important',
-                }
+                },
               }}
             />
           </>
@@ -538,63 +587,68 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         if (!MessageTable) {
           setMessageTable(() => newMessageTable)
+
         }
 
 
     }
-  }, [props.message, previousMessages, messageContentCategory, MessageTable, MessagePlot])
+  }, [props.message, messageContentCategory, MessageTable, MessagePlot])
+
+  // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
+  async function getGlossary(message: Message) {
+
+    if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
+
+    if (message.chatSessionId in glossaryBlurbs) return
+
+    const getGlossaryPrompt = `
+    Return a glossary for terms found in the text blurb below:
+
+    ${message.content}
+    `
+    const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
+    if (!newBlurb) throw new Error("No glossary blurb returned")
+    setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
+  }
+
+  // async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
+  async function getDataQualityCheck(message: Message) {
+    setDataQualityBlurb("")
+
+    if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
+
+    const dataQualityCheckResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
+      chatSessionId: message.chatSessionId,
+      lastMessageText: "What data quality issues can you identify in the messages above?",
+      outputStructure: JSON.stringify(getDataQualityCheckSchema)
+    })
+    console.log("Data Quality Check Response: ", dataQualityCheckResponse)
+    if (dataQualityCheckResponse.data) {
+      const newDataQualityChecks = JSON.parse(dataQualityCheckResponse.data).dataChecks as string[]
+      if (newDataQualityChecks.length) {
+        setDataQualityBlurb(() => newDataQualityChecks.join('\n\n'))
+      } else {
+        setDataQualityBlurb(() => "No data quality issues identified")
+      }
 
 
-  // async function getGlossary(message: Message) {
-
-  //   if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
-
-  //   if (message.chatSessionId in glossaryBlurbs) return
-
-  //   const getGlossaryPrompt = `
-  //   Return a glossary for terms found in the text blurb below:
-
-  //   ${message.content}
-  //   `
-  //   const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
-  //   if (!newBlurb) throw new Error("No glossary blurb returned")
-  //   setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
-  // }
-
-  // async function getDataQualityCheck(message: Message) {
-  //   setDataQualityBlurb("")
-
-  //   if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
-
-  //   const dataQualityCheckResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
-  //     chatSessionId: message.chatSessionId,
-  //     lastMessageText: "What data quality issues can you identify in the messages above?",
-  //     outputStructure: JSON.stringify(getDataQualityCheckSchema)
-  //   })
-  //   console.log("Data Quality Check Response: ", dataQualityCheckResponse)
-  //   if (dataQualityCheckResponse.data) {
-  //     const newDataQualityChecks = JSON.parse(dataQualityCheckResponse.data).dataChecks as string[]
-  //     if (newDataQualityChecks.length) {
-  //       setDataQualityBlurb(() => newDataQualityChecks.join('\n\n'))
-  //     } else {
-  //       setDataQualityBlurb(() => "No data quality issues identified")
-  //     }
+    } else console.log('No suggested prompts found in response: ', dataQualityCheckResponse)
 
 
-  //   } else console.log('No suggested prompts found in response: ', dataQualityCheckResponse)
-
-
-  // }
+  }
 
   // console.log('messagePlot:', MessagePlot);
   // console.log('Type of messagePlot:', typeof MessagePlot);
   // console.log('Is valid React element:', React.isValidElement(MessagePlot));
 
   return (
-    <div>
+    <div
+      key={props.message.id}
+      id={props.message.content}
+    >
       {props.message?.role != 'human' && (
         <Container>
-          {/* <div className={styles.btn_chabot_message_copy}>
+          <div className={styles.btn_chabot_message_copy}>
             <Popover
               size="medium"
               position="top"
@@ -614,9 +668,9 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                 }}
               />
             </Popover>
-          </div> */}
+          </div>
 
-          {/* {props.message.chatSessionId ? (
+          {props.message.chatSessionId ? (
             <>
               <div className={styles.btn_chabot_message_copy}>
                 <Popover
@@ -659,7 +713,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               </div>
             </>
           ) : null
-          } */}
+          }
 
           {props.message.trace ? (
             <div className={styles.btn_chabot_message_copy}>
@@ -681,7 +735,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           }
 
           {/* If the tool returns a table, add the show / hide rows button */}
-          {messageContentCategory === 'tool_table' ? (
+          {messageContentCategory === 'tool_table_events' ? (
             <div className={styles.btn_chabot_message_copy}>
               <Popover
                 size="medium"
@@ -721,11 +775,13 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               case 'tool_plot':
                 return <>
                   {/* <MessagePlot/> */}
-                  {MessagePlot && <MessagePlot/>}
+                  {MessagePlot && <MessagePlot />}
                 </>
-              case 'tool_table':
+              case 'tool_table_events':
+              case 'tool_table_trend':
                 return <>
-                  {MessageTable && <MessageTable/>}
+                  {/* <pre>{props.message.content}</pre> */}
+                  {MessageTable && <MessageTable />}
                 </>
               case 'tool_json':
                 return <pre
@@ -733,7 +789,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                     whiteSpace: 'pre-wrap',
                     wordWrap: 'break-word',
                     overflowWrap: 'break-word',
-                    color: 'initial',
                   }}
                 >
                   {

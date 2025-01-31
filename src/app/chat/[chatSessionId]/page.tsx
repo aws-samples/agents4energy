@@ -30,7 +30,7 @@ import Messages from './messages';
 import Steps from "@cloudscape-design/components/steps";
 
 import type { Schema } from '@/../amplify/data/resource';
-import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
+import { amplifyClient, getMessageCatigory, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useRouter } from 'next/navigation';
 
@@ -213,7 +213,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["createType"]>>([]);
     // const messagesContainerRef = React.useRef<HTMLDivElement>(null);
-    const [prompt, setPrompt] = useState('');
+    const [userPrompt, setUserPrompt] = useState('');
     const [isGenAiResponseLoading, setIsGenAiResponseLoading] = useState(false);
 
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
@@ -375,10 +375,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     lastMessageText: "Suggest three follow up prompts",
                     usePastMessages: true,
                     outputStructure: JSON.stringify({
-                        title: "RecommendNextPrompt",
+                        title: "RecommendNextPrompt", //title and description help the llm to know how to fill the arguments out
                         description: "Help the user chose the next prompt to send.",
                         type: "object",
-                        properties: {
+                        properties: {// Change anyting in the properties according to the json schema reference: https://json-schema.org/understanding-json-schema/reference
                             suggestedPrompts: {
                                 type: 'array',
                                 items: {
@@ -437,7 +437,35 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 }
             }).subscribe({
                 next: ({ items }) => { //isSynced is an option here to
-                    setMessages((prevMessages) => combineAndSortMessages(prevMessages, items))
+                    setMessages((prevMessages) => {
+                        //If the message has type plot, attach the previous tool_table_events and tool_table_trend messages to it.
+                        const sortedMessages = combineAndSortMessages(prevMessages, items)
+
+                        const sortedMessageWithPlotContext = sortedMessages.map((message, index) => {
+                            const messageCatigory = getMessageCatigory(message)
+                            if (messageCatigory === 'tool_plot') {
+                                //Get the messages with a lower index than the tool_plot's index
+                                const earlierMessages = sortedMessages.slice(0, index).reverse()
+
+                                const earlierEventsTable = earlierMessages.find((previousMessage) => {
+                                    const previousMessageCatigory = getMessageCatigory(previousMessage)
+                                    return previousMessageCatigory === 'tool_table_events'
+                                })
+
+                                const earlierTrendTable = earlierMessages.find((previousMessage) => {
+                                    const previousMessageCatigory = getMessageCatigory(previousMessage)
+                                    return previousMessageCatigory === 'tool_table_trend'
+                                })
+
+                                return {
+                                    ...message,
+                                    previousTrendTableMessage: earlierTrendTable,
+                                    previousEventTableMessage: earlierEventsTable
+                                }
+                            } else return message
+                        })
+                        return sortedMessageWithPlotContext
+                    })
                 }
             }
             )
@@ -576,7 +604,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         }
         // await addChatMessage({ body: body, role: "human" })
         sendMessageToChatBot(value);
-        setPrompt("")
+        setUserPrompt("")
     }
 
     async function sendMessageToChatBot(prompt: string) {
@@ -628,15 +656,52 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         // setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: "Generating Glossary Entry for message..." })) //TODO fix this
 
-        const getGlossaryPrompt = `
-        Return a glossary for terms found in the text blurb below:
-    
-        ${message.content}
-        `
-        const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
-        if (!newBlurb) throw new Error("No glossary blurb returned")
-        setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
+        // const getGlossaryPrompt = `
+        // Return a glossary for terms found in the text blurb below:
+
+        // ${message.content}
+        // `
+        // const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
+        // if (!newBlurb) throw new Error("No glossary blurb returned")
+
+        const generateGlossaryResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
+            chatSessionId: message.chatSessionId,
+            lastMessageText: `Define any uncommon or industry specific terms in the message below\n<message>${message.content}</message>`,
+            usePastMessages: false,
+            outputStructure: JSON.stringify({
+                title: "DefineGlossaryTerms", //title and description help the llm to know how to fill the arguments out
+                description: "Create a JSON object which describes complex technical terms in the text. Only define terms which may be confuse some engineers",
+                type: "object",
+                properties: {// Change anyting in the properties according to the json schema reference: https://json-schema.org/understanding-json-schema/reference
+                    glossaryArray: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                term: { type: 'string' },
+                                definition: { type: 'string' }
+                            },
+                            required: ['term', 'description']
+                        },
+                        description: `Array of defined glossary terms`
+                    }
+                },
+                required: ['glossaryArray'],
+            })
+        })
+        console.log("Generate Glossary Response: ", generateGlossaryResponse)
+        if (generateGlossaryResponse.data) {
+            const newGeneratedGlossary = jsonParseHandleError(generateGlossaryResponse.data).glossaryArray as { term: string, definition: string }[]
+            console.log('Generated Glossary Entry: ', newGeneratedGlossary)
+            const newGlossaryBlurb = newGeneratedGlossary.map(glossaryEntry => `## ${glossaryEntry.term}: \n ${glossaryEntry.definition}`).join("\n\n")
+            // const newGlossaryBlurb = newGeneratedGlossary.map(glossaryEntry => (<><h4>${glossaryEntry.term}</h4><p>{glossaryEntry.definition}</p></>)).join("\n")
+            if (newGeneratedGlossary) setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newGlossaryBlurb }))
+            // const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
+        } else console.log('Error Generating Glossary: ', generateGlossaryResponse)
     }
+
+    // setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
+
 
     // Helper function to group chat sessions by month
     const groupChatsByMonth = (chatSessions: Array<Schema["ChatSession"]["type"]>): SideNavigationProps.Item[] => {
@@ -782,6 +847,13 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                 content={
                                     <div
                                         className='chat-container'
+                                        style={{
+                                            // maxHeight: '100%', // Constrain to parent height
+                                            // height: '100%',    // Take full height
+                                            // display: 'flex',
+                                            flexDirection: 'column-reverse', //The intent is for this to enable auto-scrolling
+                                            overflow: 'auto'
+                                        }}
                                     >
                                         <Container
                                             header={
@@ -820,9 +892,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                     {/* In the meantime, changing aria labels of prompt input and action button to reflect this. */}
 
                                                     <PromptInput
-                                                        onChange={({ detail }) => setPrompt(detail.value)}
+                                                        onChange={({ detail }) => setUserPrompt(detail.value)}
                                                         onAction={addUserChatMessage}
-                                                        value={prompt}
+                                                        value={userPrompt}
                                                         actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
                                                         actionButtonIconName="send"
                                                         ariaLabel={isGenAiResponseLoading ? 'Prompt input - suppressed' : 'Prompt input'}
