@@ -30,6 +30,7 @@ import {
 
 import { AwsSolutionsChecks } from 'cdk-nag'
 
+import { corporateAgentBuilder } from "./agents/corporate/corporateAgent"
 import { productionAgentBuilder } from "./agents/production/productionAgent"
 import { maintenanceAgentBuilder } from "./agents/maintenance/maintenanceAgent"
 import { AppConfigurator } from './custom/appConfigurator'
@@ -183,7 +184,6 @@ applyTagsToRootStack()
 /////// Create the Production Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
 const productionAgentStack = backend.createStack('prodAgentStack')
-const maintenanceAgentStack = backend.createStack('maintAgentStack')
 
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -274,8 +274,28 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
 )
 
 ///////////////////////////////////////////////////////////
+/////// Create the Corporate Agent Stack //////////////////
+///////////////////////////////////////////////////////////
+const corporateAgentStack = backend.createStack('corporateAgentStack')
+
+const {corporateAgent, corporateAgentAlias} = corporateAgentBuilder(corporateAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
+  s3Bucket: backend.storage.resources.bucket,
+})
+
+backend.addOutput({
+  custom: {
+    corporateAgentId: corporateAgent.attrAgentId,
+    corporateAgentAliasId: corporateAgentAlias.attrAgentAliasId,
+  },
+})
+
+///////////////////////////////////////////////////////////
 /////// Create the Maintenance Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
+const maintenanceAgentStack = backend.createStack('maintAgentStack')
+
 const {defaultDatabaseName, maintenanceAgent, maintenanceAgentAlias} = maintenanceAgentBuilder(maintenanceAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.

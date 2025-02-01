@@ -1,0 +1,17 @@
+Explanation of Metrics:
+Title: The name of the project.
+Summary: A brief description of the project.
+Start Date: The planned start date of the project.
+End Date: The planned end date of the project.
+Estimated Cost (BRL): The total estimated cost of the project in Brazilian Reals.
+NPV (BRL): The Net Present Value of the project in Brazilian Reals, indicating the present value of all future cash flows.
+IRR (%): The Internal Rate of Return, which is the discount rate that makes the NPV of all cash flows equal to zero.
+ROI (%): The Return on Investment, which measures the gain or loss generated on an investment relative to the amount of money invested.
+Payback Period (Years): The time it takes for the project to recoup its initial cost out of its operating cash flows.
+Risk Level: The assessed risk level of the project (Low, Medium, High).
+Location: The geographical location where the project will be implemented.
+Partnership Type: The type of partnership between BP and Petrobras (Joint Venture, Collaborative Project).
+Technology Used: The specific technology that will be utilized in the project.
+Environmental Impact: The expected environmental impact of the project (Low, Moderate, High).
+Social Impact: The expected social impact of the project (Low, Medium, High).
+You can import this CSV list into Excel to further analyze and manage these projects.
