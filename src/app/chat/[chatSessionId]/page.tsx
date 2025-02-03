@@ -890,19 +890,19 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     //     id: "second",
                     //     content: "Second tab content area"
                     // },
-                    {
-                        label: "Reasoning",
-                        id: "third",
-                        content: <ul>
-                            {
-                                messages
-                                    .filter((message) => message.trace)
-                                    .map((message, index) => {
-                                        return <li key={index}>{message.trace}</li>
-                                    })
-                            }
-                        </ul>,
-                    },
+                    // {
+                    //     label: "Reasoning",
+                    //     id: "third",
+                    //     content: <ul>
+                    //         {
+                    //             messages
+                    //                 .filter((message) => message.trace)
+                    //                 .map((message, index) => {
+                    //                     return <li key={index}>{message.trace}</li>
+                    //                 })
+                    //         }
+                    //     </ul>,
+                    // },
                     {
                         label: "Links",
                         id: "fourth",
@@ -913,15 +913,15 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                 </Container>
                             </div>,
                     },
-                    {
-                        label: "Glossary",
-                        id: "fifth",
-                        content: <ul>
-                            {
-                                Object.values(glossaryBlurbs).map((blurb, index) => (<li key={index}>{blurb}</li>))
-                            }
-                        </ul>,
-                    }
+                    // {
+                    //     label: "Glossary",
+                    //     id: "fifth",
+                    //     content: <ul>
+                    //         {
+                    //             Object.values(glossaryBlurbs).map((blurb, index) => (<li key={index}>{blurb}</li>))
+                    //         }
+                    //     </ul>,
+                    // }
                 ]}
             />
         </div>
