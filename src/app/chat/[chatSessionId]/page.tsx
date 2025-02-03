@@ -218,6 +218,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
+    const [groupedChatSessions, setGroupedChatSessions] = useState<SideNavigationProps.Item[]>([])
     const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
@@ -228,56 +229,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const router = useRouter();
 
     const [navigationOpen, setNavigationOpen] = useState(true);
-    // const [value, setValue] = React.useState("item1");
 
-
-    // const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
-    //     if (!value || value.length === 0 || isGenAiResponseLoading) {
-    //         return;
-    //     }
-
-    //     const newMessage: Message = {
-    //         // type: 'chat-bubble',
-    //         // authorId: 'user-jane-doe',
-    //         // type: '',
-    //         role: 'human',
-    //         content: value,
-    //         createdAt: new Date().toLocaleTimeString(),
-    //     };
-
-    //     setMessages(prevMessages => [...prevMessages, newMessage]);
-    //     setPrompt('');
-
-    //     const waitTimeBeforeLoading = 300;
-
-    //     // Show loading state
-    //     setTimeout(() => {
-    //         setIsGenAiResponseLoading(true);
-    //         // setMessages(prevMessages => [...prevMessages, getLoadingMessage()]);
-    //         setMessages(prevMessages => [...prevMessages]);
-    //     }, waitTimeBeforeLoading);
-
-    //     const lowerCasePrompt = value.toLowerCase();
-
-    //     const isLoadingPrompt = validLoadingPrompts.includes(lowerCasePrompt);
-
-    //     // The loading state will be shown for 4 seconds for loading prompt and 1.5 seconds for rest of the prompts
-    //     const waitTimeBeforeResponse = isLoadingPrompt ? 4000 : 1500;
-
-    //     // Send Gen-AI response, replacing the loading chat bubble
-    //     setTimeout(() => {
-    //         const validPrompt = VALID_PROMPTS.find(({ prompt }) => prompt.includes(lowerCasePrompt));
-
-    //         setMessages(prevMessages => {
-    //             const response = validPrompt ? validPrompt.getResponse() : getInvalidPromptResponse();
-    //             prevMessages.splice(prevMessages.length - 1, 1, { ...response, type: 'chat-bubble' });
-    //             return prevMessages;
-    //         });
-    //         setIsGenAiResponseLoading(false);
-    //     }, waitTimeBeforeResponse + waitTimeBeforeLoading);
-    // };
-
-    // const [messages, setMessages] = useState<Array<Message>>([]);
 
     const [, setCharacterStream] = useState<{ content: string, index: number }[]>([{
         content: "\n\n\n",
@@ -408,6 +360,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     // List the user's chat sessions
     useEffect(() => {
+        console.log("Listing User's Chat Sessions")
         if (user) {
             amplifyClient.models.ChatSession.observeQuery({
                 filter: {
@@ -427,8 +380,16 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }, [user, initialActiveChatSession, params?.chatSessionId])
 
+    // Groupd the user's chat sessions
+    useEffect(() => {
+        console.log("Grouping Chat Sessions")
+        const newGroupedChatSessions = groupChatsByMonth(chatSessions)
+        setGroupedChatSessions(newGroupedChatSessions)
+    }, [chatSessions])
+
     // Subscribe to messages of the active chat session
     useEffect(() => {
+        console.log("Subscribing to messages of the active chat session")
         // setMessages([])
         if (initialActiveChatSession) {
             const sub = amplifyClient.models.ChatMessage.observeQuery({
@@ -476,6 +437,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     // Subscribe to the token stream for this chat session
     useEffect(() => {
+        console.log("Subscribing to the token stream for this chat session")
         if (initialActiveChatSession) {
             const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: initialActiveChatSession.id }).subscribe({
                 next: (newChunk) => {
@@ -731,7 +693,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             return acc;
         }, {});
 
-        return Object.entries(grouped).map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
+        return Object.entries(grouped).reverse().map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
             type: "section",
             text: monthYear,
             items: [{
@@ -751,15 +713,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     }
                 />
             }]
-            // items: chats.map(chat => ({
-            //     type: "link",
-            //     text: chat.firstMessageSummary || `Chat ${chat.id}`,
-            //     href: `/chat/${chat.id}`,
-            //     // Add a style property to bold when selected
-            //     style: chat.id === params?.chatSessionId ? 
-            //         { fontWeight: 'bold' } : 
-            //         { fontWeight: 'normal' }
-            // }))
         }));
     };
 
@@ -837,9 +790,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                             href: '#',
                                             text: 'Sessions',
                                         }}
-
-
-                                        items={groupChatsByMonth(chatSessions)}
+                                        items={groupedChatSessions}
 
                                     />
 
