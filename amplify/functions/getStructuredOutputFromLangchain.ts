@@ -43,7 +43,7 @@ Amplify.configure(
 const amplifyClient = generateClient<Schema>();
 
 interface FieldDefinition {
-    type: string;
+    type: string  | Array<string>;
     description: string;
     format?: string;
     pattern?: string;
@@ -54,7 +54,7 @@ interface FieldDefinition {
 }
 
 interface JsonSchema {
-    title: string;
+    title: string | Array<string>;
     description: string;
     type: string;
     properties: Record<string, FieldDefinition>;
@@ -150,8 +150,11 @@ export async function correctStructuredOutputResponse(model: { invoke: (arg0: an
             new AIMessage({ content: JSON.stringify(response.parsed) }),
             new HumanMessage({ content: `Data validation error: ${validationReslut.errors.join('\n')}. Please try again.` })
         );
+        console.log('Messages sent to model: \n', stringifyLimitStringLength(messages))
         response = await model.invoke(messages)
     }
+
+    console.log('Parsed model response: ', response.parsed)
 
     if (!response.parsed) throw new Error("No parsed response from model");
 
@@ -162,7 +165,7 @@ export const getStructuredOutputResponse = async (props: {modelId: string, messa
 
 
     const chatModelWithStructuredOutput = new ChatBedrockConverse({
-        model: process.env.MODEL_ID,
+        model: props.modelId || process.env.MODEL_ID,
         temperature: 0
     }).withStructuredOutput(
         props.outputStructure, 

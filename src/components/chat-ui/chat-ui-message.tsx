@@ -148,10 +148,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     const nonDefaultColumns = ['s3Key', 'relevantPartOfJsonObject', 'includeScoreExplanation', 'includeScore']
     switch (messageContentCategory) {
       case 'tool_plot':
-        const { chartTitle, numberOfPreviousTablesToInclude } = JSON.parse(props.message.content) as {
+        const { chartTitle, includePreviousEventTable, includePreviousDataTable } = JSON.parse(props.message.content) as {
           // columnNameFromQueryForXAxis: string,
           chartTitle: string | undefined,
-          numberOfPreviousTablesToInclude: number
+          // numberOfPreviousTablesToInclude: number,
+          includePreviousEventTable: boolean,
+          includePreviousDataTable: boolean
         }
 
         // //Limit messages to those before the plot message
@@ -167,7 +169,46 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         // console.log('Tool Response Messages:\n', toolResponseMessages)
 
-        const selectedToolMessages = toolResponseMessages.slice(-1 * numberOfPreviousTablesToInclude)
+        const dataTableMessages = toolResponseMessages.filter(
+          (message) => {
+            const chartContent = JSON.parse(message.content) as {
+              queryResponseData: RowDataInput,
+            }
+
+            if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
+
+            const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+            const chartTrendNames = Object.keys(chartDataObject)
+
+            const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+
+            return tableType === 'trend'
+          }
+        )
+
+        const eventTableMessages = toolResponseMessages.filter(
+          (message) => {
+            const chartContent = JSON.parse(message.content) as {
+              queryResponseData: RowDataInput,
+            }
+
+            if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
+
+            const chartDataObject = transformListToObject(chartContent.queryResponseData)
+
+            const chartTrendNames = Object.keys(chartDataObject)
+
+            const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+
+            return tableType === 'events'
+          }
+        )
+
+        const selectedToolMessages = [
+          ...includePreviousDataTable ? dataTableMessages.slice(-1) : [],
+          ...includePreviousEventTable ? eventTableMessages.slice(-1) : []
+        ]
 
         // console.log("Selected messages: ", selectedToolMessages)
 
@@ -190,7 +231,17 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
           if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
 
-          const chartDataObject = transformListToObject(chartContent.queryResponseData)
+          const chartQueryResponsesWithDate = chartContent.queryResponseData
+            .filter(dataRow => { //The first key in the object must contain a date
+              const dateCandidate = dataRow[Object.keys(dataRow)[0]]
+              // console.log('dateCandidate: ', dateCandidate)
+              return (dateCandidate !== null) &&
+                !isNaN((new Date(dateCandidate)).getTime())
+            })
+
+          // console.log('chart query responses with date: ', chartQueryResponsesWithDate)
+
+          const chartDataObject = transformListToObject(chartQueryResponsesWithDate)
 
           // console.log('chart data: ', chartDataObject)
 
@@ -198,10 +249,11 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
           const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
 
-          console.log('table type: ', tableType)
+          // console.log('table type: ', tableType)
 
           switch (tableType) {
             case 'events':
+              // console.log('chartQueryResponsesWithDate:\n', stringify(chartQueryResponsesWithDate))
               const newEventData: ChartData<'scatter', ScatterDataPoint[]> = {
                 // labels: ['event'.repeat(chartDataObject[chartTrendNames[0]].length)],
                 datasets: [
@@ -396,18 +448,18 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             options={options}
           />
         </>
-        
+
         // console.log("Number of table tool response messages: ", toolResponseMessages.length)
         // console.log("New Data: ", newMessagePlot().props.children?.props?.data)
         // console.log("Previous Data: ", MessagePlot && MessagePlot().props.children?.props?.data)
         if (
-          !MessagePlot || 
-          JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data) 
-        )  {
-          console.log("Number of datasets: ", data.datasets.length)
-          console.log("Number of table tool response messages: ", toolResponseMessages)
-          console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
-          console.log('New Message Plot Props: ', newMessagePlot().props.children?.props)
+          !MessagePlot ||
+          JSON.stringify(newMessagePlot().props.children?.props?.data) !== JSON.stringify(MessagePlot().props.children?.props?.data)
+        ) {
+          // console.log("Number of datasets: ", data.datasets.length)
+          // console.log("Number of table tool response messages: ", toolResponseMessages)
+          // console.log('Previous Message Plot Props: ', MessagePlot && MessagePlot().props)
+          // console.log('New Message Plot Props: ', newMessagePlot().props.children?.props)
           setMessagePlot(() => newMessagePlot)
         }
 
@@ -417,7 +469,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         const queryResponseData: RowDataInput = JSON.parse(props.message.content as string).queryResponseData
 
         if (!queryResponseData || queryResponseData.length === 0) {
-          console.log('no query response data')
+          // console.log('no query response data')
           return
         }
 
@@ -588,7 +640,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   // console.log('Is valid React element:', React.isValidElement(MessagePlot));
 
   return (
-    <div>
+    <div
+      key={props.message.id}
+      id={props.message.content}
+    >
       {props.message?.role != 'human' && (
         <Container>
           <div className={styles.btn_chabot_message_copy}>
@@ -718,11 +773,12 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               case 'tool_plot':
                 return <>
                   {/* <MessagePlot/> */}
-                  {MessagePlot && <MessagePlot/>}
+                  {MessagePlot && <MessagePlot />}
                 </>
               case 'tool_table':
                 return <>
-                  {MessageTable && <MessageTable/>}
+                  {/* <pre>{props.message.content}</pre> */}
+                  {MessageTable && <MessageTable />}
                 </>
               case 'tool_json':
                 return <pre

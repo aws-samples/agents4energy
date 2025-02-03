@@ -35,7 +35,7 @@ import { withAuth } from '@/components/WithAuth';
 
 import dynamic from 'next/dynamic'
 
-import { createHash } from 'crypto';
+// import { createHash } from 'crypto';
 
 const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
     ssr: false,
@@ -43,34 +43,34 @@ const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/cha
 
 // const drawerWidth = 240;
 
-type ListBedrockAgentsResponseType = {
-    agentSummaries: {
-        agentId: string;
-        agentName: string;
-        agentStatus: string;
-        latestAgentVersion: string;
-        updatedAt: string;
-    }[];
-}
+// type ListBedrockAgentsResponseType = {
+//     agentSummaries: {
+//         agentId: string;
+//         agentName: string;
+//         agentStatus: string;
+//         latestAgentVersion: string;
+//         updatedAt: string;
+//     }[];
+// }
 
-type ListAgentIdsResponseType = {
-    agentAliasSummaries:
-    {
-        agentAliasId: string,
-        agentAliasName: string,
-        agentAliasStatus: string,
-        createdAt: string,
-        description: string,
-        routingConfiguration:
-        {
-            agentVersion: string,
-            provisionedThroughput: string
-        }[],
-        updatedAt: string
-    }[]
-    ,
-    nextToken: string
-}
+// type ListAgentIdsResponseType = {
+//     agentAliasSummaries:
+//     {
+//         agentAliasId: string,
+//         agentAliasName: string,
+//         agentAliasStatus: string,
+//         createdAt: string,
+//         description: string,
+//         routingConfiguration:
+//         {
+//             agentVersion: string,
+//             provisionedThroughput: string
+//         }[],
+//         updatedAt: string
+//     }[]
+//     ,
+//     nextToken: string
+// }
 
 const jsonParseHandleError = (jsonString: string) => {
     try {
@@ -147,25 +147,25 @@ const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSe
     )
 }
 
-const getAgentAliasId = async (agentId: string) => {
-    const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
-    // console.log('get Agent Alias Id Response: ', response.data)
-    if (!(response.data && response.data.body)) {
-        console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
-        return
-    }
-    // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
-    const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
+// const getAgentAliasId = async (agentId: string) => {
+//     const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
+//     // console.log('get Agent Alias Id Response: ', response.data)
+//     if (!(response.data && response.data.body)) {
+//         console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
+//         return
+//     }
+//     // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
+//     const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
 
-    if (!listAgnetAliasIdsResponseBody) {
-        console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
-        return
-    }
-    //Get the most recently created AliasId
-    const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
+//     if (!listAgnetAliasIdsResponseBody) {
+//         console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
+//         return
+//     }
+//     //Get the most recently created AliasId
+//     const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
 
-    return mostRecentAliasId
-}
+//     return mostRecentAliasId
+// }
 
 // const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr2: Array<Schema["ChatMessage"]["type"]>) => {
 const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
@@ -193,7 +193,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false);
-    const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
+    // const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
 
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
@@ -239,10 +239,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         // console.log("initialActiveChatSession hash: ", createHash('md5').update("dasf").digest('hex'))
         console.log("Messages: ", messages)
-        console.log("initialActiveChatSession: ", initialActiveChatSession)
+        // console.log("initialActiveChatSession: ", initialActiveChatSession)
 
-        console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
-        console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
+        // console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
+        // console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
 
         //Reset the character stream when we get a new message
         setCharacterStream(() => {
@@ -403,27 +403,27 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }, [initialActiveChatSession])
 
-    // List the available bedrock agents
-    useEffect(() => {
-        const fetchListBedrockAgents = async () => {
-            const response = await amplifyClient.queries.listBedrockAgents()
-            console.log('List Agents Response: ', response.data)
-            if (!(response.data && response.data.body)) {
-                console.log('No response from listing bedrock agents')
-                return
-            }
-            // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
-            const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
-            if (!listAgentsResponseBody) {
-                console.log('Could not parse response body from listing bedrock agents')
-                return
-            }
-            console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
-            setBedrockAgents(listAgentsResponseBody)
-            // return listAgentsResponseBody
-        }
-        fetchListBedrockAgents()
-    }, [])
+    // // List the available bedrock agents
+    // useEffect(() => {
+    //     const fetchListBedrockAgents = async () => {
+    //         const response = await amplifyClient.queries.listBedrockAgents()
+    //         console.log('List Agents Response: ', response.data)
+    //         if (!(response.data && response.data.body)) {
+    //             console.log('No response from listing bedrock agents')
+    //             return
+    //         }
+    //         // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
+    //         const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
+    //         if (!listAgentsResponseBody) {
+    //             console.log('Could not parse response body from listing bedrock agents')
+    //             return
+    //         }
+    //         console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
+    //         setBedrockAgents(listAgentsResponseBody)
+    //         // return listAgentsResponseBody
+    //     }
+    //     fetchListBedrockAgents()
+    // }, [])
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
         setMessages([])
@@ -485,20 +485,21 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     async function sendMessageToChatBot(prompt: string) {
         setIsLoading(true);
-        await addChatMessage({ body: prompt, role: "human" })
+        // await addChatMessage({ body: prompt, role: "human" })
         if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
             await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession})
             // if (!response) throw new Error("No response from agent");
         } else {
             switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
                 case defaultAgents.FoundationModel.name:
-                    // await addChatMessage({ body: prompt, role: "human" })
+                    await addChatMessage({ body: prompt, role: "human" })
                     console.log("invoking the foundation model")
                     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
                     if (!responseText) throw new Error("No response from agent");
                     addChatMessage({ body: responseText, role: "ai" })
                     break
                 case defaultAgents.MaintenanceAgent.name:
+                    await addChatMessage({ body: prompt, role: "human" })
                     await invokeBedrockAgentParseBodyGetTextAndTrace({ 
                         prompt: prompt, 
                         chatSession: initialActiveChatSession,
@@ -509,11 +510,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     // addChatMessage({ body: response!.text!, role: "ai" })
                     break
                 case defaultAgents.ProductionAgent.name:
-                    // await addChatMessage({ body: prompt, role: "human" chainOfThought: true})
+                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true})
                     await invokeProductionAgent(prompt, initialActiveChatSession)
                     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
-                    // await addChatMessage({ body: prompt, role: "human" })
+                    await addChatMessage({ body: prompt, role: "human" })
                     const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: initialActiveChatSession.id })
                     console.log('Plan and execute response: ', planAndExecuteResponse)
                     break;
@@ -534,14 +535,15 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                         {
                             [
                                 ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
-                                ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
+                                // ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
                             ]
                                 .map((agent) => (
                                     <MenuItem
                                         key={agent.agentName}
                                         onClick={async () => {
-                                            const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
-                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
+                                            // const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
+                                            
+                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId } })
                                         }}
                                     >
                                         <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
@@ -592,166 +594,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     }
                 </Box>
             </SideBar>
-
-            {/* <AddSideBar
-            anchor="left"
-            drawerContent={
-                <>
-                    <Box sx={{ overflow: 'auto' }}>
-                        <DropdownMenu buttonText='New Chat Session'>
-                            {
-                                [
-                                    ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
-                                    ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
-                                ]
-                                    .map((agent) => (
-                                        <MenuItem
-                                            key={agent.agentName}
-                                            onClick={async () => {
-                                                const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
-                                                createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId, aiBotAliasId: agentAliasId } })
-                                            }}
-                                        >
-                                            <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
-                                        </MenuItem>
-                                    ))
-                            }
-                        </DropdownMenu>
-
-
-                        <Typography sx={{ textAlign: 'center' }}>My Chat Sessions:</Typography>
-                        {chatSessions
-                            .slice()
-                            .sort((a, b) => {
-                                if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-                                return a.createdAt < b.createdAt ? 1 : -1
-                            })
-                            .map((session) => (
-
-                                <Card key={session.id} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
-                                    <CardContent>
-                                        <Typography variant="h6" component="div" noWrap>
-                                            {session.firstMessageSummary?.slice(0, 50)}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {formatDate(session.createdAt)}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                            AI: {session.aiBotInfo?.aiBotName || 'Unknown'}
-                                        </Typography>
-                                    </CardContent>
-                                    <CardActions>
-                                        <Button
-                                            size="small"
-                                            onClick={() => router.push(`/chat/${session.id}`)}
-                                        >
-                                            Open Chat
-                                        </Button>
-                                        <IconButton
-                                            aria-label="delete"
-                                            onClick={() => deleteChatSession(session)}
-                                            sx={{ marginLeft: 'auto' }}
-                                        >
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    </CardActions>
-                                </Card>
-                            ))
-                        }
-                    </Box>
-                </>
-            }
-        >
-
-            <AddSideBar
-                initiallyOpen={(initialActiveChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name)}
-                floatingButton={(initialActiveChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name)}
-                anchor="right"
-                drawerContent={
-                    <>
-                        <Typography variant="h5" sx={{ textAlign: 'center' }}>Plan and execute steps:</Typography>
-                        {LiveUpdateActiveChatSession?.pastSteps?.map((step) => {
-                            try {
-                                const stepContent = JSON.parse(step as string)
-                                return (
-                                    <Tooltip
-                                        key={step as string}
-                                        title={<pre
-                                            style={{ //Wrap long lines
-                                                whiteSpace: 'pre-wrap',
-                                                wordWrap: 'break-word',
-                                                overflowWrap: 'break-word',
-                                            }}
-                                        >
-                                            {stringify(stepContent)}
-                                        </pre>}
-                                        arrow
-                                        placement="left"
-                                        slotProps={{
-                                            tooltip: {
-                                                sx: {
-                                                    maxWidth: 2000,
-                                                },
-                                            },
-                                        }}
-                                    >
-                                        <Card key={step as string} sx={{ marginBottom: 2, backgroundColor: '#e3f2fd', flexShrink: 0 }}>
-                                            <CardContent>
-                                                <Typography variant="h6" component="div">
-                                                    {stepContent.title}
-                                                </Typography>
-                                            </CardContent>
-                                        </Card>
-                                    </Tooltip>
-                                )
-                            } catch {
-                                return <p>{step}</p>
-                            }
-                        })}
-                        {LiveUpdateActiveChatSession?.planSteps?.map((step) => {
-                            try {
-                                const { result, ...stepContent } = JSON.parse(step as string)// Remove the result if it exists from the plan steps
-                                console.info(result)//TODO: remove this
-                                return (
-                                    <Tooltip
-                                        key={step as string}
-                                        title={<pre
-                                            style={{ //Wrap long lines
-                                                whiteSpace: 'pre-wrap',
-                                                wordWrap: 'break-word',
-                                                overflowWrap: 'break-word',
-                                            }}
-                                        >
-                                            {stringify(stepContent)}
-                                        </pre>}
-                                        arrow
-                                        placement="left"
-                                        slotProps={{
-                                            tooltip: {
-                                                sx: {
-                                                    maxWidth: 800,
-                                                },
-                                            },
-                                        }}
-                                    >
-                                        <Card key={step as string} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
-                                            <CardContent>
-                                                <Typography variant="h6" component="div">
-                                                    {stepContent.title}
-                                                </Typography>
-                                            </CardContent>
-                                        </Card>
-                                    </Tooltip>
-
-                                )
-                            } catch {
-                                return <p>{step}</p>
-                            }
-                        })}
-                    </>
-
-                }
-            > */}
             {params ? //Show the chat UI if there is an active chat session
                 // <div 
                 // // style={{ marginLeft: '210px', padding: '20px' }}
@@ -836,7 +678,24 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                 },
                                             }}
                                         >
-                                            <Card key={step as string} sx={{ marginBottom: 2, backgroundColor: '#e3f2fd', flexShrink: 0 }}>
+                                            <Card
+                                                key={step as string}
+                                                sx={{
+                                                    marginBottom: 2,
+                                                    backgroundColor: '#e3f2fd',
+                                                    flexShrink: 0,
+                                                    cursor: 'pointer'
+                                                }}
+                                                onClick={() => {
+                                                    const element = document.getElementById(`## ${stepContent.title}`);
+                                                    if (element) {
+                                                        element.scrollIntoView({
+                                                            behavior: 'smooth',
+                                                            block: 'center'
+                                                        });
+                                                    }
+                                                }}
+                                            >
                                                 <CardContent>
                                                     <Typography variant="h6" component="div">
                                                         {stepContent.title}
@@ -875,7 +734,24 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                 },
                                             }}
                                         >
-                                            <Card key={step as string} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
+                                            <Card
+                                                key={step as string}
+                                                sx={{
+                                                    marginBottom: 2,
+                                                    backgroundColor: '#f5f5f5',
+                                                    flexShrink: 0,
+                                                    cursor: 'pointer'
+                                                }}
+                                                onClick={() => {
+                                                    const element = document.getElementById(`## ${stepContent.title}`);
+                                                    if (element) {
+                                                        element.scrollIntoView({
+                                                            behavior: 'smooth',
+                                                            block: 'center'
+                                                        });
+                                                    }
+                                                }}
+                                            >
                                                 <CardContent>
                                                     <Typography variant="h6" component="div">
                                                         {stepContent.title}
