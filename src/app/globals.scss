@@ -26,6 +26,8 @@ body {
   }
 } */
 
+@use '@cloudscape-design/design-tokens/index.scss' as awsui;
+
 .awsui_tabs-header-list_14rmt_1xftp_298.awsui_tabs-header-list_1acwa_dp0cl_5 {
   justify-content: center;
 }
@@ -37,9 +39,6 @@ body {
 .chat-container {
   height: calc(100vh - 146px);
   margin-top: 10px;
-}
-.links-container {
-
 }
 .steps:not(:has(.steps)) {
   margin-left: 58px;
@@ -58,7 +57,6 @@ body {
 }
 
 .awsui_tabs-content-wrapper_14rmt_1xftp_575.awsui_with-paddings_14rmt_1xftp_575 > .awsui_tabs-content_14rmt_1xftp_551:not(#\9) {
-  /* padding-block: var(--space-scaled-m-mo5yse, 16px); */
   padding: 0;
 }
 
@@ -122,6 +120,11 @@ body {
   padding-left: 297px !important;
   padding-right: 297px !important;
   padding-top: 40px !important;
+  height: calc(100vh - 100px) !important;
+}
+.amplify-storage-browser__data-table {
+  border-color: gray !important;
+  border-radius: 16px !important;
 }
 .amplify-text {
   display: block;
@@ -135,7 +138,7 @@ strong.amplify-text {
   color: inherit!important;
 }
 .amplify-storage-browser__table-head {
-  background-color: inherit !important;
+  background-color: awsui.$color-background-cell-shaded !important;
   color: inherit !important;
 }
 
@@ -160,4 +163,15 @@ strong.amplify-text {
 }
 .awsui_container_1cbgc_1n36j_181.awsui_display-inline-block_1cbgc_1n36j_260:not(#\9) {
   word-break: break-word !important;
+}
+.css-aymtem-MuiDataGrid-virtualScrollerContent {
+  color: initial;
+}
+[class*=amplify] {
+  color: initial !important;
+}
+
+.css-uvfk0e-MuiDataGrid-root .MuiDataGrid-container--top [role=row], .css-uvfk0e-MuiDataGrid-root .MuiDataGrid-container--bottom [role=row] {
+  background-color: awsui.$color-background-cell-shaded !important;
+  color: initial;
 }

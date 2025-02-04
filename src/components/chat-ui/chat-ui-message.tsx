@@ -648,7 +648,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     >
       {props.message?.role != 'human' && (
         <Container>
-          <div className={styles.btn_chabot_message_copy}>
+          {/* <div className={styles.btn_chabot_message_copy}>
             <Popover
               size="medium"
               position="top"
@@ -732,7 +732,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               </Popover>
             </div>
           ) : null
-          }
+          } */}
 
           {/* If the tool returns a table, add the show / hide rows button */}
           {messageContentCategory === 'tool_table_events' ? (
