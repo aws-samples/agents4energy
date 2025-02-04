@@ -18,13 +18,24 @@ export type LangGraphAgent = BaseAgent & {
 }
 
 export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGraphAgent } = {
-    MaintenanceAgent: {
+    CorporateAgent: {
+        name: "Corporate Agent",
+        source: "bedrockAgent",
+        agentId: outputs.custom.corporateAgentId,
+        agentAliasId: outputs.custom.corporateAgentAliasId,
+        samplePrompts: [
+            "Summarize the BP-Petrobras partnership agreement with details about the obligations, activities and specific timelines",
+            "When is first biofuels production expected based on the project plan",
+            "Which project has the lowest IRR",
+            "When do we expect peak revenue for the enhanced oil recovery project",
+        ],
+    } as BedrockAgent,    MaintenanceAgent: {
         name: "Maintenance Agent",
         source: "bedrockAgent",
         agentId: outputs.custom.maintenanceAgentId,
         agentAliasId: outputs.custom.maintenanceAgentAliasId,
         samplePrompts: [
-            "How many tanks are in my biodiesel unit?",
+            "I am planning a turnaround for the distillation unit of sandy point refinery in 2025.  Can you provide a summary of all equipment including equipment ID, name, manufacturer, year manufactured, dates of service, and any maintenance that was performed on the equipment in 2024.",
             "In September 2024, what are a few key incidents and actions taken at the biodiesel unit?",
         ],
     } as BedrockAgent,
