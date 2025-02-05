@@ -28,7 +28,7 @@ export function corporateAgentBuilder(scope: Construct, props: AgentProps) {
     //const foundationModel = 'amazon.nova-micro-v1:0';
     const foundationModel = 'anthropic.claude-3-haiku-20240307-v1:0';
     const agentName = `A4E-Corporate-${stackUUID}`;
-    const agentRoleName = `AmazonBedrockExecutionRole_A4E_Corporate-${stackUUID}`;
+    //const agentRoleName = `AmazonBedrockExecutionRole_A4E_Corporate-${stackUUID}`;
     const agentDescription = 'Agent for energy industry corporate workflows';
 
     console.log("Corporate Stack UUID: ", stackUUID)
@@ -44,7 +44,7 @@ export function corporateAgentBuilder(scope: Construct, props: AgentProps) {
 
     // IAM Role for Agent
     const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
-        roleName: agentRoleName,
+        //roleName: agentRoleName,
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
         description: 'IAM role for Corporate Agent to access KBs with partnership, project, and policy documents',
     });

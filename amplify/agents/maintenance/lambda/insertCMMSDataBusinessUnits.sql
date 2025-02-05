@@ -4,5 +4,6 @@ INSERT INTO businessunits (buid, buname) VALUES
 ('T', 'Trading & Forecasting'),
 ('L', 'LNG Facilities'),
 ('P', 'Pipelines'),
-('U', 'Upstream')
+('U', 'Upstream'),
+('N', 'Renewables')
 ;
