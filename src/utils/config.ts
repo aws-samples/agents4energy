@@ -29,7 +29,8 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
             "Which project has the lowest IRR",
             "When do we expect peak revenue for the enhanced oil recovery project",
         ],
-    } as BedrockAgent,    MaintenanceAgent: {
+    } as BedrockAgent,    
+    MaintenanceAgent: {
         name: "Maintenance Agent",
         source: "bedrockAgent",
         agentId: outputs.custom.maintenanceAgentId,
