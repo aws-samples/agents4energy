@@ -57,49 +57,9 @@ import {
     Tooltip
 } from '@mui/material';
 
-// import DeleteIcon from '@mui/icons-material/Delete';
 
-// import { ChatUIProps } from "@/components/chat-ui/chat-ui";
 import { withAuth } from '@/components/WithAuth';
 
-// import dynamic from 'next/dynamic'
-
-// import { createHash } from 'crypto';
-
-// const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
-//     ssr: false,
-// });
-
-// const drawerWidth = 240;
-
-// type ListBedrockAgentsResponseType = {
-//     agentSummaries: {
-//         agentId: string;
-//         agentName: string;
-//         agentStatus: string;
-//         latestAgentVersion: string;
-//         updatedAt: string;
-//     }[];
-// }
-
-// type ListAgentIdsResponseType = {
-//     agentAliasSummaries:
-//     {
-//         agentAliasId: string,
-//         agentAliasName: string,
-//         agentAliasStatus: string,
-//         createdAt: string,
-//         description: string,
-//         routingConfiguration:
-//         {
-//             agentVersion: string,
-//             provisionedThroughput: string
-//         }[],
-//         updatedAt: string
-//     }[]
-//     ,
-//     nextToken: string
-// }
 
 const jsonParseHandleError = (jsonString: string) => {
     try {
@@ -125,14 +85,7 @@ const invokeBedrockAgentParseBodyGetTextAndTrace = async (props: { prompt: strin
         chatSessionId: chatSession.id
     })
     console.log('Bedrock Agent Response: ', response)
-    // if (!(response.data)) {
-    //     console.log('No response from bedrock agent after prompt: ', prompt)
-    //     return
-    // }
-    // return {
-    //     text: response.data.completion,
-    //     trace: response.data.orchestrationTrace
-    // }
+
 }
 
 const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targetChatSession: Schema['ChatSession']['type']) => {
@@ -176,27 +129,7 @@ const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSe
     )
 }
 
-// const getAgentAliasId = async (agentId: string) => {
-//     const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
-//     // console.log('get Agent Alias Id Response: ', response.data)
-//     if (!(response.data && response.data.body)) {
-//         console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
-//         return
-//     }
-//     // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
-//     const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
 
-//     if (!listAgnetAliasIdsResponseBody) {
-//         console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
-//         return
-//     }
-//     //Get the most recently created AliasId
-//     const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
-
-//     return mostRecentAliasId
-// }
-
-// const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr2: Array<Schema["ChatMessage"]["type"]>) => {
 const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
     const combinedMessages = [...arr1, ...arr2]
     const uniqueMessages = combinedMessages.filter((message, index, self) =>
@@ -212,25 +145,18 @@ const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => 
 function Page({ params }: { params?: { chatSessionId: string } }) {
 
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["createType"]>>([]);
-    // const messagesContainerRef = React.useRef<HTMLDivElement>(null);
     const [userPrompt, setUserPrompt] = useState('');
     const [isGenAiResponseLoading, setIsGenAiResponseLoading] = useState(false);
-
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
     const [groupedChatSessions, setGroupedChatSessions] = useState<SideNavigationProps.Item[]>([])
     const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
-    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([]
-                                                                        
-    // const [isLoading, setIsLoading] = useState(false);
-    // const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
-    const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
+    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([]);
+    const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({});
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
-
     const [navigationOpen, setNavigationOpen] = useState(true);
-
 
     const [, setCharacterStream] = useState<{ content: string, index: number }[]>([{
         content: "\n\n\n",
@@ -488,27 +414,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }, [initialActiveChatSession])
 
-    // // List the available bedrock agents
-    // useEffect(() => {
-    //     const fetchListBedrockAgents = async () => {
-    //         const response = await amplifyClient.queries.listBedrockAgents()
-    //         console.log('List Agents Response: ', response.data)
-    //         if (!(response.data && response.data.body)) {
-    //             console.log('No response from listing bedrock agents')
-    //             return
-    //         }
-    //         // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
-    //         const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
-    //         if (!listAgentsResponseBody) {
-    //             console.log('Could not parse response body from listing bedrock agents')
-    //             return
-    //         }
-    //         console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
-    //         setBedrockAgents(listAgentsResponseBody)
-    //         // return listAgentsResponseBody
-    //     }
-    //     fetchListBedrockAgents()
-    // }, [])
+
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
         setMessages([])
@@ -519,11 +425,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         })
     }
 
-    // async function deleteChatSession(targetSession: Schema['ChatSession']['type']) {
-    //     amplifyClient.models.ChatSession.delete({ id: targetSession.id })
-    //     // Remove the target session from the list of chat sessions
-    //     setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
-    // }
+
 
     async function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string, chainOfThought?: boolean }) {
         const targetChatSessionId = initialActiveChatSession?.id;
@@ -599,7 +501,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     // addChatMessage({ body: response!.text!, role: "ai" })
                     break
                 case defaultAgents.ProductionAgent.name:
-                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true})
+                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true })
                     await invokeProductionAgent(prompt, initialActiveChatSession)
                     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
@@ -621,15 +523,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         if (message.chatSessionId in glossaryBlurbs) return
 
-        // setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: "Generating Glossary Entry for message..." })) //TODO fix this
-
-        // const getGlossaryPrompt = `
-        // Return a glossary for terms found in the text blurb below:
-
-        // ${message.content}
-        // `
-        // const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
-        // if (!newBlurb) throw new Error("No glossary blurb returned")
 
         const generateGlossaryResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
             chatSessionId: message.chatSessionId,
@@ -666,9 +559,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             // const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
         } else console.log('Error Generating Glossary: ', generateGlossaryResponse)
     }
-
-
-    // setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
 
 
 
@@ -895,24 +785,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
                             />
                     },
-                    // {
-                    //     label: "Plan",
-                    //     id: "second",
-                    //     content: "Second tab content area"
-                    // },
-                    // {
-                    //     label: "Reasoning",
-                    //     id: "third",
-                    //     content: <ul>
-                    //         {
-                    //             messages
-                    //                 .filter((message) => message.trace)
-                    //                 .map((message, index) => {
-                    //                     return <li key={index}>{message.trace}</li>
-                    //                 })
-                    //         }
-                    //     </ul>,
-                    // },
+
                     {
                         label: "Links",
                         id: "fourth",
@@ -923,15 +796,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                 </Container>
                             </div>,
                     },
-                    // {
-                    //     label: "Glossary",
-                    //     id: "fifth",
-                    //     content: <ul>
-                    //         {
-                    //             Object.values(glossaryBlurbs).map((blurb, index) => (<li key={index}>{blurb}</li>))
-                    //         }
-                    //     </ul>,
-                    // }
+
                 ]}
             />
         </div>
