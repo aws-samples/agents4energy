@@ -98,5 +98,6 @@
 .prose {
   flex: 1;
   overflow-y: auto; /* If you want scrolling when content overflows */
+  color: unset!important;
 }
 
