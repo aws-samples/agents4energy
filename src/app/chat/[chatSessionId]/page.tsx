@@ -1,65 +1,76 @@
 "use client"
 import { stringify } from 'yaml'
-
 import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic'
+import { useAuthenticator } from '@aws-amplify/ui-react';
+import { useRouter } from 'next/navigation';
+import { Tooltip } from '@mui/material';
+import '@aws-amplify/ui-react/styles.css'
 
-import {
-    AppLayout,
-    // BreadcrumbGroup,
-    // ContentLayout,
-    HelpPanel,
-    Header,
-    Link,
-    SideNavigation,
-    // Cards,
-    // SpaceBetween,
-    // Button,
-    // TextFilter,
-    SideNavigationProps
-    // ListItem
-} from '@cloudscape-design/components';
-import Tabs from "@cloudscape-design/components/tabs";
-import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
-import Tiles from "@cloudscape-design/components/tiles";
-// import Chat from "./chat"
-import PromptInput from '@cloudscape-design/components/prompt-input';
-import Container from '@cloudscape-design/components/container';
-import FormField from '@cloudscape-design/components/form-field';
-// import { ScrollableContainer } from './common-components';
-import Messages from './messages';
-import Steps from "@cloudscape-design/components/steps";
+// Dynamic imports for Cloudscape components
+const AppLayout = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.AppLayout),
+    { ssr: false }
+);
+const HelpPanel = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.HelpPanel),
+    { ssr: false }
+);
+const Header = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.Header),
+    { ssr: false }
+);
+const Link = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.Link),
+    { ssr: false }
+);
+const SideNavigation = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.SideNavigation),
+    { ssr: false }
+);
+const Tabs = dynamic(
+    () => import('@cloudscape-design/components/tabs'),
+    { ssr: false }
+);
+const ButtonDropdown = dynamic(
+    () => import('@cloudscape-design/components/button-dropdown'),
+    { ssr: false }
+);
+const Tiles = dynamic(
+    () => import('@cloudscape-design/components/tiles'),
+    { ssr: false }
+);
+const PromptInput = dynamic(
+    () => import('@cloudscape-design/components/prompt-input'),
+    { ssr: false }
+);
+const Container = dynamic(
+    () => import('@cloudscape-design/components/container'),
+    { ssr: false }
+);
+const FormField = dynamic(
+    () => import('@cloudscape-design/components/form-field'),
+    { ssr: false }
+);
+const Steps = dynamic(
+    () => import('@cloudscape-design/components/steps'),
+    { ssr: false }
+);
+
+// Dynamic import for custom components
+const Messages = dynamic(() => import('./messages'), { ssr: false });
+const StorageBrowser = dynamic(
+    () => import('@/components/StorageBrowser').then(mod => mod.StorageBrowser),
+    { ssr: false }
+);
 
 import type { Schema } from '@/../amplify/data/resource';
 import { amplifyClient, getMessageCatigory, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
-import { useAuthenticator } from '@aws-amplify/ui-react';
-import { useRouter } from 'next/navigation';
-
 import { formatDate } from "@/utils/date-utils";
-// import DropdownMenu from '@/components/DropDownMenu';
-// import SideBar from '@/components/SideBar';
-import { StorageBrowser } from '@/components/StorageBrowser';
-// import AutoScrollContainer from '@/components/ScrollableContainer'
-
 import { defaultAgents, BedrockAgent } from '@/utils/config'
 import { Message } from '@/utils/types'
-
-import '@aws-amplify/ui-react/styles.css'
-
-import {
-    // Typography,
-    // Box,
-    // MenuItem,
-    // IconButton,
-    // Card,
-    // CardContent,
-    // CardActions,
-    // Button,
-    Tooltip
-} from '@mui/material';
-
-
 import { withAuth } from '@/components/WithAuth';
-
+import type { SideNavigationProps } from '@cloudscape-design/components';
 
 const jsonParseHandleError = (jsonString: string) => {
     try {
@@ -68,6 +79,7 @@ const jsonParseHandleError = (jsonString: string) => {
         console.warn(`Could not parse string: ${jsonString}`)
     }
 }
+
 
 const invokeBedrockAgentParseBodyGetTextAndTrace = async (props: { prompt: string, chatSession: Schema['ChatSession']['type'], agentId?: string, agentAliasId?: string }) => {
     const { prompt, chatSession } = props

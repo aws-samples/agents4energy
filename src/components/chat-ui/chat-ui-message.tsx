@@ -6,7 +6,7 @@ import {
   Button,
   Container,
   Popover,
-  Spinner,
+//Spinner,
   StatusIndicator
 } from "@cloudscape-design/components";
 
@@ -132,6 +132,7 @@ function generateColor(index: number): string {
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
   const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   const [MessagePlot, setMessagePlot] = useState<() => React.JSX.Element>()
   // const [MessagePlot, setMessagePlot] = useState<React.ElementType>(() => (<div></div>))
@@ -597,6 +598,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   }, [props.message, messageContentCategory, MessageTable, MessagePlot])
 
   // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function getGlossary(message: Message) {
 
     if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
@@ -614,6 +616,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   }
 
   // async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function getDataQualityCheck(message: Message) {
     setDataQualityBlurb("")
 
