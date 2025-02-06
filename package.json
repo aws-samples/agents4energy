@@ -49,8 +49,8 @@
     "sass": "^1.79.4"
   },
   "devDependencies": {
-    "@aws-amplify/backend": "^1.3.2",
-    "@aws-amplify/backend-cli": "^1.2.9",
+    "@aws-amplify/backend": "^1.13.0",
+    "@aws-amplify/backend-cli": "^1.4.7",
     "@aws-appsync/utils": "^1.9.0",
     "@aws-sdk/client-appsync": "^3.670.0",
     "@aws-sdk/client-athena": "^3.679.0",
@@ -68,7 +68,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "aws-cdk": "^2.175.1",
-    "aws-cdk-lib": "^2.161.1",
+    "aws-cdk-lib": "^2.177.0",
     "aws-sdk": "^2.1691.0",
     "constructs": "^10.4.2",
     "esbuild": "^0.24.0",

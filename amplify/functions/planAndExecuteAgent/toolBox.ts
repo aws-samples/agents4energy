@@ -211,9 +211,9 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
         description: `
         Can query a GraphQL API. 
         Query invokeProductionAgent for:
+            - Create plots or visualizations of well data (including invoking plotProductionTool)
             - General petroleum engineering knowledge
             - Gathering well data, with data sources including well files, production volume databases.
-            - Create plots or visualizations of well data
             - Diagnosing well problems
             - Steps to repair a well
             - Repair cost estimates

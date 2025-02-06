@@ -208,6 +208,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         const selectedToolMessages = [
           ...includePreviousDataTable ? [props.message.previousTrendTableMessage] : [],
           ...includePreviousEventTable ? [props.message.previousEventTableMessage] : []
+
         ]
 
         // console.log("Selected messages: ", selectedToolMessages)
@@ -241,6 +242,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             })
 
           // console.log('chart query responses with date: ', chartQueryResponsesWithDate)
+
 
           const chartDataObject = transformListToObject(chartQueryResponsesWithDate)
 

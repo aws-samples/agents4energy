@@ -1,3 +1,4 @@
+import { stringify } from 'yaml'
 import { EventBridgeEvent, Context } from 'aws-lambda';
 
 import { BedrockAgentClient, StartIngestionJobCommand } from "@aws-sdk/client-bedrock-agent";
@@ -257,10 +258,12 @@ export const handler = async (
   }
 
   //Now start the knowledge base sync
-  await bedrockAgentClient.send(new StartIngestionJobCommand({
+  const startIngestionJobResponse = await bedrockAgentClient.send(new StartIngestionJobCommand({
     dataSourceId: process.env.TABLE_DEF_KB_DS_ID,
     knowledgeBaseId: process.env.TABLE_DEF_KB_ID,
   }))
+
+  console.log("Start ingestion job resposne:\n", stringify(startIngestionJobResponse))
 
   return { statusCode: 200, body: 'All SQL statements executed and table definitions exported successfully.' };
 };

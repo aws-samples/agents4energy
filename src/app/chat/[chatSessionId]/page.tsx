@@ -221,7 +221,8 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const [groupedChatSessions, setGroupedChatSessions] = useState<SideNavigationProps.Item[]>([])
     const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
-    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
+    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([]
+                                                                        
     // const [isLoading, setIsLoading] = useState(false);
     // const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
     const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
@@ -279,7 +280,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
         // console.log("initialActiveChatSession hash: ", createHash('md5').update("dasf").digest('hex'))
         console.log("Messages: ", messages)
-        console.log("initialActiveChatSession: ", initialActiveChatSession)
+        // console.log("initialActiveChatSession: ", initialActiveChatSession)
 
         // console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
         // console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
@@ -572,21 +573,24 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     async function sendMessageToChatBot(prompt: string) {
         setIsGenAiResponseLoading(true);
         await addChatMessage({ body: prompt, role: "human" })
+
         if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
             await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession })
             // if (!response) throw new Error("No response from agent");
         } else {
             switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
                 case defaultAgents.FoundationModel.name:
-                    // await addChatMessage({ body: prompt, role: "human" })
+                    await addChatMessage({ body: prompt, role: "human" })
                     console.log("invoking the foundation model")
                     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
                     if (!responseText) throw new Error("No response from agent");
                     addChatMessage({ body: responseText, role: "ai" })
                     break
                 case defaultAgents.MaintenanceAgent.name:
+
                     await invokeBedrockAgentParseBodyGetTextAndTrace({
                         prompt: prompt,
+
                         chatSession: initialActiveChatSession,
                         agentAliasId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentAliasId,
                         agentId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentId,
@@ -595,11 +599,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     // addChatMessage({ body: response!.text!, role: "ai" })
                     break
                 case defaultAgents.ProductionAgent.name:
-                    // await addChatMessage({ body: prompt, role: "human" chainOfThought: true})
+                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true})
                     await invokeProductionAgent(prompt, initialActiveChatSession)
                     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
-                    // await addChatMessage({ body: prompt, role: "human" })
+                    await addChatMessage({ body: prompt, role: "human" })
                     const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: initialActiveChatSession.id })
                     console.log('Plan and execute response: ', planAndExecuteResponse)
                     break;
@@ -609,6 +613,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             }
         }
     }
+
 
     async function getGlossary(message: Message) {
 
@@ -662,7 +667,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         } else console.log('Error Generating Glossary: ', generateGlossaryResponse)
     }
 
+
     // setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
+
 
 
     // Helper function to group chat sessions by month
@@ -794,6 +801,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
                                     />
 
+
                                 }
                                 content={
                                     <div
@@ -855,6 +863,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                 </FormField>
                                             }
                                         >
+
                                             <Messages
                                                 messages={[
                                                     ...messages,
@@ -866,6 +875,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                             />
                                         </Container>
                                     </div>
+
                                 }
                             />,
                         action:

@@ -1,5 +1,9 @@
 import { stringify } from 'yaml';
 import { S3Event, SQSEvent, SQSHandler } from 'aws-lambda';
+import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+
+
+import { PDFDocument } from 'pdf-lib';
 
 // import { HumanMessage, AIMessage, ToolMessage, BaseMessage, MessageContentText } from "@langchain/core/messages";
 // import { ChatBedrockConverse } from "@langchain/aws";
@@ -20,6 +24,56 @@ import {
 
 // import { writeFileSync } from 'fs';
 
+
+async function splitPdfIfNeeded(bucket: string, key: string): Promise<string[]> {
+    const s3Client = new S3Client();
+    const response = await s3Client.send(
+        new GetObjectCommand({ Bucket: bucket, Key: key })
+    );
+
+    // const pdfBytes = await streamToBuffer(response.Body);
+    const pdfBytes = await response.Body?.transformToByteArray()
+    if (!pdfBytes) throw new Error("No PDF bytes found");
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    const pageCount = pdfDoc.getPageCount();
+
+    // If document is small enough, return original key
+    if (pageCount <= 10) {
+        const stats = await s3Client.send(
+            new HeadObjectCommand({ Bucket: bucket, Key: key })
+        );
+        if ((stats.ContentLength || 0) <= 5 * 1024 * 1024) {
+            return [key];
+        }
+    }
+
+    // Split into chunks of 10 pages or less
+    const splitKeys: string[] = [];
+    for (let i = 0; i < pageCount; i += 10) {
+        const newPdf = await PDFDocument.create();
+        const pagesToCopy = Math.min(10, pageCount - i);
+        const pages = await newPdf.copyPages(pdfDoc, Array.from({ length: pagesToCopy }, (_, j) => i + j));
+        pages.forEach(page => newPdf.addPage(page));
+
+        const newPdfBytes = await newPdf.save();
+
+        // Only save if under 5MB
+        if (newPdfBytes.length <= 5 * 1024 * 1024) {
+            const splitKey = `${key.replace('.pdf', '')}_part${Math.floor(i / 10)}.pdf`;
+            await s3Client.send(new PutObjectCommand({
+                Bucket: bucket,
+                Key: splitKey,
+                Body: newPdfBytes,
+                ContentType: 'application/pdf'
+            }));
+            splitKeys.push(splitKey);
+        }
+    }
+
+    return splitKeys;
+}
+
+
 async function startAndWaitForDocumentAnalysis(bucketName: string, documentName: string) {
     try {
         // Create Textract client
@@ -34,7 +88,7 @@ async function startAndWaitForDocumentAnalysis(bucketName: string, documentName:
                 }
             },
             FeatureTypes: [FeatureType.FORMS]
-        }; 
+        };
 
         const startCommand = new StartDocumentAnalysisCommand(startParams);
         const startResponse = await client.send(startCommand);
@@ -72,14 +126,14 @@ async function waitForJobCompletion(
 
         const getCommand = new GetDocumentAnalysisCommand(getParams);
 
-        // Poll every 5 seconds
+        // Poll every 2 seconds
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         const response = await client.send(getCommand);
         console.log('Job Status: ', response.JobStatus)
 
         if (response.JobStatus === "FAILED") {
-            throw new Error(`Document analysis failed: \${response.StatusMessage}`);
+            throw new Error(`Document analysis failed: ${response.StatusMessage}`);
         }
 
         if (response.JobStatus === "SUCCEEDED") {
@@ -105,7 +159,7 @@ function findRelationship(blocks: GetDocumentAnalysisCommandOutput["Blocks"], id
 function processResults(results: GetDocumentAnalysisCommandOutput[]) {
     // writeFileSync('./results.yaml', stringify(results))
     const processedData = results.map((result, index) => {
-        console.log(`\nPage ${index + 1}:`);
+        console.log(`\nChunk ${index + 1}:`);
 
         if (result.Blocks) {
 
@@ -160,14 +214,14 @@ function processResults(results: GetDocumentAnalysisCommandOutput[]) {
                 .join('\n');
 
             return {
-                page: index + 1,
+                chunk: index + 1,
                 formData: formData,
                 textData: textData
             }
-        } else return { page: index + 1 }
+        } else return { chunk: index + 1 }
     });
 
-    if (processedData) return processedData.sort((a, b) => a?.page - b?.page)
+    if (processedData) return processedData.sort((a, b) => a?.chunk - b?.chunk)
 }
 
 export const handler: SQSHandler = async (event: SQSEvent) => {
@@ -175,7 +229,12 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
     try {
         // Process each record in the event
         for (const sqsRecord of event.Records) {
+            console.log('sqsRecord:\n', sqsRecord)
             const sqsRecordContent = JSON.parse(sqsRecord.body) as S3Event
+            if (!sqsRecordContent.Records || !sqsRecordContent.Records.length) {
+                console.warn(`No records found in the record content \n${sqsRecordContent}`)
+                return
+            }
 
             for (const s3Record of sqsRecordContent.Records) {
 
@@ -185,15 +244,23 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
 
                 console.log(`Processing file: ${key} from bucket: ${bucket}`);
 
-                const documentContent = await startAndWaitForDocumentAnalysis(bucket, key) || "No contents found in file"
+                // Split the PDF if needed and get array of keys
+                const documentKeys = await splitPdfIfNeeded(bucket, key);
 
-                await uploadStringToS3({
-                    bucket: bucket,
-                    key: key + '.yaml',
-                    content: stringify(documentContent)
-                })
+                for (const docKey of documentKeys) {
+                    console.log(`Processing file: ${docKey} from bucket: ${bucket}`);
+                    const documentContent = await startAndWaitForDocumentAnalysis(bucket, docKey) || "No contents found in file"
 
-                console.log(`Successfully processed file: ${key}. Content:\n`, stringify(documentContent));
+                    await uploadStringToS3({
+                        bucket: bucket,
+                        key: docKey + '.yaml',
+                        content: stringify(documentContent)
+                    })
+
+                    console.log(`Successfully processed file: ${docKey}. Content:\n`, stringify(documentContent));
+                }
+                console.log(`Sucessfully processed file: ${key}`)
+
             }
         }
 
