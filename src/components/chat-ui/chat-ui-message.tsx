@@ -6,7 +6,7 @@ import {
   Button,
   Container,
   Popover,
-  Spinner,
+//Spinner,
   StatusIndicator
 } from "@cloudscape-design/components";
 
@@ -60,7 +60,7 @@ ChartJS.register(
 export interface ChatUIMessageProps {
   // message: Schema["ChatMessage"]["type"];
   message: Message;
-  messages: Message[];
+  // messages: Message[];
   showCopyButton?: boolean;
 }
 
@@ -92,13 +92,13 @@ const getDataQualityCheckSchema = {
 //   }
 // }
 
-const jsonParseHandleError = (jsonString: string) => {
-  try {
-    return JSON.parse(jsonString)
-  } catch {
-    console.warn(`Could not parse string: ${jsonString}`)
-  }
-}
+// const jsonParseHandleError = (jsonString: string) => {
+//   try {
+//     return JSON.parse(jsonString)
+//   } catch {
+//     console.warn(`Could not parse string: ${jsonString}`)
+//   }
+// }
 
 function transformListToObject<T extends Record<string, string | number>>(
   list: T[]
@@ -132,6 +132,7 @@ function generateColor(index: number): string {
 export default function ChatUIMessage(props: ChatUIMessageProps) {
   const [hideRows, setHideRows] = useState<boolean>(true)
   const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({})
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dataQualityBlurb, setDataQualityBlurb] = useState("")
   const [MessagePlot, setMessagePlot] = useState<() => React.JSX.Element>()
   // const [MessagePlot, setMessagePlot] = useState<React.ElementType>(() => (<div></div>))
@@ -140,7 +141,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
   const messageContentCategory = getMessageCatigory(props.message);
 
-  const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
+  // const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
 
   // Set the plot and table messages
   useEffect(() => {
@@ -159,55 +160,56 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         // //Limit messages to those before the plot message
         // const previousMessages = props.messages.slice(0, props.messages.indexOf(props.message))
 
-        const toolResponseMessages = previousMessages.filter(
-          (message) =>
-            "tool_call_id" in message &&
-            message.tool_call_id &&
-            jsonParseHandleError(message.content as string) &&
-            JSON.parse(message.content as string).messageContentType === 'tool_table'
-        )
+        // const toolResponseMessages = previousMessages.filter(
+        //   (message) =>
+        //     "tool_call_id" in message &&
+        //     message.tool_call_id &&
+        //     jsonParseHandleError(message.content as string) &&
+        //     JSON.parse(message.content as string).messageContentType === 'tool_table'
+        // )
 
-        // console.log('Tool Response Messages:\n', toolResponseMessages)
+        // // console.log('Tool Response Messages:\n', toolResponseMessages)
 
-        const dataTableMessages = toolResponseMessages.filter(
-          (message) => {
-            const chartContent = JSON.parse(message.content) as {
-              queryResponseData: RowDataInput,
-            }
+        // const dataTableMessages = toolResponseMessages.filter(
+        //   (message) => {
+        //     const chartContent = JSON.parse(message.content) as {
+        //       queryResponseData: RowDataInput,
+        //     }
 
-            if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
+        //     if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
 
-            const chartDataObject = transformListToObject(chartContent.queryResponseData)
+        //     const chartDataObject = transformListToObject(chartContent.queryResponseData)
 
-            const chartTrendNames = Object.keys(chartDataObject)
+        //     const chartTrendNames = Object.keys(chartDataObject)
 
-            const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+        //     const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
 
-            return tableType === 'trend'
-          }
-        )
+        //     return tableType === 'trend'
+        //   }
+        // )
 
-        const eventTableMessages = toolResponseMessages.filter(
-          (message) => {
-            const chartContent = JSON.parse(message.content) as {
-              queryResponseData: RowDataInput,
-            }
+        // const eventTableMessages = toolResponseMessages.filter(
+        //   (message) => {
+        //     const chartContent = JSON.parse(message.content) as {
+        //       queryResponseData: RowDataInput,
+        //     }
 
-            if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
+        //     if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return false
 
-            const chartDataObject = transformListToObject(chartContent.queryResponseData)
+        //     const chartDataObject = transformListToObject(chartContent.queryResponseData)
 
-            const chartTrendNames = Object.keys(chartDataObject)
+        //     const chartTrendNames = Object.keys(chartDataObject)
 
-            const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
+        //     const tableType = chartTrendNames.includes('s3Key') ? 'events' : 'trend'
 
-            return tableType === 'events'
-          }
-        )
+        //     return tableType === 'events'
+        //   }
+        // )
 
         const selectedToolMessages = [
-          ...includePreviousDataTable ? dataTableMessages.slice(-1) : [],
-          ...includePreviousEventTable ? eventTableMessages.slice(-1) : []
+          ...includePreviousDataTable ? [props.message.previousTrendTableMessage] : [],
+          ...includePreviousEventTable ? [props.message.previousEventTableMessage] : []
+
         ]
 
         // console.log("Selected messages: ", selectedToolMessages)
@@ -224,12 +226,13 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
         const data: ChartData<'scatter', ScatterDataPoint[]> = { datasets: [] }
 
         const xAxisLabels = selectedToolMessages.map((selectedToolMessage) => {
+          if (!selectedToolMessage) return
 
           const chartContent = JSON.parse(selectedToolMessage.content) as {
             queryResponseData: RowDataInput,
           }
 
-          if (chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
+          if (!chartContent.queryResponseData || chartContent.queryResponseData.length === 0 || !chartContent.queryResponseData[0]) return
 
           const chartQueryResponsesWithDate = chartContent.queryResponseData
             .filter(dataRow => { //The first key in the object must contain a date
@@ -240,6 +243,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
             })
 
           // console.log('chart query responses with date: ', chartQueryResponsesWithDate)
+
 
           const chartDataObject = transformListToObject(chartQueryResponsesWithDate)
 
@@ -441,7 +445,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               overflowWrap: 'break-word',
             }}
           >
-            {stringify(chartDataObject)}
+            {stringify(props.message)}
           </pre> */}
           <Scatter
             data={data}
@@ -463,7 +467,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
           setMessagePlot(() => newMessagePlot)
         }
 
-      case 'tool_table':
+      case 'tool_table_events':
+      case 'tool_table_trend':
         // https://mui.com/x/react-data-grid/
         // const queryResponseData: { [key: string]: (string | number)[] } = JSON.parse(props.message.content as string).queryResponseData
         const queryResponseData: RowDataInput = JSON.parse(props.message.content as string).queryResponseData
@@ -590,9 +595,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
 
     }
-  }, [props.message, previousMessages, messageContentCategory, MessageTable, MessagePlot])
+  }, [props.message, messageContentCategory, MessageTable, MessagePlot])
 
   // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function getGlossary(message: Message) {
 
     if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
@@ -610,6 +616,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
   }
 
   // async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function getDataQualityCheck(message: Message) {
     setDataQualityBlurb("")
 
@@ -646,7 +653,7 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     >
       {props.message?.role != 'human' && (
         <Container>
-          <div className={styles.btn_chabot_message_copy}>
+          {/* <div className={styles.btn_chabot_message_copy}>
             <Popover
               size="medium"
               position="top"
@@ -730,10 +737,10 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
               </Popover>
             </div>
           ) : null
-          }
+          } */}
 
           {/* If the tool returns a table, add the show / hide rows button */}
-          {messageContentCategory === 'tool_table' ? (
+          {messageContentCategory === 'tool_table_events' ? (
             <div className={styles.btn_chabot_message_copy}>
               <Popover
                 size="medium"
@@ -775,7 +782,8 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
                   {/* <MessagePlot/> */}
                   {MessagePlot && <MessagePlot />}
                 </>
-              case 'tool_table':
+              case 'tool_table_events':
+              case 'tool_table_trend':
                 return <>
                   {/* <pre>{props.message.content}</pre> */}
                   {MessageTable && <MessageTable />}

@@ -1,76 +1,76 @@
 "use client"
 import { stringify } from 'yaml'
-
 import React, { useEffect, useState } from 'react';
-import type { Schema } from '@/../amplify/data/resource';
-import { amplifyClient, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
+import dynamic from 'next/dynamic'
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useRouter } from 'next/navigation';
-
-import { formatDate } from "@/utils/date-utils";
-import DropdownMenu from '@/components/DropDownMenu';
-import SideBar from '@/components/SideBar';
-
-import { defaultAgents, BedrockAgent} from '@/utils/config'
-import { Message } from '@/utils/types'
-
+import { Tooltip } from '@mui/material';
 import '@aws-amplify/ui-react/styles.css'
 
-import {
-    Typography,
-    Box,
-    MenuItem,
-    IconButton,
-    Card,
-    CardContent,
-    CardActions,
-    Button,
-    Tooltip
-} from '@mui/material';
+// Dynamic imports for Cloudscape components
+const AppLayout = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.AppLayout),
+    { ssr: false }
+);
+const HelpPanel = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.HelpPanel),
+    { ssr: false }
+);
+const Header = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.Header),
+    { ssr: false }
+);
+const Link = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.Link),
+    { ssr: false }
+);
+const SideNavigation = dynamic(
+    () => import('@cloudscape-design/components').then((mod) => mod.SideNavigation),
+    { ssr: false }
+);
+const Tabs = dynamic(
+    () => import('@cloudscape-design/components/tabs'),
+    { ssr: false }
+);
+const ButtonDropdown = dynamic(
+    () => import('@cloudscape-design/components/button-dropdown'),
+    { ssr: false }
+);
+const Tiles = dynamic(
+    () => import('@cloudscape-design/components/tiles'),
+    { ssr: false }
+);
+const PromptInput = dynamic(
+    () => import('@cloudscape-design/components/prompt-input'),
+    { ssr: false }
+);
+const Container = dynamic(
+    () => import('@cloudscape-design/components/container'),
+    { ssr: false }
+);
+const FormField = dynamic(
+    () => import('@cloudscape-design/components/form-field'),
+    { ssr: false }
+);
+const Steps = dynamic(
+    () => import('@cloudscape-design/components/steps'),
+    { ssr: false }
+);
 
-import DeleteIcon from '@mui/icons-material/Delete';
+// Dynamic import for custom components
+const Messages = dynamic(() => import('./messages'), { ssr: false });
+const StorageBrowser = dynamic(
+    () => import('@/components/StorageBrowser').then(mod => mod.StorageBrowser),
+    { ssr: false }
+);
 
-import { ChatUIProps } from "@/components/chat-ui/chat-ui";
+import type { Schema } from '@/../amplify/data/resource';
+import { amplifyClient, getMessageCatigory, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
+import { formatDate } from "@/utils/date-utils";
+import { defaultAgents, BedrockAgent } from '@/utils/config'
+import { Message } from '@/utils/types'
 import { withAuth } from '@/components/WithAuth';
-
-import dynamic from 'next/dynamic'
-
-// import { createHash } from 'crypto';
-
-const DynamicChatUI = dynamic<ChatUIProps>(() => import('../../../components/chat-ui/chat-ui').then(mod => mod.ChatUI), {
-    ssr: false,
-});
-
-// const drawerWidth = 240;
-
-// type ListBedrockAgentsResponseType = {
-//     agentSummaries: {
-//         agentId: string;
-//         agentName: string;
-//         agentStatus: string;
-//         latestAgentVersion: string;
-//         updatedAt: string;
-//     }[];
-// }
-
-// type ListAgentIdsResponseType = {
-//     agentAliasSummaries:
-//     {
-//         agentAliasId: string,
-//         agentAliasName: string,
-//         agentAliasStatus: string,
-//         createdAt: string,
-//         description: string,
-//         routingConfiguration:
-//         {
-//             agentVersion: string,
-//             provisionedThroughput: string
-//         }[],
-//         updatedAt: string
-//     }[]
-//     ,
-//     nextToken: string
-// }
+import type { SideNavigationProps } from '@cloudscape-design/components';
 
 const jsonParseHandleError = (jsonString: string) => {
     try {
@@ -80,15 +80,16 @@ const jsonParseHandleError = (jsonString: string) => {
     }
 }
 
-const invokeBedrockAgentParseBodyGetTextAndTrace = async (props: {prompt: string, chatSession: Schema['ChatSession']['type'], agentId?: string, agentAliasId?: string}) => {
-    const {prompt, chatSession} = props
+
+const invokeBedrockAgentParseBodyGetTextAndTrace = async (props: { prompt: string, chatSession: Schema['ChatSession']['type'], agentId?: string, agentAliasId?: string }) => {
+    const { prompt, chatSession } = props
     const agentId = props.agentId || chatSession.aiBotInfo?.aiBotId
     const agentAliasId = props.agentAliasId || chatSession.aiBotInfo?.aiBotAliasId
     console.log(`Agent (id: ${agentId}, aliasId: ${agentAliasId}) Prompt:\n ${prompt} `)
 
     if (!agentId) throw new Error('No Agent ID found in invoke request')
     if (!agentAliasId) throw new Error('No Agent Alias ID found in invoke request')
-    
+
     const response = await amplifyClient.queries.invokeBedrockAgent({
         prompt: prompt,
         agentId: agentId,
@@ -96,14 +97,7 @@ const invokeBedrockAgentParseBodyGetTextAndTrace = async (props: {prompt: string
         chatSessionId: chatSession.id
     })
     console.log('Bedrock Agent Response: ', response)
-    // if (!(response.data)) {
-    //     console.log('No response from bedrock agent after prompt: ', prompt)
-    //     return
-    // }
-    // return {
-    //     text: response.data.completion,
-    //     trace: response.data.orchestrationTrace
-    // }
+
 }
 
 const setChatSessionFirstMessageSummary = async (firstMessageBody: string, targetChatSession: Schema['ChatSession']['type']) => {
@@ -147,27 +141,7 @@ const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSe
     )
 }
 
-// const getAgentAliasId = async (agentId: string) => {
-//     const response = await amplifyClient.queries.listBedrockAgentAliasIds({ agentId: agentId })
-//     // console.log('get Agent Alias Id Response: ', response.data)
-//     if (!(response.data && response.data.body)) {
-//         console.warn('No response getting Agent Alias ID for Agent ID ', agentId)
-//         return
-//     }
-//     // const listAgnetAliasIdsResponseBody = JSON.parse(response.data.body) as ListAgentIdsResponseType
-//     const listAgnetAliasIdsResponseBody = jsonParseHandleError(response.data.body) as ListAgentIdsResponseType
 
-//     if (!listAgnetAliasIdsResponseBody) {
-//         console.warn('Could not parse responce body for getting Agent Alias ID for Agent ID ', agentId, '\n response body: ', response.data.body)
-//         return
-//     }
-//     //Get the most recently created AliasId
-//     const mostRecentAliasId = listAgnetAliasIdsResponseBody.agentAliasSummaries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].agentAliasId
-
-//     return mostRecentAliasId
-// }
-
-// const combineAndSortMessages = ((arr1: Array<Schema["ChatMessage"]["type"]>, arr2: Array<Schema["ChatMessage"]["type"]>) => {
 const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => {
     const combinedMessages = [...arr1, ...arr2]
     const uniqueMessages = combinedMessages.filter((message, index, self) =>
@@ -179,24 +153,29 @@ const combineAndSortMessages = ((arr1: Array<Message>, arr2: Array<Message>) => 
     });
 })
 
+
 function Page({ params }: { params?: { chatSessionId: string } }) {
+
     const [messages, setMessages] = useState<Array<Schema["ChatMessage"]["createType"]>>([]);
-    // const [messages, setMessages] = useState<Array<Message>>([]);
+    const [userPrompt, setUserPrompt] = useState('');
+    const [isGenAiResponseLoading, setIsGenAiResponseLoading] = useState(false);
+    const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
+    const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
+    const [groupedChatSessions, setGroupedChatSessions] = useState<SideNavigationProps.Item[]>([])
+    const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([]);
+    const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({});
+    const { user } = useAuthenticator((context) => [context.user]);
+    const router = useRouter();
+    const [navigationOpen, setNavigationOpen] = useState(true);
 
     const [, setCharacterStream] = useState<{ content: string, index: number }[]>([{
         content: "\n\n\n",
         index: -1
     }]);
-    const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
-    const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
-    const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
-    const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
-    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([])
-    const [isLoading, setIsLoading] = useState(false);
-    // const [bedrockAgents, setBedrockAgents] = useState<ListBedrockAgentsResponseType>();
 
-    const { user } = useAuthenticator((context) => [context.user]);
-    const router = useRouter();
+
 
     //Set the chat session from params
     useEffect(() => {
@@ -276,21 +255,21 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             messages[messages.length - 1].responseComplete
         ) {
             console.log('Ready for human response')
-            setIsLoading(false)
+            setIsGenAiResponseLoading(false)
 
             async function fetchAndSetSuggestedPrompts() {
                 setSuggestedPromptes([])
                 if (!initialActiveChatSession || !initialActiveChatSession.id) throw new Error("No active chat session")
 
                 const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
-                    chatSessionId: initialActiveChatSession?.id,
+                    chatSessionId: initialActiveChatSession.id,
                     lastMessageText: "Suggest three follow up prompts",
                     usePastMessages: true,
                     outputStructure: JSON.stringify({
-                        title: "RecommendNextPrompt",
+                        title: "RecommendNextPrompt", //title and description help the llm to know how to fill the arguments out
                         description: "Help the user chose the next prompt to send.",
                         type: "object",
-                        properties: {
+                        properties: {// Change anyting in the properties according to the json schema reference: https://json-schema.org/understanding-json-schema/reference
                             suggestedPrompts: {
                                 type: 'array',
                                 items: {
@@ -314,12 +293,13 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
             }
             fetchAndSetSuggestedPrompts()
-        } else if (messages.length) setIsLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
+        } else if (messages.length) setIsGenAiResponseLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
 
     }, [JSON.stringify(messages), JSON.stringify(initialActiveChatSession)])
 
     // List the user's chat sessions
     useEffect(() => {
+        console.log("Listing User's Chat Sessions")
         if (user) {
             amplifyClient.models.ChatSession.observeQuery({
                 filter: {
@@ -327,14 +307,28 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     owner: { contains: user.userId }
                 }
             }).subscribe({
-                next: (data) => setChatSessions(data.items)
+                next: (data) => {
+                    if (initialActiveChatSession) { // If there is an active chat session, show the other chat sessions with the same ai bot
+                        setChatSessions(data.items.filter(item => item.aiBotInfo?.aiBotName === initialActiveChatSession?.aiBotInfo?.aiBotName))
+                    } else if (!params?.chatSessionId) { //If no chat session is supplied, list all chat sessions.
+                        setChatSessions(data.items)
+                    }
+                }
             })
         }
 
-    }, [user])
+    }, [user, initialActiveChatSession, params?.chatSessionId])
+
+    // Groupd the user's chat sessions
+    useEffect(() => {
+        console.log("Grouping Chat Sessions")
+        const newGroupedChatSessions = groupChatsByMonth(chatSessions)
+        setGroupedChatSessions(newGroupedChatSessions)
+    }, [chatSessions])
 
     // Subscribe to messages of the active chat session
     useEffect(() => {
+        console.log("Subscribing to messages of the active chat session")
         // setMessages([])
         if (initialActiveChatSession) {
             const sub = amplifyClient.models.ChatMessage.observeQuery({
@@ -343,7 +337,35 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                 }
             }).subscribe({
                 next: ({ items }) => { //isSynced is an option here to
-                    setMessages((prevMessages) => combineAndSortMessages(prevMessages, items))
+                    setMessages((prevMessages) => {
+                        //If the message has type plot, attach the previous tool_table_events and tool_table_trend messages to it.
+                        const sortedMessages = combineAndSortMessages(prevMessages, items)
+
+                        const sortedMessageWithPlotContext = sortedMessages.map((message, index) => {
+                            const messageCatigory = getMessageCatigory(message)
+                            if (messageCatigory === 'tool_plot') {
+                                //Get the messages with a lower index than the tool_plot's index
+                                const earlierMessages = sortedMessages.slice(0, index).reverse()
+
+                                const earlierEventsTable = earlierMessages.find((previousMessage) => {
+                                    const previousMessageCatigory = getMessageCatigory(previousMessage)
+                                    return previousMessageCatigory === 'tool_table_events'
+                                })
+
+                                const earlierTrendTable = earlierMessages.find((previousMessage) => {
+                                    const previousMessageCatigory = getMessageCatigory(previousMessage)
+                                    return previousMessageCatigory === 'tool_table_trend'
+                                })
+
+                                return {
+                                    ...message,
+                                    previousTrendTableMessage: earlierTrendTable,
+                                    previousEventTableMessage: earlierEventsTable
+                                }
+                            } else return message
+                        })
+                        return sortedMessageWithPlotContext
+                    })
                 }
             }
             )
@@ -354,6 +376,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     // Subscribe to the token stream for this chat session
     useEffect(() => {
+        console.log("Subscribing to the token stream for this chat session")
         if (initialActiveChatSession) {
             const sub = amplifyClient.subscriptions.recieveResponseStreamChunk({ chatSessionId: initialActiveChatSession.id }).subscribe({
                 next: (newChunk) => {
@@ -403,27 +426,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }, [initialActiveChatSession])
 
-    // // List the available bedrock agents
-    // useEffect(() => {
-    //     const fetchListBedrockAgents = async () => {
-    //         const response = await amplifyClient.queries.listBedrockAgents()
-    //         console.log('List Agents Response: ', response.data)
-    //         if (!(response.data && response.data.body)) {
-    //             console.log('No response from listing bedrock agents')
-    //             return
-    //         }
-    //         // const listAgentsResponseBody = JSON.parse(response.data.body) as ListBedrockAgentsResponseType
-    //         const listAgentsResponseBody = jsonParseHandleError(response.data.body) as ListBedrockAgentsResponseType
-    //         if (!listAgentsResponseBody) {
-    //             console.log('Could not parse response body from listing bedrock agents')
-    //             return
-    //         }
-    //         console.log('List Bedrock Agents Response Body: ', listAgentsResponseBody)
-    //         setBedrockAgents(listAgentsResponseBody)
-    //         // return listAgentsResponseBody
-    //     }
-    //     fetchListBedrockAgents()
-    // }, [])
+
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
         setMessages([])
@@ -434,11 +437,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         })
     }
 
-    async function deleteChatSession(targetSession: Schema['ChatSession']['type']) {
-        amplifyClient.models.ChatSession.delete({ id: targetSession.id })
-        // Remove the target session from the list of chat sessions
-        setChatSessions((previousChatSessions) => previousChatSessions.filter(existingSession => existingSession.id != targetSession.id))
-    }
+
 
     async function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string, chainOfThought?: boolean }) {
         const targetChatSessionId = initialActiveChatSession?.id;
@@ -473,21 +472,24 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }
 
-    async function addUserChatMessage(body: string) {
+    // const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
+    async function addUserChatMessage({ detail: { value } }: { detail: { value: string } }) {
         if (!messages.length) {
             console.log("This is the initial message. Getting summary for chat session")
             if (!initialActiveChatSession) throw new Error("No active chat session")
-            setChatSessionFirstMessageSummary(body, initialActiveChatSession)
+            setChatSessionFirstMessageSummary(value, initialActiveChatSession)
         }
         // await addChatMessage({ body: body, role: "human" })
-        sendMessageToChatBot(body);
+        sendMessageToChatBot(value);
+        setUserPrompt("")
     }
 
     async function sendMessageToChatBot(prompt: string) {
-        setIsLoading(true);
-        // await addChatMessage({ body: prompt, role: "human" })
+        setIsGenAiResponseLoading(true);
+        await addChatMessage({ body: prompt, role: "human" })
+
         if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
-            await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession})
+            await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession })
             // if (!response) throw new Error("No response from agent");
         } else {
             switch (initialActiveChatSession?.aiBotInfo?.aiBotName) {
@@ -499,9 +501,10 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     addChatMessage({ body: responseText, role: "ai" })
                     break
                 case defaultAgents.MaintenanceAgent.name:
-                    await addChatMessage({ body: prompt, role: "human" })
-                    await invokeBedrockAgentParseBodyGetTextAndTrace({ 
-                        prompt: prompt, 
+
+                    await invokeBedrockAgentParseBodyGetTextAndTrace({
+                        prompt: prompt,
+
                         chatSession: initialActiveChatSession,
                         agentAliasId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentAliasId,
                         agentId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentId,
@@ -510,7 +513,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     // addChatMessage({ body: response!.text!, role: "ai" })
                     break
                 case defaultAgents.ProductionAgent.name:
-                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true})
+                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true })
                     await invokeProductionAgent(prompt, initialActiveChatSession)
                     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
@@ -525,253 +528,290 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         }
     }
 
-    return (
-        <Box sx={{ display: 'flex', padding: 2 }}>
-            <SideBar
-                anchor='left'
-            >
-                <Box sx={{ overflow: 'auto' }}>
-                    <DropdownMenu buttonText='New Chat Session'>
-                        {
-                            [
-                                ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
-                                // ...bedrockAgents?.agentSummaries.filter((agent) => (agent.agentStatus === "PREPARED")) || []
-                            ]
-                                .map((agent) => (
-                                    <MenuItem
-                                        key={agent.agentName}
-                                        onClick={async () => {
-                                            // const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
-                                            
-                                            createChatSession({ aiBotInfo: { aiBotName: agent.agentName, aiBotId: agent.agentId } })
-                                        }}
-                                    >
-                                        <Typography sx={{ textAlign: 'center' }}>{agent.agentName}</Typography>
-                                    </MenuItem>
-                                ))
-                        }
-                    </DropdownMenu>
+
+    async function getGlossary(message: Message) {
+
+        if (!message.chatSessionId) throw new Error(`No chat session id in message: ${message}`)
+
+        if (message.chatSessionId in glossaryBlurbs) return
 
 
-                    <Typography sx={{ textAlign: 'center' }}>My Chat Sessions:</Typography>
-                    {chatSessions
-                        .slice()
-                        .sort((a, b) => {
-                            if (!a.createdAt || !b.createdAt) throw new Error("createdAt is missing")
-                            return a.createdAt < b.createdAt ? 1 : -1
-                        })
-                        .map((session) => (
-
-                            <Card key={session.id} sx={{ marginBottom: 2, backgroundColor: '#f5f5f5', flexShrink: 0 }}>
-                                <CardContent>
-                                    <Typography variant="h6" component="div" noWrap>
-                                        {session.firstMessageSummary?.slice(0, 50)}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {formatDate(session.createdAt)}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                        AI: {session.aiBotInfo?.aiBotName || 'Unknown'}
-                                    </Typography>
-                                </CardContent>
-                                <CardActions>
-                                    <Button
-                                        size="small"
-                                        onClick={() => router.push(`/chat/${session.id}`)}
-                                    >
-                                        Open Chat
-                                    </Button>
-                                    <IconButton
-                                        aria-label="delete"
-                                        onClick={() => deleteChatSession(session)}
-                                        sx={{ marginLeft: 'auto' }}
-                                    >
-                                        <DeleteIcon />
-                                    </IconButton>
-                                </CardActions>
-                            </Card>
-                        ))
+        const generateGlossaryResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
+            chatSessionId: message.chatSessionId,
+            lastMessageText: `Define any uncommon or industry specific terms in the message below\n<message>${message.content}</message>`,
+            usePastMessages: false,
+            outputStructure: JSON.stringify({
+                title: "DefineGlossaryTerms", //title and description help the llm to know how to fill the arguments out
+                description: "Create a JSON object which describes complex technical terms in the text. Only define terms which may be confuse some engineers",
+                type: "object",
+                properties: {// Change anyting in the properties according to the json schema reference: https://json-schema.org/understanding-json-schema/reference
+                    glossaryArray: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                term: { type: 'string' },
+                                definition: { type: 'string' }
+                            },
+                            required: ['term', 'description']
+                        },
+                        description: `Array of defined glossary terms`
                     }
-                </Box>
-            </SideBar>
-            {params ? //Show the chat UI if there is an active chat session
-                // <div 
-                // // style={{ marginLeft: '210px', padding: '20px' }}
-                // >
-                <Box
-                sx={{ alignItems: 'center', gap: 2, width: "100%" }}
-                >
-                    {/* <Toolbar /> */}
-
-                    <Box>
-                        <Typography variant="h4" gutterBottom>
-                            Chat with {initialActiveChatSession?.aiBotInfo?.aiBotName}
-                        </Typography>
-                    </Box>
-                    <Box>
-
-                        <DynamicChatUI
-                            onSendMessage={addUserChatMessage}
-                            messages={[
-                                ...messages,
-                                ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
-                            ]}
-                            running={isLoading}
-                        />
+                },
+                required: ['glossaryArray'],
+            })
+        })
+        console.log("Generate Glossary Response: ", generateGlossaryResponse)
+        if (generateGlossaryResponse.data) {
+            const newGeneratedGlossary = jsonParseHandleError(generateGlossaryResponse.data).glossaryArray as { term: string, definition: string }[]
+            console.log('Generated Glossary Entry: ', newGeneratedGlossary)
+            const newGlossaryBlurb = newGeneratedGlossary.map(glossaryEntry => `## ${glossaryEntry.term}: \n ${glossaryEntry.definition}`).join("\n\n")
+            // const newGlossaryBlurb = newGeneratedGlossary.map(glossaryEntry => (<><h4>${glossaryEntry.term}</h4><p>{glossaryEntry.definition}</p></>)).join("\n")
+            if (newGeneratedGlossary) setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.id || "ShouldNeverHappen"]: newGlossaryBlurb }))
+            // const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
+        } else console.log('Error Generating Glossary: ', generateGlossaryResponse)
+    }
 
 
-                    </Box>
-                    <Box sx={{ mt: 5 }}>
-                        {
-                            !isLoading && (suggestedPrompts.length || !messages.length) ? (
-                                <Typography variant="body2">
-                                    Suggested Follow Ups:
-                                </Typography>
-                            ) : (
-                                null
-                                // <CircularProgress />
-                            )
-                        }
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {!isLoading && suggestedPrompts.map((prompt) => (
-                            <div key={prompt}>
-                                <Button onClick={() => addUserChatMessage(prompt)} >
-                                    {prompt}
-                                </Button>
-                            </div>
-                        ))
-                        }
-                    </Box>
-                </Box>
-                // </div>
-                : null}
-            {
-                (initialActiveChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name) ?
-                    <SideBar
-                        anchor='right'
-                    >
-                        <>
-                            <Typography variant="h5" sx={{ textAlign: 'center' }}>Plan and execute steps:</Typography>
-                            {LiveUpdateActiveChatSession?.pastSteps?.map((step) => {
-                                try {
-                                    const stepContent = JSON.parse(step as string)
-                                    return (
-                                        <Tooltip
-                                            key={step as string}
-                                            title={<pre
-                                                style={{ //Wrap long lines
-                                                    whiteSpace: 'pre-wrap',
-                                                    wordWrap: 'break-word',
-                                                    overflowWrap: 'break-word',
-                                                }}
-                                            >
-                                                {stringify(stepContent)}
-                                            </pre>}
-                                            arrow
-                                            placement="left"
-                                            slotProps={{
-                                                tooltip: {
-                                                    sx: {
-                                                        maxWidth: 2000,
-                                                    },
-                                                },
-                                            }}
-                                        >
-                                            <Card
-                                                key={step as string}
-                                                sx={{
-                                                    marginBottom: 2,
-                                                    backgroundColor: '#e3f2fd',
-                                                    flexShrink: 0,
-                                                    cursor: 'pointer'
-                                                }}
-                                                onClick={() => {
-                                                    const element = document.getElementById(`## ${stepContent.title}`);
-                                                    if (element) {
-                                                        element.scrollIntoView({
-                                                            behavior: 'smooth',
-                                                            block: 'center'
-                                                        });
-                                                    }
-                                                }}
-                                            >
-                                                <CardContent>
-                                                    <Typography variant="h6" component="div">
-                                                        {stepContent.title}
-                                                    </Typography>
-                                                </CardContent>
-                                            </Card>
-                                        </Tooltip>
-                                    )
-                                } catch {
-                                    return <p>{step}</p>
-                                }
-                            })}
-                            {LiveUpdateActiveChatSession?.planSteps?.map((step) => {
-                                try {
-                                    const { result, ...stepContent } = JSON.parse(step as string)// Remove the result if it exists from the plan steps
-                                    console.info(result)//TODO: remove this
-                                    return (
-                                        <Tooltip
-                                            key={step as string}
-                                            title={<pre
-                                                style={{ //Wrap long lines
-                                                    whiteSpace: 'pre-wrap',
-                                                    wordWrap: 'break-word',
-                                                    overflowWrap: 'break-word',
-                                                }}
-                                            >
-                                                {stringify(stepContent)}
-                                            </pre>}
-                                            arrow
-                                            placement="left"
-                                            slotProps={{
-                                                tooltip: {
-                                                    sx: {
-                                                        maxWidth: 800,
-                                                    },
-                                                },
-                                            }}
-                                        >
-                                            <Card
-                                                key={step as string}
-                                                sx={{
-                                                    marginBottom: 2,
-                                                    backgroundColor: '#f5f5f5',
-                                                    flexShrink: 0,
-                                                    cursor: 'pointer'
-                                                }}
-                                                onClick={() => {
-                                                    const element = document.getElementById(`## ${stepContent.title}`);
-                                                    if (element) {
-                                                        element.scrollIntoView({
-                                                            behavior: 'smooth',
-                                                            block: 'center'
-                                                        });
-                                                    }
-                                                }}
-                                            >
-                                                <CardContent>
-                                                    <Typography variant="h6" component="div">
-                                                        {stepContent.title}
-                                                    </Typography>
-                                                </CardContent>
-                                            </Card>
-                                        </Tooltip>
 
-                                    )
-                                } catch {
-                                    return <p>{step}</p>
-                                }
-                            })}
-                        </>
-                    </SideBar>
-                    : null
+    // Helper function to group chat sessions by month
+    const groupChatsByMonth = (chatSessions: Array<Schema["ChatSession"]["type"]>): SideNavigationProps.Item[] => {
+        const grouped = chatSessions.reduce((acc: { [key: string]: Array<Schema["ChatSession"]["type"]> }, session) => {
+            if (!session.createdAt) throw new Error("Chat session missing createdAt timestamp");
+
+            const date = new Date(session.createdAt);
+            const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            if (!acc[monthYear]) {
+                acc[monthYear] = [];
             }
 
-        </Box>
+            const insertIndex = acc[monthYear].findIndex(existingSession =>
+                existingSession.createdAt && session.createdAt &&
+                existingSession.createdAt < session.createdAt
+            );
+            // If no index found (insertIndex === -1), push to end, otherwise insert at index
+            if (insertIndex === -1) {
+                acc[monthYear].push(session);
+            } else {
+                acc[monthYear].splice(insertIndex, 0, session);
+            }
+            // acc[monthYear].push(session);
 
+
+            return acc;
+        }, {});
+
+        return Object.entries(grouped).reverse().map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
+            type: "section",
+            text: monthYear,
+            items: [{
+                type: "link", href: `/chat`, text: "", info: <Tiles
+                    onChange={({ detail }) => {
+                        // setValue(detail.value);
+                        router.push(`/chat/${detail.value}`);
+                    }}
+                    value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
+
+                    items={
+                        groupedChatSessions.map((groupedChatSession) => ({
+                            label: groupedChatSession.firstMessageSummary?.slice(0, 50),
+                            description: `${formatDate(groupedChatSession.createdAt)} - AI: ${groupedChatSession.aiBotInfo?.aiBotName || 'Unknown'}`,
+                            value: groupedChatSession.id
+                        }))
+                    }
+                />
+            }]
+        }));
+    };
+
+    return (
+        <div className='page-container'>
+            <Tabs
+                disableContentPaddings
+                tabs={[
+                    {
+                        label: "Chat Agents",
+                        id: "first",
+                        content:
+                            <AppLayout
+                                navigationOpen={navigationOpen}
+                                onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
+                                tools={
+                                    <HelpPanel
+                                        header={
+                                            <h2>Plan and Execute Steps</h2>
+                                        }>
+                                        {/* <pre>
+                                            {JSON.stringify(LiveUpdateActiveChatSession, null, 2)}
+                                        </pre> */}
+                                        {[
+                                            ...(LiveUpdateActiveChatSession?.pastSteps?.map((step) => ({ stepType: 'past', content: step })) ?? []),
+                                            ...(LiveUpdateActiveChatSession?.planSteps?.map((step) => ({ stepType: 'plan', content: step })) ?? []),
+                                        ].map((step) => {
+                                            try {
+                                                const stepContent = JSON.parse(step.content as string)
+                                                return (
+                                                    <Tooltip
+                                                        key={step.content as string}
+                                                        title={<pre
+                                                            style={{ //Wrap long lines
+                                                                whiteSpace: 'pre-wrap',
+                                                                wordWrap: 'break-word',
+                                                                overflowWrap: 'break-word',
+                                                            }}
+                                                        >
+                                                            {stringify(stepContent)}
+                                                        </pre>}
+                                                        arrow
+                                                        placement="left"
+                                                        slotProps={{
+                                                            tooltip: {
+                                                                sx: {
+                                                                    maxWidth: 2000,
+                                                                },
+                                                            },
+                                                        }}
+                                                    >
+
+                                                        <div className="step-container" key={step.content as string}>
+                                                            <Steps
+                                                                // className='steps'
+                                                                steps={[
+                                                                    {
+                                                                        status: (step.stepType === 'past' ? "success" : "loading"),
+                                                                        header: stepContent.title,
+                                                                        statusIconAriaLabel: (step.stepType === 'past' ? "Success" : "Loading")
+                                                                    }
+                                                                ]}
+                                                            />
+                                                        </div>
+                                                    </Tooltip>
+                                                )
+                                            } catch {
+                                                return <p>{step.content}</p>
+                                            }
+                                        })}
+                                    </HelpPanel>}
+                                navigation={
+                                    <SideNavigation
+                                        header={{
+                                            href: '#',
+                                            text: 'Sessions',
+                                        }}
+                                        items={groupedChatSessions}
+
+                                    />
+
+
+                                }
+                                content={
+                                    <div
+                                        className='chat-container'
+                                        style={{
+                                            // maxHeight: '100%', // Constrain to parent height
+                                            // height: '100%',    // Take full height
+                                            // display: 'flex',
+                                            flexDirection: 'column-reverse', //The intent is for this to enable auto-scrolling
+                                            overflow: 'auto'
+                                        }}
+                                    >
+                                        <Container
+                                            header={
+                                                <>
+                                                    <Header variant="h3">Generative AI chat - {initialActiveChatSession?.aiBotInfo?.aiBotName}</Header>
+                                                    <span className='prompt-label'>Try one of these example prompts</span>
+                                                    <ButtonDropdown
+                                                        ariaLabel="Suggested Prompts"
+                                                        items={[
+                                                            ...suggestedPrompts.map((prompt) => ({ id: prompt, text: prompt })),
+                                                        ]}
+                                                        onItemClick={({ detail }) => {
+                                                            addUserChatMessage({ detail: { value: detail.id } });
+                                                        }}
+                                                    />
+                                                </>
+                                            }
+                                            fitHeight
+                                            disableContentPaddings
+                                            footer={
+                                                <FormField
+                                                    stretch
+                                                    constraintText={
+                                                        <>
+                                                            Use of this service is subject to the{' '}
+                                                            <Link href="#" external variant="primary" fontSize="inherit">
+                                                                AWS Responsible AI Policy
+                                                            </Link>
+                                                            .
+                                                        </>
+                                                    }
+                                                >
+
+                                                    {/* During loading, action button looks enabled but functionality is disabled. */}
+                                                    {/* This will be fixed once prompt input receives an update where the action button can receive focus while being disabled. */}
+                                                    {/* In the meantime, changing aria labels of prompt input and action button to reflect this. */}
+
+                                                    <PromptInput
+                                                        onChange={({ detail }) => setUserPrompt(detail.value)}
+                                                        onAction={addUserChatMessage}
+                                                        value={userPrompt}
+                                                        actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
+                                                        actionButtonIconName="send"
+                                                        ariaLabel={isGenAiResponseLoading ? 'Prompt input - suppressed' : 'Prompt input'}
+                                                        placeholder="Ask a question"
+                                                        autoFocus
+                                                    />
+                                                </FormField>
+                                            }
+                                        >
+
+                                            <Messages
+                                                messages={[
+                                                    ...messages,
+                                                    ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                                                ]}
+                                                getGlossary={getGlossary}
+                                                isLoading={isGenAiResponseLoading}
+                                                glossaryBlurbs={glossaryBlurbs}
+                                            />
+                                        </Container>
+                                    </div>
+
+                                }
+                            />,
+                        action:
+                            <ButtonDropdown
+                                variant="icon"
+                                ariaLabel="Query actions for first tab"
+                                items={[
+                                    // ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ agentId: agentId, agentName: agentInfo.name })),
+                                    ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ id: agentId, text: agentInfo.name })),
+                                ]}
+                                expandToViewport={true}
+                                onItemClick={async ({ detail }) => {
+                                    const agentInfo = defaultAgents[detail.id];
+                                    // const agentAliasId = agent.agentId && !(agent.agentId in defaultAgents) ? await getAgentAliasId(agent.agentId) : null
+                                    createChatSession({ aiBotInfo: { aiBotName: agentInfo.name, aiBotId: detail.id } })
+                                }}
+
+                            />
+                    },
+
+                    {
+                        label: "Links",
+                        id: "fourth",
+                        content:
+                            <div className='links-container'>
+                                <Container>
+                                    <StorageBrowser />
+                                </Container>
+                            </div>,
+                    },
+
+                ]}
+            />
+        </div>
     );
 };
 

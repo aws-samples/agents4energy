@@ -212,7 +212,7 @@ export const executeSQLQueryTool = tool(
             const queryResponseData = transformResultSet(results.ResultSet)
 
             return {
-                messageContentType: 'tool_table',
+                messageContentType: 'tool_table_trend',
                 queryResponseData: queryResponseData,
             } as ToolMessageContentType
 
@@ -652,7 +652,7 @@ export const wellTableTool = tool(
             // console.log('data Rows: ', dataRows)
 
             return {
-                messageContentType: 'tool_table',
+                messageContentType: 'tool_table_events',
                 queryResponseData: dataRows
             } as ToolMessageContentType
         }

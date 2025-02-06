@@ -101,6 +101,17 @@ export function getMessageCatigory(message: Message): messageContentType {
       //This is a markdown tool message
       return 'tool_markdown'
     } else {
+        switch (message.tool_name) {
+        case 'executeSQLQuery':
+          return 'tool_table_trend'
+        case 'wellTableTool':
+          return 'tool_table_events'
+        case 'plotTableFromToolResponseToolBuilder':
+          return 'tool_plot'
+        default:
+          return 'tool_json'
+      }
+
       return (JSON.parse(message.content) as ToolMessageContentType).messageContentType
     }
   }
