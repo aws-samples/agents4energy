@@ -277,8 +277,10 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
             - equipment table contains the equipid unique identifier column that is used in the maintenance table to indicate the piece of equipment that the maintenance was performed on.
             - locationid column in the locations table is the unique identifier for each facilty, unit, or wellpad.
             - Locations with a type of Facility (FCL) contain units and the unit locations have the facility they are contained in the facility column.  For example, the Biodiesel Unit is at the Sandy Point Refilery (Location 928)
+            - Inspections are contained in the maintenance table with a mainttypeid value of 'INS'
             - NEVER attempt to join equipid ON locationid or installlocationid as these fields are different values and data types.
             - ALWAYS preface the table name with the schema when writing SQL.
+            - ALWAYS make sure column names exist to prevent errors when running the statement.
             - Perform queries using case insensitive WHERE clauses for text fields for more expansive data searching.
             - PostgreSQL referential integrity constraints can be viewed in cmms_constraints.  Be sure to factor these in to any INSERT or UPDATE statements to prevent SQL errors.
             - ALWAYS update the updatedby column to have the value MaintAgent and updateddate to be the current date and time when issuing UPDATE SQL statements to the CMMS database

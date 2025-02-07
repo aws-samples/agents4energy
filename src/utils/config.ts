@@ -36,8 +36,8 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
         agentId: outputs.custom.maintenanceAgentId,
         agentAliasId: outputs.custom.maintenanceAgentAliasId,
         samplePrompts: [
-            "I am planning a turnaround for the distillation unit of sandy point refinery in 2025.  Can you provide a summary of all equipment including equipment ID, name, manufacturer, year manufactured, dates of service, and any maintenance that was performed on the equipment in 2024.",
-            "In September 2024, what are a few key incidents and actions taken at the biodiesel unit?",
+            "I am planning a turnaround for the biodiesel unit of sandy point refinery in 2025.  Can you provide a summary of all equipment including equipment ID, name, manufacturer, year manufactured, dates of service, and any maintenance that was performed on the equipment in 2024.",
+            "What are some recent incidents and actions taken at the distillation unit?",
         ],
     } as BedrockAgent,
     ProductionAgent: {
