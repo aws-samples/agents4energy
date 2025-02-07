@@ -131,6 +131,7 @@ body {
 .amplify-storage-browser__data-table {
   border-color: gray !important;
   border-radius: 16px !important;
+  height: calc(100% - 40px) !important;
 }
 .amplify-text {
   display: block;
