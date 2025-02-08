@@ -33,6 +33,7 @@ import { AwsSolutionsChecks } from 'cdk-nag'
 import { productionAgentBuilder } from "./agents/production/productionAgent"
 import { maintenanceAgentBuilder } from "./agents/maintenance/maintenanceAgent"
 import { AppConfigurator } from './custom/appConfigurator'
+import { buildRegulatoryAgent } from './agents/regulatory/regulatoryAgent';
 import { cdkNagSupperssionsHandler } from './custom/cdkNagHandler';
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
@@ -213,6 +214,15 @@ const {
   s3Bucket: backend.storage.resources.bucket,
 })
 
+// Create the regulatory agent
+const regulatoryAgentStack = backend.createStack('regAgentStack')
+
+buildRegulatoryAgent(regulatoryAgentStack, {
+  vpc: vpc,
+  s3Bucket: backend.storage.resources.bucket,
+  s3Deployment: uploadToS3Deployment,
+  regulatoryKbId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
+})
 
 
 // Custom resource Lambda to introduce a delay between when the PDF to Yaml function finishes deploying, and when the objects are uploaded.
