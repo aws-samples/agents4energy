@@ -1,6 +1,8 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
-
+import { Stack } from 'aws-cdk-lib';
+import { buildRegulatoryKb } from './constructs/regulatoryKnowledgeBase';
+import { buildRegulatoryAgent } from './agents/regulatory/regulatoryAgent';
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import {
@@ -9,15 +11,12 @@ import {
   getStructuredOutputFromLangchainFunction,
   productionAgentFunction,
   planAndExecuteAgentFunction,
-  // addIamDirectiveFunction
 } from './data/resource';
 import { preSignUp } from './functions/preSignUp/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
-// import * as iam from 'aws-cdk-lib/aws-iam';
-// import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
-// import * as ec2 from 'aws-cdk-lib/aws-ec2';
+
 import {
   aws_iam as iam,
   aws_s3 as s3,
@@ -33,7 +32,6 @@ import { AwsSolutionsChecks } from 'cdk-nag'
 import { productionAgentBuilder } from "./agents/production/productionAgent"
 import { maintenanceAgentBuilder } from "./agents/maintenance/maintenanceAgent"
 import { AppConfigurator } from './custom/appConfigurator'
-import { buildRegulatoryAgent } from './agents/regulatory/regulatoryAgent';
 import { cdkNagSupperssionsHandler } from './custom/cdkNagHandler';
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
@@ -214,17 +212,6 @@ const {
   s3Bucket: backend.storage.resources.bucket,
 })
 
-// Create the regulatory agent
-const regulatoryAgentStack = backend.createStack('regAgentStack')
-
-buildRegulatoryAgent(regulatoryAgentStack, {
-  vpc: vpc,
-  s3Bucket: backend.storage.resources.bucket,
-  s3Deployment: uploadToS3Deployment,
-  regulatoryKbId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
-})
-
-
 // Custom resource Lambda to introduce a delay between when the PDF to Yaml function finishes deploying, and when the objects are uploaded.
 const delayFunction = new lambda.Function(productionAgentStack, 'DelayFunction', {
   runtime: lambda.Runtime.NODEJS_18_X,
@@ -318,34 +305,56 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   cognitoUserPool: backend.auth.resources.userPool,
 })
 
+///////////////////////////////////////////////////////////
+/////// Create the Regulatory Stack /////////////////////
+///////////////////////////////////////////////////////////
 
-// // First, create a logging bucket
-// const accessLogsBucket = new s3.Bucket(networkingStack, 'accessLogs', {
-//   // Enforce SSL for data in transit
-//   enforceSSL: true,
-//   // Block all public access
-//   blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-//   // Enable encryption by default
-//   encryption: s3.BucketEncryption.S3_MANAGED,
-//   // Set a lifecycle rule to clean up old logs if desired
-//   lifecycleRules: [
-//     {
-//       expiration: cdk.Duration.days(365), // Adjust retention period as needed
-//     }
-//   ],
-//   removalPolicy: cdk.RemovalPolicy.RETAIN // Retain logs even if stack is destroyed
-// });
+// Create a dedicated stack for regulatory services
+const regulatoryStack = backend.createStack('RegulatoryStack');
+const environment = process.env.ENVIRONMENT || 'dev'; // Define environment separately
+const stackName = regulatoryStack.stackName; // Get the actual stack name
 
-// // backend.storage.resources.bucket.grantReadWrite(accessLogsBucket)
 
-// const cfnBucket = backend.storage.resources.bucket.node.defaultChild as s3.CfnBucket;
-// cfnBucket.loggingConfiguration = {
-//   destinationBucketName: accessLogsBucket.bucketName,
-//   logFilePrefix: 'bucket-logs/'
-// };
 
-// // Run CDK nag on the stacks
-// cdkNagSupperssionsHandler(rootStack)
-// Aspects.of(productionAgentStack).add(new AwsSolutionsChecks({ verbose: true }))
-// Aspects.of(maintenanceAgentStack).add(new AwsSolutionsChecks({ verbose: true }))
-// Aspects.of(networkingStack).add(new AwsSolutionsChecks({ verbose: true }))
+// Build the regulatory knowledge base
+const { knowledgeBase, regulatoryBucket, dataSource } = buildRegulatoryKb(regulatoryStack, {
+  environment: environment,
+  description: 'Knowledge base for regulatory compliance information',
+  tags: {
+    StackName: stackName,
+    Component: 'regulatory-kb'
+  }
+});
+
+// Build the regulatory agent
+const { regulatoryAgent, regulatoryAgentAlias } = buildRegulatoryAgent(regulatoryStack, {
+  regulatoryKbId: knowledgeBase.attrKnowledgeBaseId,
+  regulatoryBucket: regulatoryBucket,
+  environment,
+  description: 'AI assistant for regulatory compliance guidance',
+  tags: {
+    Component: 'regulatory-agent',
+    Environment: environment,
+    StackName: stackName
+  }
+});
+
+// Add permissions to the Lambda function's role
+backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    resources: [
+      `arn:aws:bedrock:${regulatoryStack.region}:${regulatoryStack.account}:agent-alias/${regulatoryAgent.attrAgentId}/*`,
+    ],
+    actions: ["bedrock:InvokeAgent"],
+  })
+);
+
+// Add outputs
+backend.addOutput({
+  custom: {
+    regulatoryAgentId: regulatoryAgent.attrAgentId,
+    regulatoryAgentAliasId: regulatoryAgentAlias.attrAgentAliasId,
+    regulatoryKnowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
+    regulatoryBucketName: regulatoryBucket.bucketName
+  },
+});
