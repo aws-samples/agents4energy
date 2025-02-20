@@ -31,8 +31,8 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
     PetrophysicsAgent: {
         name: "Petrophysics Agent",
         source: "bedrockAgent",
-        agentId: "outputs.custom.corporateAgentId",
-        agentAliasId: "outputs.custom.corporateAgentAliasId",
+        agentId: "outputs.custom.petrophysicsAgentId",
+        agentAliasId: "outputs.custom.petrophysicsAgentAliasId",
         samplePrompts: [
             "What is fluid substitution modeling?",
             "What are AVO classes?",
