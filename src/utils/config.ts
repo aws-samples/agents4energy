@@ -28,6 +28,17 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
             "In September 2024, what are a few key incidents and actions taken at the biodiesel unit?",
         ],
     } as BedrockAgent,
+    PetrophysicsAgent: {
+        name: "Petrophysics Agent",
+        source: "bedrockAgent",
+        agentId: "outputs.custom.corporateAgentId",
+        agentAliasId: "outputs.custom.corporateAgentAliasId",
+        samplePrompts: [
+            "What is fluid substitution modeling?",
+            "What are AVO classes?",
+            "A 30% porosity sandstone with vshale = 0.2 has vp=3.5 km/s, vs=1.95 km/s, bulk density=2.23 gm/cc. The initial pore fluid composition is brine (sw = 1). What are the expected seismic velocities and bulk density of the sandstone if the desired fluid composition is brine+oil (sw = 0.2)? Assume a quartz+shale mineral matrix, Pressure = 17MPa, Temparetaure = 120 C, brine salinity = 100000 ppm, Oil API = 30, GOR = 500scf/stb, gas gravity = 0.8"
+        ],
+    } as BedrockAgent,
     ProductionAgent: {
         name: "Production Agent",
         source: "graphql",
