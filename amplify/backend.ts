@@ -1,8 +1,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Stack } from 'aws-cdk-lib';
-import { buildRegulatoryKb } from './constructs/regulatoryKnowledgeBase';
-import { buildRegulatoryAgent } from './agents/regulatory/regulatoryAgent';
+import { regulatoryAgentBuilder } from './agents/regulatory/regulatoryAgent';
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import {
@@ -16,7 +15,7 @@ import { preSignUp } from './functions/preSignUp/resource';
 import { storage } from './storage/resource';
 
 import * as cdk from 'aws-cdk-lib'
-
+import * as bedrock from 'aws-cdk-lib/aws-bedrock'
 import {
   aws_iam as iam,
   aws_s3 as s3,
@@ -183,6 +182,7 @@ applyTagsToRootStack()
 ///////////////////////////////////////////////////////////
 const productionAgentStack = backend.createStack('prodAgentStack')
 const maintenanceAgentStack = backend.createStack('maintAgentStack')
+const regulatoryAgentStack = backend.createStack('regAgentStack')
 
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -190,6 +190,7 @@ const rootDir = path.resolve(__dirname, '..');
 const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentStack, 'sample-deployment', {
   sources: [s3Deployment.Source.asset(path.join(rootDir, 'sampleData'))],
   destinationBucket: backend.storage.resources.bucket,
+  memoryLimit: 3008,
   prune: false
   // destinationKeyPrefix: '/'
 });
@@ -217,6 +218,7 @@ const delayFunction = new lambda.Function(productionAgentStack, 'DelayFunction',
   runtime: lambda.Runtime.NODEJS_18_X,
   handler: 'index.handler',
   timeout: cdk.Duration.minutes(15),
+  memorySize: 3008, //increased memory size to maximum to avoid SIGKILL when there are a lot of sample files being uploaded to S3.
   code: lambda.Code.fromInline(`
     exports.handler = async () => {
       const secondsToWait = 600
@@ -287,6 +289,23 @@ backend.addOutput({
 })
 
 ///////////////////////////////////////////////////////////
+/////// Create the Regulatory Agent Stack /////////////////
+///////////////////////////////////////////////////////////
+
+const { regulatoryAgent, regulatoryAgentAlias, metric } = regulatoryAgentBuilder(regulatoryAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    regulatoryAgentId: regulatoryAgent.attrAgentId,
+    regulatoryAgentAliasId: regulatoryAgentAlias.attrAgentAliasId,
+  },
+})
+
+
+///////////////////////////////////////////////////////////
 /////// Create the Configurator Stack /////////////////////
 ///////////////////////////////////////////////////////////
 // This stack configures the GraphQL API and adds a hook to the conginto user pool to check email address domain before allowing sign up.
@@ -305,56 +324,56 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   cognitoUserPool: backend.auth.resources.userPool,
 })
 
-///////////////////////////////////////////////////////////
-/////// Create the Regulatory Stack /////////////////////
-///////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////
+// /////// Create the Regulatory Stack /////////////////////
+// ///////////////////////////////////////////////////////////
 
-// Create a dedicated stack for regulatory services
-const regulatoryStack = backend.createStack('RegulatoryStack');
-const environment = process.env.ENVIRONMENT || 'dev'; // Define environment separately
-const stackName = regulatoryStack.stackName; // Get the actual stack name
+// // Create a dedicated stack for regulatory services
+// const regulatoryStack = backend.createStack('RegulatoryStack');
+// const environment = process.env.ENVIRONMENT || 'dev'; // Define environment separately
+// const stackName = regulatoryStack.stackName; // Get the actual stack name
 
 
 
-// Build the regulatory knowledge base
-const { knowledgeBase, regulatoryBucket, dataSource } = buildRegulatoryKb(regulatoryStack, {
-  environment: environment,
-  description: 'Knowledge base for regulatory compliance information',
-  tags: {
-    StackName: stackName,
-    Component: 'regulatory-kb'
-  }
-});
+// // Build the regulatory knowledge base
+// const { knowledgeBase, regulatoryBucket, dataSource } = buildRegulatoryKb(regulatoryStack, {
+//   environment: environment,
+//   description: 'Knowledge base for regulatory compliance information',
+//   tags: {
+//     StackName: stackName,
+//     Component: 'regulatory-kb'
+//   }
+// });
 
-// Build the regulatory agent
-const { regulatoryAgent, regulatoryAgentAlias } = buildRegulatoryAgent(regulatoryStack, {
-  regulatoryKbId: knowledgeBase.attrKnowledgeBaseId,
-  regulatoryBucket: regulatoryBucket,
-  environment,
-  description: 'AI assistant for regulatory compliance guidance',
-  tags: {
-    Component: 'regulatory-agent',
-    Environment: environment,
-    StackName: stackName
-  }
-});
+// // Build the regulatory agent
+// const { regulatoryAgent, regulatoryAgentAlias } = buildRegulatoryAgent(regulatoryStack, {
+//   regulatoryKbId: knowledgeBase.attrKnowledgeBaseId,
+//   regulatoryBucket: regulatoryBucket,
+//   environment,
+//   description: 'AI assistant for regulatory compliance guidance',
+//   tags: {
+//     Component: 'regulatory-agent',
+//     Environment: environment,
+//     StackName: stackName
+//   }
+// });
 
-// Add permissions to the Lambda function's role
-backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
-  new iam.PolicyStatement({
-    resources: [
-      `arn:aws:bedrock:${regulatoryStack.region}:${regulatoryStack.account}:agent-alias/${regulatoryAgent.attrAgentId}/*`,
-    ],
-    actions: ["bedrock:InvokeAgent"],
-  })
-);
+// // Add permissions to the Lambda function's role
+// backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
+//   new iam.PolicyStatement({
+//     resources: [
+//       `arn:aws:bedrock:${regulatoryStack.region}:${regulatoryStack.account}:agent-alias/${regulatoryAgent.attrAgentId}/*`,
+//     ],
+//     actions: ["bedrock:InvokeAgent"],
+//   })
+// );
 
-// Add outputs
-backend.addOutput({
-  custom: {
-    regulatoryAgentId: regulatoryAgent.attrAgentId,
-    regulatoryAgentAliasId: regulatoryAgentAlias.attrAgentAliasId,
-    regulatoryKnowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
-    regulatoryBucketName: regulatoryBucket.bucketName
-  },
-});
+// // Add outputs
+// backend.addOutput({
+//   custom: {
+//     regulatoryAgentId: regulatoryAgent.attrAgentId,
+//     regulatoryAgentAliasId: regulatoryAgentAlias.attrAgentAliasId,
+//     regulatoryKnowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
+//     regulatoryBucketName: regulatoryBucket.bucketName
+//   },
+// });
