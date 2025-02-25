@@ -22,10 +22,14 @@ export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuil
     const resourcePrefix = scope.node.tryGetContext('resourcePrefix') || 'regulatory';
     const environment = props.environment || scope.node.tryGetContext('environment') || 'dev';
 
+    // Declare a UUID to append to resources to avoid naming collisions in Amplify
+    const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
+    
+
     // Create IAM role for the Bedrock Agent
     const regulatoryAgentRole = new iam.Role(scope, 'RegulatoryAgentRole', {
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
-        roleName: 'BedrockAgentRole',
+        roleName: `BedrockAgentRole-${stackUUID}`,
         path: '/service-role/',
         description: 'Execution role for Bedrock Regulatory Agent'
     });
