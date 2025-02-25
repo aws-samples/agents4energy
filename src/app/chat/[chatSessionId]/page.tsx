@@ -511,7 +511,16 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     })
                     // console.log("MaintenanceAgentResponse: ", response)
                     // addChatMessage({ body: response!.text!, role: "ai" })
-                    break
+                    break;
+                case defaultAgents.RegulatoryAgent.name:
+                    await invokeBedrockAgentParseBodyGetTextAndTrace({
+                        prompt: prompt,
+
+                        chatSession: initialActiveChatSession,
+                        agentAliasId: (defaultAgents.RegulatoryAgent as BedrockAgent).agentAliasId,
+                        agentId: (defaultAgents.RegulatoryAgent as BedrockAgent).agentId,
+                    })
+                    break;
                 case defaultAgents.ProductionAgent.name:
                     await addChatMessage({ body: prompt, role: "human", chainOfThought: true })
                     await invokeProductionAgent(prompt, initialActiveChatSession)
@@ -523,7 +532,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     break;
                 default:
                     throw new Error("No Agent Configured");
-                    break;
+                    
             }
         }
     }
