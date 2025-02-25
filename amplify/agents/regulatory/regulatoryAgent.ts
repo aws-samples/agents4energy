@@ -96,7 +96,7 @@ export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuil
 
     // Create the Bedrock agent with the role
     const cfnAgentProps: bedrock.CfnAgentProps = {
-        agentName: `${resourcePrefix}-agent-${environment}`,
+        agentName: `${resourcePrefix}-agent-${stackUUID}`,
         description: props.description || 'This agent is designed to help with regulatory compliance.',
         instruction: props.instruction || defaultInstruction,
         foundationModel: props.modelId || 'anthropic.claude-3-haiku-20240307-v1:0',
@@ -123,7 +123,7 @@ export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuil
         'RegulatoryAgentAlias',
         {
             agentId: regulatoryAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${environment}`
+            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
         }
     );
 
