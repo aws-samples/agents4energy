@@ -40,9 +40,9 @@ You can add new data sources thorugh [Amazon Athena Federated Query](https://doc
 
 Steps:
 1. Configure a new Amazon Athena Federated Query Data Source
-1. Tag the data source with key: "AgentsForEnergy" and value: "true"
-1. Create a JSON object for each table in the data source. See an example below.
-1. Upload the files to 
+2. Tag the data source with key: "AgentsForEnergy" and value: "true"
+3. Create a JSON object for each table in the data source. See an example below.
+4. Upload the files to 
 
 Example Table Definition:
 ```json

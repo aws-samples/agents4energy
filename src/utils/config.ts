@@ -28,6 +28,16 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
             "In September 2024, what are a few key incidents and actions taken at the biodiesel unit?",
         ],
     } as BedrockAgent,
+    RegulatoryAgent: {
+        name: "Regulatory Agent",
+        source: "bedrockAgent",
+        agentId: outputs.custom.regulatoryAgentId,
+        agentAliasId: outputs.custom.regulatoryAgentAliasId,
+        samplePrompts: [
+            "What are the requirements for fugitive emissions monitoring and reporting in the U.S.?",
+            "What are the requirements for decomissioning an offshore oil well in Brazil?",
+        ],
+    } as BedrockAgent,
     ProductionAgent: {
         name: "Production Agent",
         source: "graphql",
