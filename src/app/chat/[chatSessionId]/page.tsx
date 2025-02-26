@@ -486,7 +486,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     async function sendMessageToChatBot(prompt: string) {
         setIsGenAiResponseLoading(true);
-        await addChatMessage({ body: prompt, role: "human" })
+        // await addChatMessage({ body: prompt, role: "human" })
 
         if (initialActiveChatSession?.aiBotInfo?.aiBotAliasId) {
             await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: initialActiveChatSession })
@@ -501,10 +501,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     addChatMessage({ body: responseText, role: "ai" })
                     break
                 case defaultAgents.MaintenanceAgent.name:
-
+                    await addChatMessage({ body: prompt, role: "human" })
                     await invokeBedrockAgentParseBodyGetTextAndTrace({
                         prompt: prompt,
-
                         chatSession: initialActiveChatSession,
                         agentAliasId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentAliasId,
                         agentId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentId,
@@ -614,8 +613,13 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         return Object.entries(grouped).reverse().map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
             type: "section",
             text: monthYear,
+            // controlId: "",
             items: [{
-                type: "link", href: `/chat`, text: "", info: <Tiles
+                type: "link", 
+                href: `/chat`, 
+                text: "", 
+                // controlId: "",
+                info: <Tiles
                     onChange={({ detail }) => {
                         // setValue(detail.value);
                         router.push(`/chat/${detail.value}`);
@@ -624,6 +628,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
                     items={
                         groupedChatSessions.map((groupedChatSession) => ({
+                            controlId: groupedChatSession.id,
                             label: groupedChatSession.firstMessageSummary?.slice(0, 50),
                             description: `${formatDate(groupedChatSession.createdAt)} - AI: ${groupedChatSession.aiBotInfo?.aiBotName || 'Unknown'}`,
                             value: groupedChatSession.id
