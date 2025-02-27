@@ -1,9 +1,15 @@
 
-## Agents4Energy Deployent Steps
-1. Fork the repo
-1. Configure the AWS Amplify to deploy the repo
-    1. Use this build image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
-    1. Set the maximum build time to 1 hour
+# Agents4Energy Deployent Steps
+1. Fork the Agents4Energy GitHub repository
+2. Login to your AWS account navigate to Model Access in Amazon Bedrock
+![Enable Bedrock Models](assets/images/AFE-Deploy01.png)
+3. Enable the desired foundation models for use with your agentic workflows
+4. Access should be granted immediately
+5. Test the models in the Chat/Text playground of your desired region
+6. Navigate to AWS Amplify and click Deploy an app
+
+
+
 
 ## Develop
 To begin developing in this repo, perform the following steps. These steps are indepent of the deployment steps.
@@ -15,7 +21,7 @@ To begin developing in this repo, perform the following steps. These steps are i
 1. Now when you make code changes, they will be deployed to both the front and back end.
 
 
-## Limit sign up to certain email addresses
+### Limit sign up to certain email addresses
 When a user signs up for an account, the suffix of their email address is checked against an allow list.
 To change which email address suffixes are allowed, follow these steps:
 1. In the AWS amplify console, navigate to your branch.
@@ -42,7 +48,7 @@ Steps:
 1. Configure a new Amazon Athena Federated Query Data Source
 2. Tag the data source with key: "AgentsForEnergy" and value: "true"
 3. Create a JSON object for each table in the data source. See an example below.
-4. Upload the files to 
+4. Upload the files  
 
 Example Table Definition:
 ```json
@@ -53,3 +59,5 @@ Example Table Definition:
   "tableDefinition": "\"date\"\tvarchar\n\"wti_price\"\tdouble\n\"brent_price\"\tdouble\n\"volume\"\tbigint"
 }
 ```
+
+## Maintenance Agent

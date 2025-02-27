@@ -1,7 +1,8 @@
 # Contributing Guidelines
 
-Thank you for your interest in contributing to our project. Whether it's a bug report, new feature, correction, or additional
-documentation, we greatly value feedback and contributions from our community.
+Thank you for your interest in contributing to Agents4Energy. Whether it's a bug report, new feature, correction, or additional
+documentation, we greatly value feedback and contributions from our community.  Our preference is to manage communications through 
+this aws-samples GitHub repository, but if you have additional comments, feel free to contact [Agents4Energy@amazon.com](mailto:agents4energy@amazon.com)
 
 Please read through this document before submitting any issues or pull requests to ensure we have all the necessary
 information to effectively respond to your bug report or contribution.
