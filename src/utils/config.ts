@@ -1,5 +1,5 @@
 // import { BedrockAgent } from "@aws-sdk/client-bedrock-agent"
-import outputs from '@/../amplify_outputs.json';
+import outputs from '../../amplify_outputs.json';
 
 type BaseAgent = {
     name: string
@@ -46,7 +46,7 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
         samplePrompts: [
             "What is seismic petrophysics?",
             "How does rock physics affect oil and gas production?",
-            "Calculate the expected AVO Class for a gas saturated sandstone with 25% porosity"
+            "Calculate the expected AVO Class for a gas saturated sandstone with 25% porosity, overlain by shale with Vp of 3200 m/s, Vs of 1800 m/s, and density of 2.4 g/cc"
         ],
     } as BedrockAgent,
     ProductionAgent: {

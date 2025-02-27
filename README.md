@@ -1,6 +1,6 @@
 # Agents4Energy
 
-## Agents4Energy Deployent Steps
+## Agents4Energy Deployment Steps
 
 1. Fork the repo
 1. Configure the AWS Amplify to deploy the repo
