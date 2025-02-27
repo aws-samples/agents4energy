@@ -520,6 +520,16 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                         agentId: (defaultAgents.RegulatoryAgent as BedrockAgent).agentId,
                     })
                     break;
+                case defaultAgents.PetrophysicsAgent.name:
+                    await addChatMessage({ body: prompt, role: "human" })
+                    await invokeBedrockAgentParseBodyGetTextAndTrace({
+                        prompt: prompt,
+                        chatSession: initialActiveChatSession,
+                        agentAliasId: (defaultAgents.PetrophysicsAgent as BedrockAgent).agentAliasId,
+                        agentId: (defaultAgents.PetrophysicsAgent as BedrockAgent).agentId,
+                    })
+                    break;  
+                    
                 case defaultAgents.ProductionAgent.name:
                     await addChatMessage({ body: prompt, role: "human", chainOfThought: true })
                     await invokeProductionAgent(prompt, initialActiveChatSession)

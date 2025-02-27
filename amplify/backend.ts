@@ -35,6 +35,8 @@ import { cdkNagSupperssionsHandler } from './custom/cdkNagHandler';
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
 
+import { petrophysicsAgentBuilder } from "./agents/petrophysics/petrophysics"
+
 const resourceTags = {
   Project: 'agents-for-energy',
   Environment: 'dev',
@@ -106,7 +108,7 @@ backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   )
 )
 
-//This may be unneccessary TODO figur out if this is required.
+//This may be unneccessary TODO figure out if this is required.
 backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     resources: [
@@ -181,9 +183,6 @@ applyTagsToRootStack()
 /////// Create the Production Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
 const productionAgentStack = backend.createStack('prodAgentStack')
-const maintenanceAgentStack = backend.createStack('maintAgentStack')
-const regulatoryAgentStack = backend.createStack('regAgentStack')
-
 //Deploy the test data to the s3 bucket
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -275,6 +274,8 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
 ///////////////////////////////////////////////////////////
 /////// Create the Maintenance Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
+const maintenanceAgentStack = backend.createStack('maintenanceAgentStack');
+
 const {defaultDatabaseName, maintenanceAgent, maintenanceAgentAlias} = maintenanceAgentBuilder(maintenanceAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
@@ -292,6 +293,8 @@ backend.addOutput({
 /////// Create the Regulatory Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
 
+const regulatoryAgentStack = backend.createStack('regAgentStack')
+
 const { regulatoryAgent, regulatoryAgentAlias, metric } = regulatoryAgentBuilder(regulatoryAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
@@ -304,6 +307,24 @@ backend.addOutput({
   },
 })
 
+///////////////////////////////////////////////////////////
+/////// Create the Petrophysics Agent Stack ///////////////
+///////////////////////////////////////////////////////////
+
+const petrophysicsAgentStack = backend.createStack('petrophysicsAgentStack');
+
+const { agent: petrophysicsAgent, agentAlias: petrophysicsAgentAlias } = petrophysicsAgentBuilder(petrophysicsAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
+  s3Bucket: backend.storage.resources.bucket
+});
+
+backend.addOutput({
+  custom: {
+    petrophysicsAgentId: petrophysicsAgent.attrAgentId,
+    petrophysicsAgentAliasId: petrophysicsAgentAlias.attrAgentAliasId,
+  },
+});
 
 ///////////////////////////////////////////////////////////
 /////// Create the Configurator Stack /////////////////////
@@ -324,56 +345,3 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   cognitoUserPool: backend.auth.resources.userPool,
 })
 
-// ///////////////////////////////////////////////////////////
-// /////// Create the Regulatory Stack /////////////////////
-// ///////////////////////////////////////////////////////////
-
-// // Create a dedicated stack for regulatory services
-// const regulatoryStack = backend.createStack('RegulatoryStack');
-// const environment = process.env.ENVIRONMENT || 'dev'; // Define environment separately
-// const stackName = regulatoryStack.stackName; // Get the actual stack name
-
-
-
-// // Build the regulatory knowledge base
-// const { knowledgeBase, regulatoryBucket, dataSource } = buildRegulatoryKb(regulatoryStack, {
-//   environment: environment,
-//   description: 'Knowledge base for regulatory compliance information',
-//   tags: {
-//     StackName: stackName,
-//     Component: 'regulatory-kb'
-//   }
-// });
-
-// // Build the regulatory agent
-// const { regulatoryAgent, regulatoryAgentAlias } = buildRegulatoryAgent(regulatoryStack, {
-//   regulatoryKbId: knowledgeBase.attrKnowledgeBaseId,
-//   regulatoryBucket: regulatoryBucket,
-//   environment,
-//   description: 'AI assistant for regulatory compliance guidance',
-//   tags: {
-//     Component: 'regulatory-agent',
-//     Environment: environment,
-//     StackName: stackName
-//   }
-// });
-
-// // Add permissions to the Lambda function's role
-// backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
-//   new iam.PolicyStatement({
-//     resources: [
-//       `arn:aws:bedrock:${regulatoryStack.region}:${regulatoryStack.account}:agent-alias/${regulatoryAgent.attrAgentId}/*`,
-//     ],
-//     actions: ["bedrock:InvokeAgent"],
-//   })
-// );
-
-// // Add outputs
-// backend.addOutput({
-//   custom: {
-//     regulatoryAgentId: regulatoryAgent.attrAgentId,
-//     regulatoryAgentAliasId: regulatoryAgentAlias.attrAgentAliasId,
-//     regulatoryKnowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
-//     regulatoryBucketName: regulatoryBucket.bucketName
-//   },
-// });

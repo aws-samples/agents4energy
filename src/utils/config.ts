@@ -38,6 +38,17 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
             "What are the requirements for decomissioning an offshore oil well in Brazil?",
         ],
     } as BedrockAgent,
+    PetrophysicsAgent: {
+        name: "Petrophysics Agent",
+        source: "bedrockAgent",
+        agentId: outputs.custom.petrophysicsAgentId,
+        agentAliasId: outputs.custom.petrophysicsAgentAliasId,
+        samplePrompts: [
+            "What is seismic petrophysics?",
+            "How does rock physics affect oil and gas production?",
+            "Calculate the expected AVO Class for a gas saturated sandstone with 25% porosity"
+        ],
+    } as BedrockAgent,
     ProductionAgent: {
         name: "Production Agent",
         source: "graphql",

@@ -12,7 +12,7 @@ import {
 import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { addLlmAgentPolicies } from '../../functions/utils/cdkUtils'
+
 
 interface AgentProps {
     vpc: ec2.Vpc,
@@ -25,10 +25,9 @@ export function petrophysicsAgentBuilder(scope: Construct, props: AgentProps) {
     const stackName = cdk.Stack.of(scope).stackName;
     const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3);
     // list of models can be found here https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
-    //const foundationModel = 'amazon.nova-micro-v1:0';
     const foundationModel = 'anthropic.claude-3-sonnet-20240229-v1:0';
     const agentName = `A4E-Petrophysics-${stackUUID}`;
-    //const agentRoleName = `AmazonBedrockExecutionRole_A4E_Corporate-${stackUUID}`;
+    const agentRoleName = `AmazonBedrockExecutionRole_A4E_Petrophysics-${stackUUID}`;
     const agentDescription = 'Agent for energy industry subsurface workflows';
 
     console.log("Petrophysics Stack UUID: ", stackUUID)
@@ -37,36 +36,59 @@ export function petrophysicsAgentBuilder(scope: Construct, props: AgentProps) {
     if (!rootStack) throw new Error('Root stack not found')
 
     // Agent-specific tags
-    const corporateTags = {
+    const agentTags = {
         Agent: 'Petrophysics',
         Model: foundationModel
     }
 
+    // ===== IAM ROLE =====
     // IAM Role for Agent
-    const bedrockAgentRole = new iam.Role(scope, 'BedrockAgentRole', {
-        //roleName: agentRoleName,
+    const agentRole = new iam.Role(scope, 'PetrophysicsAgentRole', {
+        roleName: agentRoleName,
         assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
         description: 'IAM role for Petrophysics Agent to access KBs with petrophyics, rock physics and other geoscientific documents',
     });
 
-
-    // ===== PETROPHYSICS KNOWLEDGE BASE =====
+    // ===== KNOWLEDGE BASE =====
     // Bedrock KB with OpenSearchServerless (OSS) vector backend
-    const petrophysicsKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `KB-Petrophysics`, {//${stackName.slice(-5)}
+    const knowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `PetrophysicsKB`, {
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         instruction: `You are a helpful question answering assistant. When asked to perform a mathematical calculation use the relationship and equations that are available in the knowledgebase.`,
         description: 'The knowledge base contains published scientific literature on seismic petrophysics and rock physics',
     });
-    const s3docsDataSource = petrophysicsKnowledgeBase.addS3DataSource({
+    
+    // Add S3 data source to the knowledge base
+    const s3docsDataSource = knowledgeBase.addS3DataSource({
         bucket: props.s3Bucket,
         dataSourceName: "a4e-kb-ds-s3-petrophysics",
         inclusionPrefixes: ['petrophysics-agent/'],
-        //chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.NONE
-    })
+    });
 
+    // ===== AGENT POLICY =====
+    // Create a custom inline policy for Agent permissions
+    const agentPolicy = new iam.Policy(scope, 'PetrophysicsAgentPolicy', {
+        statements: [
+            new iam.PolicyStatement({
+                actions: ['bedrock:InvokeModel'],
+                resources: [
+                    `arn:aws:bedrock:${rootStack.region}:${rootStack.account}:inference-profile/*`,
+                    `arn:aws:bedrock:us-*::foundation-model/*`,
+                ]
+            }),
+            new iam.PolicyStatement({
+                actions: ['bedrock:Retrieve'],
+                resources: [
+                    knowledgeBase.knowledgeBaseArn
+                ]
+            }),
+        ]
+    });
+    
+    // Attach policy to the agent role
+    agentRole.attachInlinePolicy(agentPolicy);
 
     // ===== BEDROCK AGENT =====
-    const agentPetrophysics = new bedrock.CfnAgent(scope, 'PetrophysicsAgent', {
+    const agent = new bedrock.CfnAgent(scope, 'PetrophysicsAgent', {
         agentName: agentName,
         description: agentDescription,
         instruction: `You are a petrophysics agent who can answer questions on seismic petrophysics and perform calculations using Gassmann's equation; Batzle-Wang's equations and other related equations provided in the knowledgebase. You will prompt the user to provide inputs that you are missing while running those calculations. You will provide answers that are based on your calculations and the information provided to you by the user and available to you in the knowledgebase. Show all intermediate calculations.
@@ -104,47 +126,46 @@ export function petrophysicsAgentBuilder(scope: Construct, props: AgentProps) {
         autoPrepare: true,
         knowledgeBases: [{
             description: 'Petrophysics Knowledge Base',
-            knowledgeBaseId: petrophysicsKnowledgeBase.knowledgeBaseId,
+            knowledgeBaseId: knowledgeBase.knowledgeBaseId,
             knowledgeBaseState: 'ENABLED',
         }],
-        agentResourceRoleArn: bedrockAgentRole.roleArn,
+        agentResourceRoleArn: agentRole.roleArn,
     });
+    
     // Add dependency on the KB so it gets created first
-    agentPetrophysics.node.addDependency(petrophysicsKnowledgeBase);
+    agent.node.addDependency(knowledgeBase);
 
-    // Create a custom inline policy for Agent permissions
-    const customAgentPolicy = new iam.Policy(scope, 'A4E-PetrophysicsAgentPolicy', {
-        statements: [
-            new iam.PolicyStatement({
-                actions: ['bedrock:InvokeModel'],
-                resources: [
-                    `arn:aws:bedrock:${rootStack.region}:${rootStack.account}:inference-profile/*`,
-                    `arn:aws:bedrock:us-*::foundation-model/*`,
-                ]
-            }),
-            new iam.PolicyStatement({
-                actions: ['bedrock:Retrieve'],
-                resources: [
-                    petrophysicsKnowledgeBase.knowledgeBaseArn
-                ]
-            }),
-        ]
-    });
-    // Add custom policy to the Agent role
-    bedrockAgentRole.attachInlinePolicy(customAgentPolicy);
-
-    // Add tags to all resources in this scope
-    cdk.Tags.of(scope).add('Agent', corporateTags.Agent);
-    cdk.Tags.of(scope).add('Model', corporateTags.Model);
-
-    //Add an agent alias to make the agent callable
-    const corporateAgentAlias = new bedrock.CfnAgentAlias(scope, 'petrophysics-agent-alias', {
-        agentId: agentPetrophysics.attrAgentId,
+    // ===== AGENT ALIAS =====
+    // Add an agent alias to make the agent callable
+    const agentAlias = new bedrock.CfnAgentAlias(scope, 'petrophysics-agent-alias', {
+        agentId: agent.attrAgentId,
         agentAliasName: `agent-alias`
     });
 
+    // ===== TAGS =====
+    // Add tags to all resources in this scope
+    cdk.Tags.of(scope).add('Agent', agentTags.Agent);
+    cdk.Tags.of(scope).add('Model', agentTags.Model);
+
+    // ===== OUTPUTS =====
+    // Add CloudFormation outputs
+    new cdk.CfnOutput(scope, 'PetrophysicsAgentId', {
+        value: agent.attrAgentId,
+        description: 'Petrophysics Agent ID',
+    });
+
+    new cdk.CfnOutput(scope, 'PetrophysicsAgentAliasId', {
+        value: agentAlias.attrAgentAliasId,
+        description: 'Petrophysics Agent Alias ID',
+    });
+
+    new cdk.CfnOutput(scope, 'PetrophysicsKnowledgeBaseId', {
+        value: knowledgeBase.knowledgeBaseId,
+        description: 'Petrophysics Knowledge Base ID',
+    });
+
     return {
-        corporateAgent: agentPetrophysics,
-        corporateAgentAlias: corporateAgentAlias
+        agent,
+        agentAlias
     };
 }
