@@ -108,10 +108,30 @@ export function getMessageCatigory(message: Message): messageContentType {
           return 'tool_table_events'
         case 'plotTableFromToolResponseToolBuilder':
           return 'tool_plot'
-        default:
-          return 'tool_json'
+        // default:
+        //   return 'tool_json'
       }
 
       return (JSON.parse(message.content) as ToolMessageContentType).messageContentType
     }
   }
+
+  export const invokeBedrockAgentParseBodyGetTextAndTrace = async (props: { prompt: string, chatSession: Schema['ChatSession']['type'], agentId?: string, agentAliasId?: string }) => {
+    const { prompt, chatSession } = props
+    const agentId = props.agentId || chatSession.aiBotInfo?.aiBotId
+    const agentAliasId = props.agentAliasId || chatSession.aiBotInfo?.aiBotAliasId
+    console.log(`Agent (id: ${agentId}, aliasId: ${agentAliasId}) Prompt:\n ${prompt} `)
+
+    if (!agentId) throw new Error('No Agent ID found in invoke request')
+    if (!agentAliasId) throw new Error('No Agent Alias ID found in invoke request')
+
+    const response = await amplifyClient.queries.invokeBedrockAgent({
+        prompt: prompt,
+        agentId: agentId,
+        agentAliasId: agentAliasId,
+        chatSessionId: chatSession.id
+    })
+    console.log('Bedrock Agent Response: ', response)
+
+}
+

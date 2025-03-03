@@ -21,7 +21,7 @@ import { amplifyClient, invokeBedrockModelParseBodyGetText, isValidJSON, getMess
 import styles from "@/styles/chat-ui.module.scss";
 
 import React, { useState, useEffect } from "react";
-import { Message } from "../../utils/types";
+import { Message } from "../utils/types";
 
 // import PlotComponent from '../PlotComponent'
 import { Scatter } from 'react-chartjs-2';
