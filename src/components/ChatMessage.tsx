@@ -4,7 +4,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic'
 
-// import { stringify } from 'yaml'
+// import { amplifyClient } from '@/utils/amplify-utils';
 
 import ChatBubble from '@cloudscape-design/chat-components/chat-bubble';
 // import Alert from '@cloudscape-design/components/alert';
@@ -31,9 +31,26 @@ const ChatUIMessage = dynamic(() => import('./ChatMessageElements'), { ssr: fals
 
 // import '../styles/chat.scss';
 
+// setMessages: React.Dispatch<React.SetStateAction<{
+//     id?: string | undefined;
+//     owner?: string | null | undefined;
+//     chatSessionId?: Nullable<string> | undefined;
+//     content: string;
+//     trace?: Nullable<string> | undefined;
+//     ... 8 more ...;
+//     userFeedback?: "none" | ... 3 more ... | undefined;
+// }[]>>
+
 export default function Messages(
-    { messages = [], getGlossary, isLoading, glossaryBlurbs }:
-        { messages: Array<Message>, getGlossary: (message: Message) => void, isLoading: boolean, glossaryBlurbs: { [key: string]: string } }
+    { messages = [], getGlossary, isLoading, glossaryBlurbs, updateMessage }:
+        { 
+            messages: Array<Message>, 
+            getGlossary: (message: Message) => void, 
+            isLoading: boolean, 
+            glossaryBlurbs: { [key: string]: string },
+            // setMessages: React.Dispatch<React.SetStateAction<Schema['ChatMessage']['createType'][]>>
+            updateMessage: (props: { message: Message}) => Promise<void>
+        }
 ) {
 
     return (
@@ -90,18 +107,33 @@ export default function Messages(
                                 <ButtonGroup
                                     ariaLabel="Chat bubble actions"
                                     variant="icon"
-                                    onItemClick={({ detail }) => {
+                                    onItemClick={async ({ detail }) => {
                                         //TODO: Impliment user feedback
                                         // ["like", "dislike"].includes(detail.id) &&
                                         // setFeedback(detail.pressed ? detail.id : "")
 
                                         switch (detail.id) {
+                                            case "dislike":
+                                                console.log("dislike");
+                                                const messageWithDislike: Schema['ChatMessage']['createType'] = {
+                                                    ...message,
+                                                    userFeedback: "dislike"
+                                                } 
+                                                await updateMessage({message: messageWithDislike})
+                                                break;
+                                            case "like":
+                                                console.log("like");
+                                                const messageWithLike: Schema['ChatMessage']['createType'] = {
+                                                    ...message,
+                                                    userFeedback: "like"
+                                                } 
+                                                await updateMessage({message: messageWithLike})
+                                                break;
                                             case "copy":
                                                 navigator.clipboard.writeText(message.content)
                                                 break
                                             case "glossary":
                                                 getGlossary(message);
-
                                                 break;
                                             case "check":
                                                 console.log("check");
@@ -115,20 +147,20 @@ export default function Messages(
                                             items: [
                                                 {
                                                     type: "icon-toggle-button",
-                                                    id: "helpful",
+                                                    id: "like",
                                                     iconName: "thumbs-up",
                                                     pressedIconName: "thumbs-up-filled",
                                                     text: "Helpful",
-                                                    pressed: true
+                                                    pressed: message.userFeedback === 'like'
                                                 },
                                                 {
                                                     type: "icon-toggle-button",
-                                                    id: "not-helpful",
+                                                    id: "dislike",
                                                     iconName: "thumbs-down",
                                                     pressedIconName: "thumbs-down-filled",
                                                     text: "Not helpful",
-                                                    pressed: false,
-                                                    disabled: true
+                                                    pressed: message.userFeedback === 'dislike',
+                                                    // disabled: true
                                                 }
                                             ]
                                         },
@@ -157,32 +189,18 @@ export default function Messages(
                                                     </ReactMarkdown>
 
                                                 </StatusIndicator>
-
-
-                                            // {(message.id && glossaryBlurbs && message.id in glossaryBlurbs) ? 
-                                            //   <StatusIndicator type="success">
-                                            //     {glossaryBlurbs[message.id]}
-                                            //   </StatusIndicator>
-
-                                            //   : null}
-
-
-                                            //   // <StatusIndicator type="success">
-                                            //   //   {message.id && glossaryBlurbs && message.id in glossaryBlurbs ? glossaryBlurbs[message.id]: null}
-                                            //   // </StatusIndicator>
-                                            // )
                                         },
-                                        {
-                                            type: "icon-button",
-                                            id: "check",
-                                            iconName: "check",
-                                            text: "Data Quality Check",
-                                            // popoverFeedback: (
-                                            //   <StatusIndicator type="loading">
-                                            //     Copied to clipboard
-                                            //   </StatusIndicator>
-                                            // )
-                                        }
+                                        // {
+                                        //     type: "icon-button",
+                                        //     id: "check",
+                                        //     iconName: "check",
+                                        //     text: "Data Quality Check",
+                                        //     // popoverFeedback: (
+                                        //     //   <StatusIndicator type="loading">
+                                        //     //     Copied to clipboard
+                                        //     //   </StatusIndicator>
+                                        //     // )
+                                        // }
                                     ]}
                                 />
                                 : null}
@@ -191,7 +209,6 @@ export default function Messages(
                                 key={message.id}
                                 message={message}
                                 showCopyButton={false}
-                            // messages={messages.slice(0, messages.indexOf(message))}
                             />
                         </ChatBubble>
                     );

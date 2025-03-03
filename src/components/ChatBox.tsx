@@ -271,7 +271,32 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
 
     }, [JSON.stringify(messages), JSON.stringify(chatSession)])
 
+    async function updateChatMessage(props: { message: Message}){
+        const targetChatSessionId = chatSession?.id;
 
+        // setMessages((previousMessages) => combineAndSortMessages([
+        //     ...previousMessages.filter(message => message.id != props.message.id),
+        //     props.message
+        // ]))
+
+        setMessages((previousMessages) => combineAndSortMessages(
+            previousMessages.filter(message => message.id != props.message.id),
+            [props.message]
+        ))
+
+        const updateChatMessageResponse = await amplifyClient.models.ChatMessage.update({
+            id: props.message.id!,
+            chatSessionId: targetChatSessionId,
+            ...props.message,
+        })
+
+        console.log('Update chat message response: ', updateChatMessageResponse)
+
+        // if (targetChatSessionId) {
+        //     return newMessage
+        // }
+
+    }
 
     async function addChatMessage(props: { body: string, role: "human" | "ai" | "tool", trace?: string, chainOfThought?: boolean }) {
         const targetChatSessionId = chatSession?.id;
@@ -473,6 +498,7 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
                         ...messages,
                         ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
                     ]}
+                    updateMessage={updateChatMessage}
                     getGlossary={getGlossary}
                     isLoading={isGenAiResponseLoading}
                     glossaryBlurbs={glossaryBlurbs}
