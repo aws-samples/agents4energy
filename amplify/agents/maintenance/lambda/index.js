@@ -39,23 +39,71 @@ const sqlCommands = [
 ];
 
 exports.handler = async (event) => {
-    const { MAINT_DB_CLUSTER_ARN, MAINT_DB_SECRET_ARN, DEFAULT_DATABASE_NAME } = process.env;
+    try {
+        const { MAINT_DB_CLUSTER_ARN, MAINT_DB_SECRET_ARN, DEFAULT_DATABASE_NAME } = process.env;
 
-    for (const sqlCommand of sqlCommands) {
-        const params = {
-            resourceArn: MAINT_DB_CLUSTER_ARN,
-            secretArn: MAINT_DB_SECRET_ARN,
-            database: DEFAULT_DATABASE_NAME,
-            sql: sqlCommand
+        if (!MAINT_DB_CLUSTER_ARN || !MAINT_DB_SECRET_ARN || !DEFAULT_DATABASE_NAME) {
+            throw new Error('Missing required environment variables');
+        }
+
+        const results = [];
+        for (const sqlCommand of sqlCommands) {
+            const params = {
+                resourceArn: MAINT_DB_CLUSTER_ARN,
+                secretArn: MAINT_DB_SECRET_ARN,
+                database: DEFAULT_DATABASE_NAME,
+                sql: sqlCommand
+            };
+
+            console.log('Executing SQL command:', sqlCommand);
+
+            const command = new ExecuteStatementCommand(params);
+            try {
+                const result = await rdsDataClient.send(command);
+                results.push({
+                    sql: sqlCommand,
+                    status: 'success',
+                    result
+                });
+            } catch (error) {
+                console.error('Error executing SQL command:', error);
+                results.push({
+                    sql: sqlCommand,
+                    status: 'error',
+                    error: error.message
+                });
+                // Continue with next command even if one fails
+            }
+        }
+
+        // Check if any commands failed
+        const failedCommands = results.filter(r => r.status === 'error');
+        if (failedCommands.length > 0) {
+            return {
+                statusCode: 500,
+                body: JSON.stringify({
+                    message: 'Some SQL commands failed to execute',
+                    results
+                })
+            };
+        }
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                message: 'All SQL commands executed successfully',
+                results
+            })
         };
 
-        console.log('Executing SQL command:', sqlCommand);
-
-        const command = new ExecuteStatementCommand(params);
-        try {
-            await rdsDataClient.send(command);
-        } catch (error) {
-            console.error('Error executing SQL command:', error);
-        }
+    } catch (error) {
+        console.error('Lambda execution error:', error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({
+                message: 'Lambda execution failed',
+                error: error.message
+            })
+        };
     }
 };
