@@ -48,38 +48,38 @@ const TopNavBar = () => {
           {
             type: "menu-dropdown",
             text: userAttributes?.email || "Customer Name",
-            description: userAttributes?.email || "email@example.com",
+            // description: userAttributes?.email || "email@example.com",
             iconName: "user-profile",
             onItemClick: (item) => {
               if (item.detail.id === 'signout') signOut()
             },
             items: [
-              { id: "profile", text: "Profile" },
-              { id: "preferences", text: "Preferences" },
-              { id: "security", text: "Security" },
-              {
-                id: "support-group",
-                text: "Support",
-                items: [
-                  {
-                    id: "documentation",
-                    text: "Documentation",
-                    href: "#",
-                    external: true,
-                    externalIconAriaLabel:
-                      " (opens in new tab)"
-                  },
-                  { id: "support", text: "Support" },
-                  {
-                    id: "feedback",
-                    text: "Feedback",
-                    href: "#",
-                    external: true,
-                    externalIconAriaLabel:
-                      " (opens in new tab)"
-                  }
-                ]
-              },
+              // { id: "profile", text: "Profile" },
+              // { id: "preferences", text: "Preferences" },
+              // { id: "security", text: "Security" },
+              // {
+              //   id: "support-group",
+              //   text: "Support",
+              //   items: [
+              //     {
+              //       id: "documentation",
+              //       text: "Documentation",
+              //       href: "#",
+              //       external: true,
+              //       externalIconAriaLabel:
+              //         " (opens in new tab)"
+              //     },
+              //     { id: "support", text: "Support" },
+              //     {
+              //       id: "feedback",
+              //       text: "Feedback",
+              //       href: "#",
+              //       external: true,
+              //       externalIconAriaLabel:
+              //         " (opens in new tab)"
+              //     }
+              //   ]
+              // },
               { id: "signout", text: "Sign out"}
             ]
           },

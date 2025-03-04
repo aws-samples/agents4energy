@@ -73,7 +73,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
     const [chatSessions, setChatSessions] = useState<Array<Schema["ChatSession"]["type"]>>([]);
     const [groupedChatSessions, setGroupedChatSessions] = useState<SideNavigationProps.Item[]>([])
     const [initialActiveChatSession, setInitialActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
-    const [LiveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
+    const [liveUpdateActiveChatSession, setLiveUpdateActiveChatSession] = useState<Schema["ChatSession"]["type"]>();
     const [glossaryBlurbs, setGlossaryBlurbs] = useState<{ [key: string]: string }>({});
     const { user } = useAuthenticator((context) => [context.user]);
     const router = useRouter();
@@ -199,30 +199,32 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     // Helper function to group chat sessions by month
     const groupChatsByMonth = (chatSessions: Array<Schema["ChatSession"]["type"]>): SideNavigationProps.Item[] => {
-        const grouped = chatSessions.reduce((acc: { [key: string]: Array<Schema["ChatSession"]["type"]> }, session) => {
-            if (!session.createdAt) throw new Error("Chat session missing createdAt timestamp");
+        const grouped = chatSessions
+            .sort((a, b) => (a.createdAt && b.createdAt) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0)
+            .reduce((acc: { [key: string]: Array<Schema["ChatSession"]["type"]> }, session) => {
+                if (!session.createdAt) throw new Error("Chat session missing createdAt timestamp");
 
-            const date = new Date(session.createdAt);
-            const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                const date = new Date(session.createdAt);
+                const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-            if (!acc[monthYear]) {
-                acc[monthYear] = [];
-            }
+                if (!acc[monthYear]) {
+                    acc[monthYear] = [];
+                }
 
-            const insertIndex = acc[monthYear].findIndex(existingSession =>
-                existingSession.createdAt && session.createdAt &&
-                existingSession.createdAt < session.createdAt
-            );
-            // If no index found (insertIndex === -1), push to end, otherwise insert at index
-            if (insertIndex === -1) {
-                acc[monthYear].push(session);
-            } else {
-                acc[monthYear].splice(insertIndex, 0, session);
-            }
-            return acc;
-        }, {});
+                const insertIndex = acc[monthYear].findIndex(existingSession =>
+                    existingSession.createdAt && session.createdAt &&
+                    existingSession.createdAt < session.createdAt
+                );
+                // If no index found (insertIndex === -1), push to end, otherwise insert at index
+                if (insertIndex === -1) {
+                    acc[monthYear].push(session);
+                } else {
+                    acc[monthYear].splice(insertIndex, 0, session);
+                }
+                return acc;
+            }, {});
 
-        return Object.entries(grouped).reverse().map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
+        return Object.entries(grouped).map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
             type: "section",
             text: monthYear,
             // controlId: "",
@@ -263,62 +265,63 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                             <AppLayout
                                 navigationOpen={navigationOpen}
                                 onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
+                                toolsHide={liveUpdateActiveChatSession?.aiBotInfo?.aiBotName !== defaultAgents.PlanAndExecuteAgent.name}  // Add this line to hide the tools icon
                                 tools={
-                                    <HelpPanel
-                                        header={
-                                            <h2>Plan and Execute Steps</h2>
-                                        }>
-                                        {/* <pre>
-                                            {JSON.stringify(LiveUpdateActiveChatSession, null, 2)}
-                                        </pre> */}
-                                        {[
-                                            ...(LiveUpdateActiveChatSession?.pastSteps?.map((step) => ({ stepType: 'past', content: step })) ?? []),
-                                            ...(LiveUpdateActiveChatSession?.planSteps?.map((step) => ({ stepType: 'plan', content: step })) ?? []),
-                                        ].map((step) => {
-                                            try {
-                                                const stepContent = JSON.parse(step.content as string)
-                                                return (
-                                                    <Tooltip
-                                                        key={step.content as string}
-                                                        title={<pre
-                                                            style={{ //Wrap long lines
-                                                                whiteSpace: 'pre-wrap',
-                                                                wordWrap: 'break-word',
-                                                                overflowWrap: 'break-word',
+                                    liveUpdateActiveChatSession?.aiBotInfo?.aiBotName === defaultAgents.PlanAndExecuteAgent.name ? (
+                                        <HelpPanel
+                                            header={
+                                                <h2>Plan and Execute Steps</h2>
+                                            }>
+                                            {[
+                                                ...(liveUpdateActiveChatSession?.pastSteps?.map((step) => ({ stepType: 'past', content: step })) ?? []),
+                                                ...(liveUpdateActiveChatSession?.planSteps?.map((step) => ({ stepType: 'plan', content: step })) ?? []),
+                                            ].map((step) => {
+                                                try {
+                                                    const stepContent = JSON.parse(step.content as string)
+                                                    return (
+                                                        <Tooltip
+                                                            key={step.content as string}
+                                                            title={<pre
+                                                                style={{ //Wrap long lines
+                                                                    whiteSpace: 'pre-wrap',
+                                                                    wordWrap: 'break-word',
+                                                                    overflowWrap: 'break-word',
+                                                                }}
+                                                            >
+                                                                {stringify(stepContent)}
+                                                            </pre>}
+                                                            arrow
+                                                            placement="left"
+                                                            slotProps={{
+                                                                tooltip: {
+                                                                    sx: {
+                                                                        maxWidth: 2000,
+                                                                    },
+                                                                },
                                                             }}
                                                         >
-                                                            {stringify(stepContent)}
-                                                        </pre>}
-                                                        arrow
-                                                        placement="left"
-                                                        slotProps={{
-                                                            tooltip: {
-                                                                sx: {
-                                                                    maxWidth: 2000,
-                                                                },
-                                                            },
-                                                        }}
-                                                    >
 
-                                                        <div className="step-container" key={step.content as string}>
-                                                            <Steps
-                                                                // className='steps'
-                                                                steps={[
-                                                                    {
-                                                                        status: (step.stepType === 'past' ? "success" : "loading"),
-                                                                        header: stepContent.title,
-                                                                        statusIconAriaLabel: (step.stepType === 'past' ? "Success" : "Loading")
-                                                                    }
-                                                                ]}
-                                                            />
-                                                        </div>
-                                                    </Tooltip>
-                                                )
-                                            } catch {
-                                                return <p>{step.content}</p>
-                                            }
-                                        })}
-                                    </HelpPanel>}
+                                                            <div className="step-container" key={step.content as string}>
+                                                                <Steps
+                                                                    // className='steps'
+                                                                    steps={[
+                                                                        {
+                                                                            status: (step.stepType === 'past' ? "success" : "loading"),
+                                                                            header: stepContent.title,
+                                                                            statusIconAriaLabel: (step.stepType === 'past' ? "Success" : "Loading")
+                                                                        }
+                                                                    ]}
+                                                                />
+                                                            </div>
+                                                        </Tooltip>
+                                                    )
+                                                } catch {
+                                                    return <p>{step.content}</p>
+                                                }
+                                            })}
+                                        </HelpPanel>
+                                    ) : undefined
+                                }
                                 navigation={
                                     <SideNavigation
                                         header={{
@@ -364,9 +367,11 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                             <div className='glossary-container'>
                                 <Container>
                                     {Object.entries(glossaryBlurbs).map(([key, value]) => (
-                                        <ReactMarkdown>
-                                            {value}
-                                        </ReactMarkdown>
+                                        <div key={key}>
+                                            <ReactMarkdown>
+                                                {value}
+                                            </ReactMarkdown>
+                                        </div>
                                     ))}
                                 </Container>
                             </div>,
