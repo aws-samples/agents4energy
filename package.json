@@ -62,7 +62,7 @@
     "@aws-sdk/client-sfn": "^3.670.0",
     "@aws-sdk/client-textract": "^3.716.0",
     "@aws-sdk/credential-provider-node": "^3.670.0",
-    "@cdklabs/generative-ai-cdk-constructs": "^0.1.289",
+    "@cdklabs/generative-ai-cdk-constructs": "^0.1.295",
     "@langchain/community": "^0.3.17",
     "@tailwindcss/typography": "^0.5.15",
     "@types/jsdom": "^21.1.7",

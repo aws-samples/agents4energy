@@ -2,6 +2,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Stack } from 'aws-cdk-lib';
 import { regulatoryAgentBuilder } from './agents/regulatory/regulatoryAgent';
+import { petrophysicsAgentBuilder } from "./agents/petrophysics/petrophysicsAgent"
+
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import {
@@ -275,7 +277,7 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
 ///////////////////////////////////////////////////////////
 /////// Create the Maintenance Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
-const {defaultDatabaseName, maintenanceAgent, maintenanceAgentAlias} = maintenanceAgentBuilder(maintenanceAgentStack, {
+const { maintenanceAgent, maintenanceAgentAlias} = maintenanceAgentBuilder(maintenanceAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
   s3Bucket: backend.storage.resources.bucket,
@@ -304,6 +306,26 @@ backend.addOutput({
   },
 })
 
+///////////////////////////////////////////////////////////
+/////// Create the Petrophysics Agent Stack ///////////////
+///////////////////////////////////////////////////////////
+
+const petrophysicsAgentStack = backend.createStack('petrophysicsAgentStack');
+
+const { petrophysicsAgent, petrophysicsAgentAlias } = petrophysicsAgentBuilder(petrophysicsAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
+  s3Bucket: backend.storage.resources.bucket
+});
+
+backend.addOutput({
+  custom: {
+    petrophysicsAgentId: petrophysicsAgent.attrAgentId,
+    petrophysicsAgentAliasId: petrophysicsAgentAlias.attrAgentAliasId,
+  },
+});
+
+
 
 ///////////////////////////////////////////////////////////
 /////// Create the Configurator Stack /////////////////////
@@ -324,56 +346,3 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   cognitoUserPool: backend.auth.resources.userPool,
 })
 
-// ///////////////////////////////////////////////////////////
-// /////// Create the Regulatory Stack /////////////////////
-// ///////////////////////////////////////////////////////////
-
-// // Create a dedicated stack for regulatory services
-// const regulatoryStack = backend.createStack('RegulatoryStack');
-// const environment = process.env.ENVIRONMENT || 'dev'; // Define environment separately
-// const stackName = regulatoryStack.stackName; // Get the actual stack name
-
-
-
-// // Build the regulatory knowledge base
-// const { knowledgeBase, regulatoryBucket, dataSource } = buildRegulatoryKb(regulatoryStack, {
-//   environment: environment,
-//   description: 'Knowledge base for regulatory compliance information',
-//   tags: {
-//     StackName: stackName,
-//     Component: 'regulatory-kb'
-//   }
-// });
-
-// // Build the regulatory agent
-// const { regulatoryAgent, regulatoryAgentAlias } = buildRegulatoryAgent(regulatoryStack, {
-//   regulatoryKbId: knowledgeBase.attrKnowledgeBaseId,
-//   regulatoryBucket: regulatoryBucket,
-//   environment,
-//   description: 'AI assistant for regulatory compliance guidance',
-//   tags: {
-//     Component: 'regulatory-agent',
-//     Environment: environment,
-//     StackName: stackName
-//   }
-// });
-
-// // Add permissions to the Lambda function's role
-// backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
-//   new iam.PolicyStatement({
-//     resources: [
-//       `arn:aws:bedrock:${regulatoryStack.region}:${regulatoryStack.account}:agent-alias/${regulatoryAgent.attrAgentId}/*`,
-//     ],
-//     actions: ["bedrock:InvokeAgent"],
-//   })
-// );
-
-// // Add outputs
-// backend.addOutput({
-//   custom: {
-//     regulatoryAgentId: regulatoryAgent.attrAgentId,
-//     regulatoryAgentAliasId: regulatoryAgentAlias.attrAgentAliasId,
-//     regulatoryKnowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
-//     regulatoryBucketName: regulatoryBucket.bucketName
-//   },
-// });

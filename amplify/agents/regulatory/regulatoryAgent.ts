@@ -3,8 +3,8 @@ import { aws_s3 as s3 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { aws_ec2 } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
-import * as bedrock from 'aws-cdk-lib/aws-bedrock';
+import { bedrock } from '@cdklabs/generative-ai-cdk-constructs';
+import * as bedrockCdk from 'aws-cdk-lib/aws-bedrock';
 
 interface BedrockAgentBuilderProps {
     description?: string;
@@ -83,19 +83,20 @@ export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuil
     5. Provide context for why specific regulations exist when relevant`;
 
     // Create regulatory knowledge base and s3 data source for the KB
-    const regulatoryKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `KB-regulatory`, {
-        embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
+    const regulatoryKnowledgeBase = new bedrock.VectorKnowledgeBase(scope, `KB-regulatory`, {
+        embeddingsModel: bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V1,
         instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to regulatory requirements in oil and gas facilities globally`,
         description: 'Regulatory Knowledge Base',
     });
+
     const s3docsDataSource = regulatoryKnowledgeBase.addS3DataSource({
         bucket: props.s3Bucket,
         dataSourceName: "a4e-kb-ds-s3-regulatory",
         inclusionPrefixes: ['regulatory-agent/'],
-    })
+    });
 
     // Create the Bedrock agent with the role
-    const cfnAgentProps: bedrock.CfnAgentProps = {
+    const cfnAgentProps: bedrockCdk.CfnAgentProps = {
         agentName: `${resourcePrefix}-agent-${stackUUID}`,
         description: props.description || 'This agent is designed to help with regulatory compliance.',
         instruction: props.instruction || defaultInstruction,
@@ -111,14 +112,14 @@ export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuil
     };
 
     // Create the Bedrock agent
-    const regulatoryAgent = new bedrock.CfnAgent(
+    const regulatoryAgent = new bedrockCdk.CfnAgent(
         scope,
         'RegulatoryAgent',
         cfnAgentProps
     );
 
     // Create an alias for the agent
-    const regulatoryAgentAlias = new bedrock.CfnAgentAlias(
+    const regulatoryAgentAlias = new bedrockCdk.CfnAgentAlias(
         scope,
         'RegulatoryAgentAlias',
         {

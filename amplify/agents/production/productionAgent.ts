@@ -1,9 +1,8 @@
-
 import { stringify } from "yaml"
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib'
 import {
-    aws_bedrock as bedrock,
+    aws_bedrock as awsBedrock,
     aws_iam as iam,
     aws_lambda as lambda,
     aws_lambda_event_sources as lambdaEvent,
@@ -23,7 +22,7 @@ import {
     custom_resources as cr
 } from 'aws-cdk-lib';
 
-import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
+import { bedrock as bedrockConstruct } from '@cdklabs/generative-ai-cdk-constructs';
 
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 
@@ -302,7 +301,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         schemaName: 'bedrock_integration'
     })
 
-    const productionAgentTableDefDataSource = new bedrock.CfnDataSource(scope, 'sqlTableDefinitions', {
+    const productionAgentTableDefDataSource = new awsBedrock.CfnDataSource(scope, 'sqlTableDefinitions', {
         name: "sqlTableDefinition",
         dataSourceConfiguration: {
             type: 'S3',
@@ -330,8 +329,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     knowledgeBaseName: "petrowiki"
     // })
 
-    const petroleumEngineeringKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `PetroleumKB`, {//${stackName.slice(-5)}
-        embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
+    const petroleumEngineeringKnowledgeBase = new bedrockConstruct.VectorKnowledgeBase(scope, `PetroleumKB`, {
+        embeddingsModel: bedrockConstruct.BedrockFoundationModel.TITAN_EMBED_TEXT_V1,
         instruction: `You are a helpful question answering assistant. You answer
         user questions factually and honestly related to petroleum engineering data`,
         description: 'Petroleum Engineering Knowledge Base',
@@ -342,8 +341,8 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         filters: {
             excludePatterns: ['https://petrowiki\.spe\.org/.+?/.+']//Exclude pages with additional path segments
         },
-        dataDeletionPolicy: cdkLabsBedrock.DataDeletionPolicy.RETAIN,
-        chunkingStrategy: cdkLabsBedrock.ChunkingStrategy.HIERARCHICAL_TITAN
+        dataDeletionPolicy: bedrockConstruct.DataDeletionPolicy.RETAIN,
+        chunkingStrategy: bedrockConstruct.ChunkingStrategy.HIERARCHICAL_TITAN
     })
 
     new cr.AwsCustomResource(scope, 'StartIngestionPetroleumEngineeringDataSource', {
