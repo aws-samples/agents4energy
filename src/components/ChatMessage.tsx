@@ -4,42 +4,22 @@
 import React from 'react';
 import dynamic from 'next/dynamic'
 
-// import { amplifyClient } from '@/utils/amplify-utils';
-
 import ChatBubble from '@cloudscape-design/chat-components/chat-bubble';
-// import Alert from '@cloudscape-design/components/alert';
-// import LiveRegion from '@cloudscape-design/components/live-region';
 import ButtonGroup from "@cloudscape-design/components/button-group";
 import StatusIndicator from "@cloudscape-design/components/status-indicator";
 // import Avatar from "@cloudscape-design/chat-components/avatar";
 
 import ReactMarkdown from "react-markdown";
-// import AutoScrollContainer from "@/components/ScrollableContainer"
 
-// import { ChatBubbleAvatar } from './common-components';
-import { ChatBubbleAvatar, AUTHORS } from '@/utils/ui-utils'
-// import { AUTHORS } from './config'; //Message
-// import { AUTHORS } from '@/utils/ui-utils'
+import { useUserAttributes } from '@/components/UserAttributesProvider';
+import { ChatBubbleAvatar, AuthorAvatarProps } from '@/utils/ui-utils'
 
 import type { Schema } from '../../amplify/data/resource';
 type Message = Schema["ChatMessage"]["createType"]
 
-// import ChatUIMessage from '@/components/chat-ui/chat-ui-message'
-// import ChatUIMessage from './ChatMessageElements'
 const ChatUIMessage = dynamic(() => import('./ChatMessageElements'), { ssr: false });
-// import ChatMessageElements from '@/components/ChatMessageElements'
 
-// import '../styles/chat.scss';
-
-// setMessages: React.Dispatch<React.SetStateAction<{
-//     id?: string | undefined;
-//     owner?: string | null | undefined;
-//     chatSessionId?: Nullable<string> | undefined;
-//     content: string;
-//     trace?: Nullable<string> | undefined;
-//     ... 8 more ...;
-//     userFeedback?: "none" | ... 3 more ... | undefined;
-// }[]>>
+import '@/app/styles/chat.scss';
 
 export default function Messages(
     { messages = [], getGlossary, isLoading, glossaryBlurbs, updateMessage }:
@@ -48,11 +28,10 @@ export default function Messages(
             getGlossary: (message: Message) => void, 
             isLoading: boolean, 
             glossaryBlurbs: { [key: string]: string },
-            // setMessages: React.Dispatch<React.SetStateAction<Schema['ChatMessage']['createType'][]>>
             updateMessage: (props: { message: Message}) => Promise<void>
         }
 ) {
-
+    const { userAttributes } = useUserAttributes();
     return (
         <div
             id="autoscroll-wrapper"
@@ -84,7 +63,17 @@ export default function Messages(
 
                     if (!message.role) return;
 
-                    const author = AUTHORS[message.role];
+                    // const author = AUTHORS[message.role];
+                    const author: AuthorAvatarProps =  (message.role === 'human') ? {
+                        type: 'user',
+                        name: userAttributes?.email || "",
+                        initials: (userAttributes?.email || "").slice(0,2),
+                        loading: (messages.length === index + 1) && isLoading,
+                    } : {
+                        type: 'gen-ai',
+                        name: 'GenAi',
+                        loading: (messages.length === index + 1) && isLoading,
+                    }
 
                     if ( // This is for the task header message
                         message.role === 'ai' && message.content.startsWith('## ') && !message.content.includes('\n')
