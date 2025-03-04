@@ -46,7 +46,10 @@ exports.handler = async (event) => {
             throw new Error('Missing required environment variables');
         }
 
-        const results = [];
+        let successCount = 0;
+        let errorCount = 0;
+        let lastError = null;
+
         for (const sqlCommand of sqlCommands) {
             const params = {
                 resourceArn: MAINT_DB_CLUSTER_ARN,
@@ -59,31 +62,23 @@ exports.handler = async (event) => {
 
             const command = new ExecuteStatementCommand(params);
             try {
-                const result = await rdsDataClient.send(command);
-                results.push({
-                    sql: sqlCommand,
-                    status: 'success',
-                    result
-                });
+                await rdsDataClient.send(command);
+                successCount++;
             } catch (error) {
                 console.error('Error executing SQL command:', error);
-                results.push({
-                    sql: sqlCommand,
-                    status: 'error',
-                    error: error.message
-                });
-                // Continue with next command even if one fails
+                errorCount++;
+                lastError = error.message;
             }
         }
 
-        // Check if any commands failed
-        const failedCommands = results.filter(r => r.status === 'error');
-        if (failedCommands.length > 0) {
+        if (errorCount > 0) {
             return {
                 statusCode: 500,
                 body: JSON.stringify({
-                    message: 'Some SQL commands failed to execute',
-                    results
+                    message: `Database setup completed with ${errorCount} errors`,
+                    successCount,
+                    errorCount,
+                    lastError
                 })
             };
         }
@@ -91,8 +86,8 @@ exports.handler = async (event) => {
         return {
             statusCode: 200,
             body: JSON.stringify({
-                message: 'All SQL commands executed successfully',
-                results
+                message: 'Database setup completed successfully',
+                successCount
             })
         };
 
