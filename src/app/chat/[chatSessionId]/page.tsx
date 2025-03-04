@@ -512,9 +512,9 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                     // addChatMessage({ body: response!.text!, role: "ai" })
                     break;
                 case defaultAgents.RegulatoryAgent.name:
+                    await addChatMessage({ body: prompt, role: "human" })
                     await invokeBedrockAgentParseBodyGetTextAndTrace({
                         prompt: prompt,
-
                         chatSession: initialActiveChatSession,
                         agentAliasId: (defaultAgents.RegulatoryAgent as BedrockAgent).agentAliasId,
                         agentId: (defaultAgents.RegulatoryAgent as BedrockAgent).agentId,
