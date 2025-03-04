@@ -80,7 +80,8 @@ export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuil
     2. Indicate if any information might be outdated
     3. Suggest related regulatory requirements the user should consider
     4. If uncertain, recommend consulting official regulatory bodies
-    5. Provide context for why specific regulations exist when relevant`;
+    5. Provide context for why specific regulations exist when relevant
+    6. Try to determine the user's intent and provide a more tailored response based on location`;
 
     // Create regulatory knowledge base and s3 data source for the KB
     const regulatoryKnowledgeBase = new bedrock.VectorKnowledgeBase(scope, `KB-regulatory`, {
