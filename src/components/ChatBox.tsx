@@ -6,17 +6,9 @@ import Messages from './ChatMessage'
 import { jsonParseHandleError, combineAndSortMessages } from '@/utils/ui-utils'
 import { invokeBedrockAgentParseBodyGetTextAndTrace } from '@/utils/amplify-utils'
 import { defaultAgents, BedrockAgent } from '@/utils/config'
-import { amplifyClient, getMessageCatigory, invokeBedrockModelParseBodyGetText } from '@/utils/amplify-utils';
+import { amplifyClient, getMessageCatigory } from '@/utils/amplify-utils';
 
 // Dynamic imports for Cloudscape components
-// const AppLayout = dynamic(
-//     () => import('@cloudscape-design/components').then((mod) => mod.AppLayout),
-//     { ssr: false }
-// );
-// const HelpPanel = dynamic(
-//     () => import('@cloudscape-design/components').then((mod) => mod.HelpPanel),
-//     { ssr: false }
-// );
 const Header = dynamic(
     () => import('@cloudscape-design/components').then((mod) => mod.Header),
     { ssr: false }
@@ -25,22 +17,14 @@ const Link = dynamic(
     () => import('@cloudscape-design/components').then((mod) => mod.Link),
     { ssr: false }
 );
-// const SideNavigation = dynamic(
-//     () => import('@cloudscape-design/components').then((mod) => mod.SideNavigation),
-//     { ssr: false }
-// );
-// const Tabs = dynamic(
-//     () => import('@cloudscape-design/components/tabs'),
-//     { ssr: false }
-// );
+const Button = dynamic(
+    () => import('@cloudscape-design/components/button'),
+    { ssr: false }
+);
 const ButtonDropdown = dynamic(
     () => import('@cloudscape-design/components/button-dropdown'),
     { ssr: false }
 );
-// const Tiles = dynamic(
-//     () => import('@cloudscape-design/components/tiles'),
-//     { ssr: false }
-// );
 const PromptInput = dynamic(
     () => import('@cloudscape-design/components/prompt-input'),
     { ssr: false }
@@ -53,10 +37,6 @@ const FormField = dynamic(
     () => import('@cloudscape-design/components/form-field'),
     { ssr: false }
 );
-// const Steps = dynamic(
-//     () => import('@cloudscape-design/components/steps'),
-//     { ssr: false }
-// );
 
 interface ChatBoxProps {
     chatSession: Schema['ChatSession']['type'] | undefined,
@@ -64,12 +44,7 @@ interface ChatBoxProps {
     glossaryBlurbs: {
         [key: string]: string;
     }
-    // setGlossaryBlurbs: React.Dispatch<React.SetStateAction<{
-    //     [key: string]: string;
-    // }>>
-    // addUserChatMessage: ({ detail: { value } }: { detail: { value: string } }) => Promise<void>
 }
-
 
 const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
     const { chatSession, getGlossary, glossaryBlurbs } = props;
@@ -271,7 +246,7 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
 
     }, [JSON.stringify(messages), JSON.stringify(chatSession)])
 
-    async function updateChatMessage(props: { message: Message}){
+    async function updateChatMessage(props: { message: Message }) {
         const targetChatSessionId = chatSession?.id;
 
         // setMessages((previousMessages) => combineAndSortMessages([
@@ -364,13 +339,13 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
         } else console.log('No structured output found in response: ', structuredResponse)
     }
 
-    const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
-        amplifyClient.queries.invokeProductionAgent({ lastMessageText: prompt, chatSessionId: chatSession.id }).then(
-            (response) => {
-                console.log("bot response: ", response)
-            }
-        )
-    }
+    // const invokeProductionAgent = async (prompt: string, chatSession: Schema['ChatSession']['type']) => {
+    //     amplifyClient.queries.invokeProductionAgent({ lastMessageText: prompt, chatSessionId: chatSession.id }).then(
+    //         (response) => {
+    //             console.log("bot response: ", response)
+    //         }
+    //     )
+    // }
 
     // const onPromptSend = ({ detail: { value } }: { detail: { value: string } }) => {
     async function addUserChatMessage({ detail: { value } }: { detail: { value: string } }) {
@@ -393,13 +368,13 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
             // if (!response) throw new Error("No response from agent");
         } else {
             switch (chatSession?.aiBotInfo?.aiBotName) {
-                case defaultAgents.FoundationModel.name:
-                    await addChatMessage({ body: prompt, role: "human" })
-                    console.log("invoking the foundation model")
-                    const responseText = await invokeBedrockModelParseBodyGetText(prompt)
-                    if (!responseText) throw new Error("No response from agent");
-                    addChatMessage({ body: responseText, role: "ai" })
-                    break
+                // case defaultAgents.FoundationModel.name:
+                //     await addChatMessage({ body: prompt, role: "human" })
+                //     console.log("invoking the foundation model")
+                //     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
+                //     if (!responseText) throw new Error("No response from agent");
+                //     addChatMessage({ body: responseText, role: "ai" })
+                //     break
                 case defaultAgents.MaintenanceAgent.name:
                     await addChatMessage({ body: prompt, role: "human" })
                     await invokeBedrockAgentParseBodyGetTextAndTrace({
@@ -411,10 +386,10 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
                     // console.log("MaintenanceAgentResponse: ", response)
                     // addChatMessage({ body: response!.text!, role: "ai" })
                     break
-                case defaultAgents.ProductionAgent.name:
-                    await addChatMessage({ body: prompt, role: "human", chainOfThought: true })
-                    await invokeProductionAgent(prompt, chatSession)
-                    break;
+                // case defaultAgents.ProductionAgent.name:
+                //     await addChatMessage({ body: prompt, role: "human", chainOfThought: true })
+                //     await invokeProductionAgent(prompt, chatSession)
+                //     break;
                 case defaultAgents.PlanAndExecuteAgent.name:
                     await addChatMessage({ body: prompt, role: "human" })
                     const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: chatSession.id })
@@ -458,6 +433,15 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
                                 addUserChatMessage({ detail: { value: detail.id } });
                             }}
                         />
+                        <span className='prompt-label'>
+                            <Button
+                                onClick={async () => {
+                                    if (chatSession?.id && window.confirm('Are you sure you want to delete this chat session? This action cannot be undone.')) {
+                                        await amplifyClient.models.ChatSession.delete({ id: chatSession.id })
+                                    }
+                                }}
+                            >x</Button>
+                        </span>
                     </>
                 }
                 fitHeight

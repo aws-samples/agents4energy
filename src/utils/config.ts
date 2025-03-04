@@ -57,10 +57,10 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
     //         `Plot the total monthly oil, gas, and water production since 1900 for the well with API number 30-045-29202`
     //     ]
     // },
-    FoundationModel: {
-        name: "Foundation Model",
-        samplePrompts: [
-            "What portion of world oil production does the US produce?"
-        ]
-    }
+    // FoundationModel: {
+    //     name: "Foundation Model",
+    //     samplePrompts: [
+    //         "What portion of world oil production does the US produce?"
+    //     ]
+    // }
 }

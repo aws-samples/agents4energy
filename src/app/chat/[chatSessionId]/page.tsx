@@ -36,6 +36,10 @@ const Tabs = dynamic(
     () => import('@cloudscape-design/components/tabs'),
     { ssr: false }
 );
+const Button = dynamic(
+    () => import('@cloudscape-design/components/button'),
+    { ssr: false }
+);
 const ButtonDropdown = dynamic(
     () => import('@cloudscape-design/components/button-dropdown'),
     { ssr: false }
@@ -52,8 +56,6 @@ const Steps = dynamic(
     () => import('@cloudscape-design/components/steps'),
     { ssr: false }
 );
-
-// Dynamic import for custom components
 const StorageBrowser = dynamic(
     () => import('@/components/StorageBrowser').then(mod => mod.StorageBrowser),
     { ssr: false }
@@ -227,15 +229,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
         return Object.entries(grouped).map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
             type: "section",
             text: monthYear,
-            // controlId: "",
             items: [{
                 type: "link",
                 href: `/chat`,
                 text: "",
-                // controlId: "",
                 info: <Tiles
                     onChange={({ detail }) => {
-                        // setValue(detail.value);
                         router.push(`/chat/${detail.value}`);
                     }}
                     value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
@@ -329,24 +328,45 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                             text: 'Sessions',
                                         }}
                                         items={groupedChatSessions}
-
                                     />
-
-
                                 }
                                 content={
-                                    <ChatBox
-                                        chatSession={initialActiveChatSession}
-                                        glossaryBlurbs={glossaryBlurbs}
-                                        getGlossary={getGlossary}
-                                    />
-
-
+                                    initialActiveChatSession ?
+                                        (<ChatBox
+                                            chatSession={initialActiveChatSession}
+                                            glossaryBlurbs={glossaryBlurbs}
+                                            getGlossary={getGlossary}
+                                        />) : (
+                                            <div style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '1rem',
+                                                alignItems: 'flex-start' 
+                                            }}>
+                                                <h3>Select and agent to chat with</h3>
+                                                {
+                                                    Object.entries(defaultAgents)
+                                                        .map(
+                                                            ([agentId, agentInfo]) => {
+                                                                return <Button
+                                                                    key= { agentId }
+                                                                    onClick={() => {
+                                                                        createChatSession({ aiBotInfo: { aiBotName: agentInfo.name, aiBotId: agentId } })
+                                                                    }}
+                                                                >
+                                                                    {agentInfo.name}
+                                                                </Button>
+                                                            }
+                                                        )
+                                                }
+                                            </div>
+                                        )
                                 }
                             />,
                         action:
                             <ButtonDropdown
                                 variant="icon"
+
                                 ariaLabel="Query actions for first tab"
                                 items={[
                                     ...Object.entries(defaultAgents).map(([agentId, agentInfo]) => ({ id: agentId, text: agentInfo.name })),
@@ -376,15 +396,12 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                 </Container>
                             </div>,
                     },
-
                     {
-                        label: "Links",
+                        label: "Files",
                         id: "fourth",
                         content:
                             <div className='links-container'>
-                                <Container>
-                                    <StorageBrowser />
-                                </Container>
+                                <StorageBrowser />
                             </div>,
                     },
 
