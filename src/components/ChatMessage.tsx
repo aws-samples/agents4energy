@@ -61,7 +61,7 @@ export default function Messages(
 
                 {messages.map((message, index) => {
 
-                    if (!message.role) return;
+                    // if (!message.role) return;
 
                     // const author = AUTHORS[message.role];
                     const author: AuthorAvatarProps =  (message.role === 'human') ? {
@@ -77,7 +77,7 @@ export default function Messages(
 
                     if ( // This is for the task header message
                         message.role === 'ai' && message.content.startsWith('## ') && !message.content.includes('\n')
-                    ) return <h1 key={message.content}>{message.content.slice(3)}</h1>
+                    ) return <h1 id={message.content} key={message.createdAt}>{message.content.slice(3)}</h1>
 
 
                     return (

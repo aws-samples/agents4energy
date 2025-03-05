@@ -300,7 +300,19 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                             }}
                                                         >
 
-                                                            <div className="step-container" key={step.content as string}>
+                                                            <div className="step-container"
+                                                                key={step.content as string}
+                                                                onClick={() => {
+                                                                    const element = document.getElementById(`## ${stepContent.title}`);
+                                                                    // console.log('Scrolling to element: ', element)
+                                                                    if (element) {
+                                                                        element.scrollIntoView({
+                                                                            behavior: 'smooth',
+                                                                            block: 'center'
+                                                                        });
+                                                                    }
+                                                                }}
+                                                            >
                                                                 <Steps
                                                                     // className='steps'
                                                                     steps={[
@@ -341,7 +353,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 gap: '1rem',
-                                                alignItems: 'flex-start' 
+                                                alignItems: 'flex-start'
                                             }}>
                                                 <h3>Select and agent to chat with</h3>
                                                 {
@@ -349,7 +361,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                         .map(
                                                             ([agentId, agentInfo]) => {
                                                                 return <Button
-                                                                    key= { agentId }
+                                                                    key={agentId}
                                                                     onClick={() => {
                                                                         createChatSession({ aiBotInfo: { aiBotName: agentInfo.name, aiBotId: agentId } })
                                                                     }}
