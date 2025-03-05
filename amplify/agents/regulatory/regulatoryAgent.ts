@@ -83,7 +83,7 @@ export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuil
     5. Provide context for why specific regulations exist when relevant`;
 
     // Create regulatory knowledge base and s3 data source for the KB
-    const regulatoryKnowledgeBase = new cdkLabsBedrock.VectorKnowledgeBase(scope, `KB-regulatory`, {
+    const regulatoryKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `KB-regulatory`, {
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to regulatory requirements in oil and gas facilities globally`,
         description: 'Regulatory Knowledge Base',

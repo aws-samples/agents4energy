@@ -137,7 +137,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
 
     // ===== MAINTENANCE KNOWLEDGE BASE =====
     // Bedrock KB with OpenSearchServerless (OSS) vector backend
-    const maintenanceKnowledgeBase = new cdkLabsBedrock.VectorKnowledgeBase(scope, `KB-Maintenance`, {//${stackName.slice(-5)}
+    const maintenanceKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `KB-Maintenance`, {//${stackName.slice(-5)}
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         // name: knowledgeBaseName, //Note: The knowledge base name will contain the id of this construct "MaintKB" even without this key being set
         instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to industrial facility maintenance and operations`,

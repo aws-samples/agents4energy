@@ -78,7 +78,7 @@ export function petrophysicsAgentBuilder(scope: Construct, props: PetrophysicsAg
     5. Provide context for how the analysis impacts reservoir characterization`;
 
     // Create petrophysics knowledge base
-    const petrophysicsKnowledgeBase = new cdkLabsBedrock.VectorKnowledgeBase(scope, `KB-petrophysics`, {
+    const petrophysicsKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `KB-petrophysics`, {
         embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
         instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to petrophysics and well log analysis`,
         description: 'Petrophysics Knowledge Base',
