@@ -1,128 +1,168 @@
-import { aws_bedrock as bedrock } from "aws-cdk-lib";
 import * as cdk from 'aws-cdk-lib';
+import { aws_s3 as s3 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-
+import { aws_ec2 } from 'aws-cdk-lib';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
+import * as bedrock from 'aws-cdk-lib/aws-bedrock';
 
 interface BedrockAgentBuilderProps {
-    description?: string,
-    regulatoryKbId: string
+    description?: string;
+    modelId?: string;
+    environment?: string;
+    instruction?: string;
+    vpc: aws_ec2.Vpc;
+    s3Bucket: s3.IBucket;
+    s3Deployment: cdk.aws_s3_deployment.BucketDeployment;
+    regulatoryAgentId?: string;
+    regulatoryAgentAliasId?: string;
 }
 
-// Create the agent 
-export function buildRegulatoryAgent (scope: Construct, props: BedrockAgentBuilderProps) {
+export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuilderProps) {
+    const resourcePrefix = scope.node.tryGetContext('resourcePrefix') || 'regulatory';
+    const environment = props.environment || scope.node.tryGetContext('environment') || 'dev';
 
-    // Create a bedrock execution role for the agent and use the role arn in the agent props.
-    const agentRole = new cdk.aws_iam.Role(scope, 'BedrockAgentRole', {
-        assumedBy: new cdk.aws_iam.ServicePrincipal('bedrock.amazonaws.com'),
-        roleName: 'BedrockAgentRole',
-        description: 'Bedrock agent execution role',
-        // Managed policy of full access for testing only, use principle of least priviledge in guideance
-        // TODO: adjust this policy after testing
-        managedPolicies: [cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonBedrockFullAccess')]
+    // Declare a UUID to append to resources to avoid naming collisions in Amplify
+    const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
+    
+
+    // Create IAM role for the Bedrock Agent
+    const regulatoryAgentRole = new iam.Role(scope, 'RegulatoryAgentRole', {
+        assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
+        roleName: `BedrockAgentRole-${stackUUID}`,
+        path: '/service-role/',
+        description: 'Execution role for Bedrock Regulatory Agent'
+    });
+
+    // Add required permissions instead of using the non-existent managed policy
+    regulatoryAgentRole.addToPolicy(
+        new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: [
+                'bedrock:InvokeModel',
+                'bedrock:Retrieve',
+                'bedrock:ListFoundationModels',
+                'bedrock:ListCustomModels',
+                'bedrock:InvokeAgent',
+                'bedrock:RetrieveAgent'
+            ],
+            resources: [
+                `arn:aws:bedrock:${cdk.Stack.of(scope).region}::foundation-model/*`,
+                `arn:aws:bedrock:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:agent/*`,
+                `arn:aws:bedrock:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:knowledge-base/*`
+            ]
+        })
+    );
+
+    // Add CloudWatch Logs permissions
+    regulatoryAgentRole.addToPolicy(
+        new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: [
+                'logs:CreateLogGroup',
+                'logs:CreateLogStream',
+                'logs:PutLogEvents'
+            ],
+            resources: [
+                `arn:aws:logs:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:log-group:/aws/bedrock/*`
+            ]
+        })
+    );
+
+    // Add S3 access permissions
+    props.s3Bucket.grantRead(regulatoryAgentRole);
+    
+    // Default instruction for the regulatory agent
+    const defaultInstruction = `You are a helpful regulatory assistant that uses your knowledge base to answer user questions. 
+    Always answer the question as factually correct as possible and cite your sources from your knowledge base. 
+    When providing regulatory guidance:
+    1. Always reference specific regulations or documents from the knowledge base
+    2. Indicate if any information might be outdated
+    3. Suggest related regulatory requirements the user should consider
+    4. If uncertain, recommend consulting official regulatory bodies
+    5. Provide context for why specific regulations exist when relevant`;
+
+    // Create regulatory knowledge base and s3 data source for the KB
+    const regulatoryKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `KB-regulatory`, {
+        embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
+        instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to regulatory requirements in oil and gas facilities globally`,
+        description: 'Regulatory Knowledge Base',
+    });
+    const s3docsDataSource = regulatoryKnowledgeBase.addS3DataSource({
+        bucket: props.s3Bucket,
+        dataSourceName: "a4e-kb-ds-s3-regulatory",
+        inclusionPrefixes: ['regulatory-agent/'],
     })
-    
-    // Configure the agent properties
+
+    // Create the Bedrock agent with the role
     const cfnAgentProps: bedrock.CfnAgentProps = {
-        agentName: 'RegulatoryAgent',
-        description: 'This agent is designed to help with regulatory compliance.',
-        knowledgeBases: [{
-            description: 'Regulatory Knowledge Base',
-            knowledgeBaseId: props.regulatoryKbId,
-            knowledgeBaseState: 'ENABLED',
-        }],
+        agentName: `${resourcePrefix}-agent-${stackUUID}`,
+        description: props.description || 'This agent is designed to help with regulatory compliance.',
+        instruction: props.instruction || defaultInstruction,
+        foundationModel: props.modelId || 'anthropic.claude-3-haiku-20240307-v1:0',
+        agentResourceRoleArn: regulatoryAgentRole.roleArn,
         autoPrepare: true,
-        // Use the arn from the role created above (agentRole) so we can auto-prepare the agent and create alias for the agent
-        agentResourceRoleArn: agentRole.roleArn,
-        // Specify the agent instructions 
-       instruction: `You are a helpful regulatory assistant that uses your knowledge base to answer user questions. Always answer the question as factually correct as possible and cite your sources from your knowledge base.`,
-      
-       // Specify the agent model 
-       foundationModel: 'anthropic.claude-3-haiku-20240307-v1:0',
-
-       /*THE FOLLOWING COMMENTED SECTION IS AN EXAMPLE OF OVERRIDING THE DEFAULT PROMPT
-         RESULTS WERE TESTED BETTER WHEN USING THE BEDROCK DEFAULT PROMPTS */
-       
-       // Set the prompt override configuration. Note the promptConfiguration is an array that can hold multiple configs (i.e. PRE_PROCESSING, ORCHESTRATION, KNOWLEDGE_BASE_RESPONSE, etc.),
-       // here we are defining the promptConfiguration for orchestration.
-    //    promptOverrideConfiguration: {
-    //     promptConfigurations: [{
-    //         // Set the inference configuration parameters (note that inference configuration cannot be empty when prompt type is PRE_PROCESSING and promptCreationMode is set to OVERRIDDEN)
-    //         inferenceConfiguration: {
-    //             maximumLength: 4096,
-    //             temperature: 1,
-    //             topP: 0.9,
-    //             topK: 250
-    //         },
-    //         // Override the default agent prompt and use the basePromptTemplate defined here instead
-    //         promptCreationMode: 'OVERRIDDEN',
-    //         // This is an orchestration prompt type, to override pre-processing, post processing, and knowledge base response generation prompts add additional prompt configurations to this array. Note there are rules around prompt templates depending on 
-    //         // the prompt type. For more information refer to: https://docs.aws.amazon.com/bedrock/latest/userguide/advanced-prompts-configure.html
-    //         promptType: 'ORCHESTRATION',
-    //         // Set the base prompt template you want to use instead of the default (the engineered prompt). In this prompt, we also put sensitive topic guardrails in place to further test the agent response.
-    //         basePromptTemplate: `{
-    //                                         "anthropic_version": "bedrock-2023-05-31",
-    //                                         "system": "
-    //                                             $instruction$
-    //                                             You are an AI assistant named Regulatory Expert, created to provide information and guidance on regulatory matters to users. 
-    //                                             You have access to a comprehensive knowledge base on environmental and other government regulations related to the energy industry in the United States
-    //                                             including; The Environmental Protection Agency (EPA), The Occupational Safety and Health Administration (OSHA), The Pipeline and Hazardous Materials Safety Administration (PHMSA),
-    //                                             The Bureau of Safety and Environmental Enforcement (BSEE), The Federal Energy Regulatory Commission (FERC), and the Bureau of Land Management (BLM).
-    //                                             Your role is to provide factual, objective information to users, while citing your sources in your answers.
-                                               
-
-    //                                             $prompt_session_attributes$
-    //                                             ",
-    //                                         "messages": [
-    //                                             {
-    //                                                 "role" : "user",
-    //                                                 "content" : "$question$"
-    //                                             },
-    //                                             {
-    //                                                 "role" : "assistant",
-    //                                                 "content" : "$agent_scratchpad$"
-    //                                             }
-    //                                         ]
-    //                                     }`,
-    //         promptState: 'ENABLED'                       
-    //     }]
-    //    }
-       
-    }
+        knowledgeBases: [{
+                knowledgeBaseId: regulatoryKnowledgeBase.knowledgeBaseId,
+                description: 'Knowledge Base for regulatory requirements',
+                knowledgeBaseState: 'ENABLED'
+            }],
     
-    
-    // Agent declaration
+    };
+
+    // Create the Bedrock agent
     const regulatoryAgent = new bedrock.CfnAgent(
         scope,
         'RegulatoryAgent',
         cfnAgentProps
     );
 
-    // Create an alias to the regulatoryAgent (needed for UI integration)
+    // Create an alias for the agent
     const regulatoryAgentAlias = new bedrock.CfnAgentAlias(
-       scope,
-       'RegulatoryAgentAlias',
-       {
-           agentId: regulatoryAgent.attrAgentId,
-           agentAliasName: 'RegulatoryAgentAlias'
-       }          
+        scope,
+        'RegulatoryAgentAlias',
+        {
+            agentId: regulatoryAgent.attrAgentId,
+            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+        }
     );
 
-    // Add a dependency so the agent gets created before the alias
     regulatoryAgentAlias.addDependency(regulatoryAgent);
 
-     //Create a CFN Output containing the agentId attribute
-    new cdk.CfnOutput(scope, 'agentId', {
-        value: regulatoryAgent.attrAgentId
+    // Apply removal policies
+    regulatoryAgent.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
+    regulatoryAgentAlias.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
+
+    // Create CloudWatch metrics
+    const metric = new cdk.aws_cloudwatch.Metric({
+        namespace: 'RegulatoryAgent',
+        metricName: 'Invocations',
+        dimensionsMap: {
+            AgentId: regulatoryAgent.attrAgentId,
+            Environment: environment
+        }
     });
 
-    //Create a CFN Output containing the agentAliasId attribute
-    new cdk.CfnOutput(scope, 'agentAliasId', {
-        value: regulatoryAgentAlias.attrAgentAliasId
+    // Create CloudWatch alarm
+    new cdk.aws_cloudwatch.Alarm(scope, 'RegulatoryAgentErrorAlarm', {
+        metric: metric,
+        threshold: 5,
+        evaluationPeriods: 1,
+        alarmDescription: 'Alert when regulatory agent encounters multiple errors',
+        comparisonOperator: cdk.aws_cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD
     });
 
-  return {
-    regulatoryAgent: regulatoryAgent, 
-    regulatoryAgentAlias: regulatoryAgentAlias
-    };    
-  
-};
+    // Add trust policy conditions
+    const cfnRole = regulatoryAgentRole.node.defaultChild as iam.CfnRole;
+    cfnRole.addPropertyOverride('AssumeRolePolicyDocument.Statement.0.Condition', {
+    StringEquals: {
+        'aws:SourceAccount': cdk.Stack.of(scope).account
+    }
+});
+    return {
+        regulatoryAgent,
+        regulatoryAgentAlias,
+        regulatoryAgentRole,
+        metric
+    };
+}
