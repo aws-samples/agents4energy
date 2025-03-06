@@ -58,8 +58,6 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
             "What are the requirements for decomissioning an offshore oil well in Brazil?",
         ],
     } as BedrockAgent,
-    
-    
     PetrophysicsAgent: {
         name: "Petrophysics Agent",
         source: "bedrockAgent",
