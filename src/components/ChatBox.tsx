@@ -367,41 +367,43 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
             await invokeBedrockAgentParseBodyGetTextAndTrace({ prompt: prompt, chatSession: chatSession })
             // if (!response) throw new Error("No response from agent");
         } else {
-            switch (chatSession?.aiBotInfo?.aiBotName) {
-                // case defaultAgents.FoundationModel.name:
-                //     await addChatMessage({ body: prompt, role: "human" })
-                //     console.log("invoking the foundation model")
-                //     const responseText = await invokeBedrockModelParseBodyGetText(prompt)
-                //     if (!responseText) throw new Error("No response from agent");
-                //     addChatMessage({ body: responseText, role: "ai" })
-                //     break
-                case defaultAgents.MaintenanceAgent.name:
+
+            const selectedDefaultAgentKey = Object.keys(defaultAgents).find(key =>
+                defaultAgents[key].name === chatSession?.aiBotInfo?.aiBotName
+            );
+            const selectedDefaultAgent = selectedDefaultAgentKey ? defaultAgents[selectedDefaultAgentKey] : null;
+
+            if (!selectedDefaultAgent) throw new Error("No default agent selected");
+            if (!chatSession) throw new Error("No active chat session");
+
+            switch (selectedDefaultAgent.source) {
+                case "bedrockAgent":
                     await addChatMessage({ body: prompt, role: "human" })
                     await invokeBedrockAgentParseBodyGetTextAndTrace({
                         prompt: prompt,
                         chatSession: chatSession,
-                        agentAliasId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentAliasId,
-                        agentId: (defaultAgents.MaintenanceAgent as BedrockAgent).agentId,
+                        agentAliasId: (selectedDefaultAgent as BedrockAgent).agentAliasId,
+                        agentId: (selectedDefaultAgent as BedrockAgent).agentId,
                     })
-                    // console.log("MaintenanceAgentResponse: ", response)
-                    // addChatMessage({ body: response!.text!, role: "ai" })
-                    break
-                // case defaultAgents.ProductionAgent.name:
-                //     await addChatMessage({ body: prompt, role: "human", chainOfThought: true })
-                //     await invokeProductionAgent(prompt, chatSession)
-                //     break;
-                case defaultAgents.PlanAndExecuteAgent.name:
+                    break;
+                case "graphql":
                     await addChatMessage({ body: prompt, role: "human" })
-                    const planAndExecuteResponse = await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: chatSession.id })
-                    console.log('Plan and execute response: ', planAndExecuteResponse)
+                    switch (selectedDefaultAgent.name) {
+                        case defaultAgents.PlanAndExecuteAgent.name:
+                            await amplifyClient.queries.invokePlanAndExecuteAgent({ lastMessageText: prompt, chatSessionId: chatSession.id })
+                            break;
+                        default:
+                            throw new Error("No Agent Configured");
+                            break;
+                    }
                     break;
                 default:
                     throw new Error("No Agent Configured");
                     break;
+
             }
         }
     }
-
 
     return (
         <div

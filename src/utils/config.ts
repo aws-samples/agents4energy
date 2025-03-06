@@ -4,6 +4,7 @@ import outputs from '@/../amplify_outputs.json';
 type BaseAgent = {
     name: string
     samplePrompts: string[]
+    source: 'bedrockAgent' | 'graphql'
 }
 
 export type BedrockAgent = BaseAgent & {
@@ -19,7 +20,8 @@ export type LangGraphAgent = BaseAgent & {
 
 export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGraphAgent } = {
     PlanAndExecuteAgent: {
-        name: "Production Agent",
+        name: `Production Agent`,
+        source: `graphql`,
         samplePrompts: [
             `This morning well with API number 30-045-29202 stopped producing gas with indication of a hole in tubing.  
             Make a table of all operational events found in the well files. 
