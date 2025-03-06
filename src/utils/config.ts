@@ -4,6 +4,7 @@ import outputs from '@/../amplify_outputs.json';
 type BaseAgent = {
     name: string
     samplePrompts: string[]
+    source: 'bedrockAgent' | 'graphql'
 }
 
 export type BedrockAgent = BaseAgent & {
@@ -18,6 +19,25 @@ export type LangGraphAgent = BaseAgent & {
 }
 
 export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGraphAgent } = {
+    PlanAndExecuteAgent: {
+        name: `Production Agent`,
+        source: `graphql`,
+        samplePrompts: [
+            `This morning well with API number 30-045-29202 stopped producing gas with indication of a hole in tubing.  
+            Make a table of all operational events found in the well files. 
+            Query all historic monthly production rates and make a plot with both the event and production data. 
+            Estimate the value of the well's remaining production. 
+            Write a procedure to repair the well, estimate the cost of the repair, and calculate financial metrics. 
+            Make an executive report about repairing the well with detailed cost and procedure data. 
+            Use the ai role for all steps.
+            `.replace(/^\s+/gm, ''),
+            `Search the well files for the well with API number 30-045-29202 to make a table with type of operation (drilling, completion, workover, plugging, other), text from the report describing operational details, and document title.
+            Also execute a sql query to get the total monthly oil, gas and water production from this well.
+            Create a plot with both the event data and the production data. `.replace(/^\s+/gm, ''), //This trims the white space at the start of each line
+            `Plot the total monthly oil, gas, and water production since 1900 for the well with API number 30-045-29202`,
+            `Which form of artifical lift best matches my personality?`
+        ]
+    },
     MaintenanceAgent: {
         name: "Maintenance Agent",
         source: "bedrockAgent",
@@ -47,37 +67,5 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
             "How does rock physics affect oil and gas production?",
             "Calculate the expected AVO Class for a gas saturated sandstone with 25% porosity, overlain by shale with Vp of 3200 m/s, Vs of 1800 m/s, and density of 2.4 g/cc"
         ],
-    } as BedrockAgent,
-
-    ProductionAgent: {
-        name: "Production Agent",
-        source: "graphql",
-        invokeFieldName: "invokeProductionAgent",
-        samplePrompts: [
-            `Search the well files for the well with API number 30-045-29202 to make a table with type of operation (drilling, completion, workover, plugging, other), text from the report describing operational details, and document title.
-            Also execute a sql query to get the total monthly oil, gas and water production from this well.
-            Create a plot with both the event data and the production data. `.replace(/^\s+/gm, ''), //This trims the white space at the start of each line
-            `Plot the total monthly oil, gas, and water production since 1900 for the well with API number 30-045-29202`
-        ]
-    },
-    FoundationModel: {
-        name: "Foundation Model",
-        samplePrompts: [
-            "What portion of world oil production does the US produce?"
-        ]
-    },
-    PlanAndExecuteAgent: {
-        name: "Plan And Execute",
-        samplePrompts: [
-            `This morning well with API number 30-045-29202 stopped producing gas with indication of a hole in tubing.  
-            Make a table of all operational events found in the well files. 
-            Query all historic monthly production rates and make a plot with both the event and production data. 
-            Estimate the value of the well's remaining production. 
-            Write a procedure to repair the well, estimate the cost of the repair, and calculate financial metrics. 
-            Make an executive report about repairing the well with detailed cost and procedure data. 
-            Use the ai role for all steps.
-            `.replace(/^\s+/gm, ''),
-            `Where should I go on vacation?`
-        ]
-    },
+    } as BedrockAgent
 }
