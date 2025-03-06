@@ -30,28 +30,19 @@ export default function PressRelease() {
             HOUSTON - March 17, 2025 - Amazon Web Services (AWS), an Amazon.com, Inc. company (NASDAQ: AMZN), announced Agents4Energy, an easily configurable and deployable, set of open-source agentic workflows to help customers in Energy industry accelerate their workloads on AWS. Agents4Energy is available as an open-source AWS Solution and makes it easy for energy professionals to use generative AI assistants for a range of common energy industry use cases, e.g., field operations, supply chain optimization, and asset integrity management.
           </Box>
           <Box variant="p">
-            Generative AI is revolutionizing the energy industry by enhancing operational efficiencies and driving innovation. In particular, foundation model-based agentic workflows are gaining traction, activating autonomous task execution and collaboration to streamline complex processes. They are increasingly utilized in generative AI workloads for real-time decision making, actionable insight generation, automating routine tasks, and optimization of operational efficiencies. They can help answer questions such as "what equipment has failed most frequently?", "who serviced the equipment?", "what procedures were followed?", "which supplier provided the parts?", and determine whether there are connections between these data points. Their true power, however, lies in their ability to take action when needed - such as shutting down failing equipment, ordering parts, or scheduling maintenance crews - all with a human in the lead. Agentic workflows require domain expertise to design and engineering skill to deploy. Agents4Energy simplifies this by providing pre-designed agents for energy-specific domain workflows.
+            Generative AI is revolutionizing the energy industry by enhancing operational efficiencies and driving innovation. In particular, foundation model-based agentic workflows are gaining traction, activating autonomous task execution and collaboration to streamline complex processes. They are increasingly utilized in generative AI workloads for real-time decision making, actionable insight generation, automating routine tasks, and optimization of operational efficiencies. They can help answer questions such as &ldquo;what equipment has failed most frequently?&rdquo;, &ldquo;who serviced the equipment?&rdquo;, &ldquo;what procedures were followed?&rdquo;, &ldquo;which supplier provided the parts?&rdquo;, and determine whether there are connections between these data points. Their true power, however, lies in their ability to take action when needed - such as shutting down failing equipment, ordering parts, or scheduling maintenance crews - all with a human in the lead. Agentic workflows require domain expertise to design and engineering skill to deploy. Agents4Energy simplifies this by providing pre-designed agents for energy-specific domain workflows.
           </Box>
           <Box variant="p">
-            The first release of Agents4Energy will feature agent-based assistants in specific energy domains: Operations, Production Engineering, Regulatory Compliance, and Wells Exploration. It will include publicly-sourced test data to help customers evaluate available Agentic Workflows. Agents4Energy can also be easily configured to access and work with customer data, such as contracts, engineering reports, maintenance logs, and equipment manuals. The built-in chat interface supports natural language queries, activating data exploration and insights by drawing responses from various data sources.
+            The first release of Agents4Energy will feature agent-based assistants in specific energy domains: Maintenance, Production, Regulatory, and Petrophysics. It will include publicly-sourced test data to help customers evaluate available Agentic Workflows. Agents4Energy can also be easily configured to access and work with customer data, such as contracts, engineering reports, maintenance logs, and equipment manuals. The built-in chat interface supports natural language queries, activating data exploration and insights by drawing responses from various data sources.
           </Box>
           <Box variant="p">
-            In addition to interactions with a company's static data, agents can provide a translation layer between energy professionals and the enterprise systems that contain crucial real-time data across the company. Systems such as SAP, daily production systems, and The OSDU Data Platform that historically required integration developers for data access are now accessed with interfaces created and run by agents.
+            In addition to interactions with a company&apos;s static data, agents can provide a translation layer between energy professionals and the enterprise systems that contain crucial real-time data across the company. Systems such as SAP, daily production systems, and The OSDU Data Platform that historically required integration developers for data access are now accessed with interfaces created and run by agents.
           </Box>
           <Box variant="p">
-            "Energy powers Gen AI and now we are using Gen AI to power energy," said Swami Sivasubramanian, VP of AWS AI. "With Agents4Energy, we've made it radically easier for energy companies to begin realizing the transformational benefits of cutting-edge generative AI technology."
+            Agents4Energy is available today as an AWS Solution Guidance with sample demos on AWS Samples GitHub. The resources can be accessed and deployed through the Agents4Energy website at https://agents4energy.com For enterprise customers looking to scale their GenAI workloads, Agents4Energy is also part of the Energy GenAI Factory Program available exclusively through AWS, and we are actively collaborating with our partners to integrate agentic support for third-party energy solutions and workflows.
           </Box>
           <Box variant="p">
-            As the head of digital transformation at a major oil and gas company, streamlining and optimizing our far-flung field operations has long been a key priority and challenge. After deploying Agents4Energy's "Operations Assistant" agent, we've seen significant improvements in operational workflows, decision-making, and issue resolution. And Agents4Energy's "Production Engineering Assistant" allows engineers to use natural language to interface directly with our enterprise data in the OSDU platform and get insights on a well's performance," said Josh Etkind, GM of Upstream Digital Transformation at Shell.
-          </Box>
-          <Box variant="p">
-            "Generative AI presents a world of opportunity, but producing capable, trustworthy agents at scale is enormously complex. Agents4Energy has been instrumental in allowing us to capitalize on this next wave of Gen AI while insulating our teams from that underlying complexity," said Jordie Harrell, CTO of bpx.
-          </Box>
-          <Box variant="p">
-            Agents4Energy is available today as an AWS Solution Guidance with sample demos on AWS Samples GitHub. The resources can be accessed and deployed through the Agents4Energy website at https://aws.amazon.com/agents4energy. For enterprise customers looking to scale their GenAI workloads, Agents4Energy is also part of the Energy GenAI Factory Program available exclusively through AWS, and we are actively collaborating with our partners to integrate agentic support for third-party energy solutions and workflows.
-          </Box>
-          <Box variant="p">
-            Please reach out to agents4energy@amazon.com to start transforming your energy operations today with Agents4Energy.
+            Reach out to us at agents4energy@amazon.com to start transforming your energy operations today with Agents4Energy.
           </Box>
         </Container>
 
@@ -71,12 +62,21 @@ export default function PressRelease() {
             <ExpandableSection header="What Agentic Workflows are included in Agents4Energy?">
               Release 1 of Agents4Energy will include agentic workflows examples in the following domains:
               <ul>
-                <li>Operations - Maintenance insights and optimization</li>
-                <li>Production Engineering - Well remediation plan development</li>
-                <li>Regulatory Compliance - Automatic contract notification</li>
+                <li>Maintenance - Maintenance insights and optimization</li>
+                <li>Production - Well remediation plan development</li>
+                <li>Regulatory - Automatic contract notification</li>
                 <li>Petrophysics - Reservoir characterization and complex calculations</li>
               </ul>
               Additional agents will be added in the future to fill in the rest of the structure for oil & gas with power & utilities agents to also be added in the future.
+              <Box padding={{ top: 's' }}>
+                <Image
+                  src="/assets/images/A4E-Open-Source-Architecture.png"
+                  alt="Agent Architecture"
+                  width={800}
+                  height={450}
+                  style={{ maxWidth: '100%', height: 'auto' }}
+                />
+              </Box>
             </ExpandableSection>
 
             <ExpandableSection header="What LLMs does Agents4Energy use?">
@@ -116,7 +116,7 @@ export default function PressRelease() {
             </ExpandableSection>
 
             <ExpandableSection header="What are Knowledge Bases?">
-              Amazon Bedrock Knowledge Bases give foundation models and agents contextual information from your company's data and date sources to deliver more relevant, accurate, and customized responses. Agents4Energy includes Knowledge Bases created from standard energy-industry data sources. Examples of using OpenSearch Serverless and Aurora Serverless are provided so customers can choose the appropriate storage service based on their policies and preferences.
+              Amazon Bedrock Knowledge Bases give foundation models and agents contextual information from your company&apos;s data and date sources to deliver more relevant, accurate, and customized responses. Agents4Energy includes Knowledge Bases created from standard energy-industry data sources. Examples of using OpenSearch Serverless and Aurora Serverless are provided so customers can choose the appropriate storage service based on their policies and preferences.
             </ExpandableSection>
 
             <ExpandableSection header="Which knowledge bases will be included in Release 1 of Agents4Energy?">
