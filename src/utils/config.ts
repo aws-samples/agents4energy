@@ -48,23 +48,6 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
             "In September 2024, what are a few key incidents and actions taken at the biodiesel unit?",
         ],
     } as BedrockAgent,
-    // ProductionAgent: {
-    //     name: "Production Agent",
-    //     source: "graphql",
-    //     invokeFieldName: "invokeProductionAgent",
-    //     samplePrompts: [
-    //         `Search the well files for the well with API number 30-045-29202 to make a table with type of operation (drilling, completion, workover, plugging, other), text from the report describing operational details, and document title.
-    //         Also execute a sql query to get the total monthly oil, gas and water production from this well.
-    //         Create a plot with both the event data and the production data. `.replace(/^\s+/gm, ''), //This trims the white space at the start of each line
-    //         `Plot the total monthly oil, gas, and water production since 1900 for the well with API number 30-045-29202`
-    //     ]
-    // },
-    // FoundationModel: {
-    //     name: "Foundation Model",
-    //     samplePrompts: [
-    //         "What portion of world oil production does the US produce?"
-    //     ]
-    // }
     RegulatoryAgent: {
         name: "Regulatory Agent",
         source: "bedrockAgent",
@@ -77,4 +60,26 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
     } as BedrockAgent,
     
     
+    PetrophysicsAgent: {
+        name: "Petrophysics Agent",
+        source: "bedrockAgent",
+        agentId: outputs.custom.petrophysicsAgentId,
+        agentAliasId: outputs.custom.petrophysicsAgentAliasId,
+        samplePrompts: [
+            "How does rock physics affect oil and gas production?",
+            "Calculate the expected AVO Class for a gas saturated sandstone with 25% porosity, overlain by shale with Vp of 3200 m/s, Vs of 1800 m/s, and density of 2.4 g/cc"
+        ],
+    } as BedrockAgent,
+
+    ProductionAgent: {
+        name: "Production Agent",
+        source: "graphql",
+        invokeFieldName: "invokeProductionAgent",
+        samplePrompts: [
+            `Search the well files for the well with API number 30-045-29202 to make a table with type of operation (drilling, completion, workover, plugging, other), text from the report describing operational details, and document title.
+            Also execute a sql query to get the total monthly oil, gas and water production from this well.
+            Create a plot with both the event data and the production data. `.replace(/^\s+/gm, ''), //This trims the white space at the start of each line
+            `Plot the total monthly oil, gas, and water production since 1900 for the well with API number 30-045-29202`
+        ]
+    }
 }
