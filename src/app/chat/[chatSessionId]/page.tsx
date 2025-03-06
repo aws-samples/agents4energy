@@ -355,7 +355,7 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
                                                 gap: '1rem',
                                                 alignItems: 'flex-start'
                                             }}>
-                                                <h3>Select and agent to chat with</h3>
+                                                <h3>Select an agent to chat with:</h3>
                                                 {
                                                     Object.entries(defaultAgents)
                                                         .map(
