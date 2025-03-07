@@ -1,7 +1,7 @@
 "use client"
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-import React from 'react';
+import React, { memo } from 'react';
 import dynamic from 'next/dynamic'
 
 import ChatBubble from '@cloudscape-design/chat-components/chat-bubble';
@@ -21,7 +21,7 @@ const ChatUIMessage = dynamic(() => import('./ChatMessageElements'), { ssr: fals
 
 import '@/app/styles/chat.scss';
 
-export default function Messages(
+export default memo(function Messages(
     { messages = [], getGlossary, isLoading, glossaryBlurbs, updateMessage }:
         { 
             messages: Array<Message>, 
@@ -32,39 +32,20 @@ export default function Messages(
         }
 ) {
     const { userAttributes } = useUserAttributes();
+    
     return (
         <div
             id="autoscroll-wrapper"
             style={{
-                maxHeight: '100%', // Constrain to parent height
-                // height: '100%',    // Take full height
+                maxHeight: '100%',
                 display: 'flex',
-                // flexGrow: 1,
                 flexDirection: 'column-reverse',
-                overflowY: 'scroll'
-                // overflow: 'scroll'
+                overflowY: 'auto'
             }}
         >
-            <div
-            // className="messages"
-            // role="region"
-            // aria-label="Chat"
-            // style={{
-            //     // overflowY: 'auto',
-            //     // maxHeight: '100%', // Constrain to parent height
-            //     height: '100%',    // Take full height
-            //     // display: 'flex',
-            //     flexDirection: 'column',
-            //     // overflow: ''
-            // }}
-            >
-
+            <div>
                 {messages.map((message, index) => {
-
-                    // if (!message.role) return;
-
-                    // const author = AUTHORS[message.role];
-                    const author: AuthorAvatarProps =  (message.role === 'human') ? {
+                    const author: AuthorAvatarProps = (message.role === 'human') ? {
                         type: 'user',
                         name: userAttributes?.email || "",
                         initials: (userAttributes?.email || "").slice(0,2),
@@ -75,32 +56,23 @@ export default function Messages(
                         loading: (messages.length === index + 1) && isLoading,
                     }
 
-                    if ( // This is for the task header message
-                        message.role === 'ai' && message.content.startsWith('## ') && !message.content.includes('\n')
-                    ) return <h1 id={message.content} key={message.createdAt}>{message.content.slice(3)}</h1>
-
+                    if (message.role === 'ai' && message.content.startsWith('## ') && !message.content.includes('\n')) {
+                        return <h1 id={message.content} key={message.createdAt}>{message.content.slice(3)}</h1>
+                    }
 
                     return (
                         <ChatBubble
-                            // key={message.authorId + message.timestamp}
                             key={message.createdAt}
-                            // avatar={<ChatBubbleAvatar {...author} loading={message.avatarLoading} />}
                             avatar={<ChatBubbleAvatar {...author} loading={(messages.length === index + 1) && isLoading} />}
                             ariaLabel={`${author?.name ?? 'Unknown'} at ${message.createdAt}`}
                             type={author?.type === 'gen-ai' ? 'incoming' : 'outgoing'}
                             showLoadingBar={(messages.length === index + 1) && isLoading}
-                            // hideAvatar={message.hideAvatar}
                             hideAvatar={false}
-                            // actions={message.actions}
                             actions={author?.type === 'gen-ai' ?
                                 <ButtonGroup
                                     ariaLabel="Chat bubble actions"
                                     variant="icon"
                                     onItemClick={async ({ detail }) => {
-                                        //TODO: Impliment user feedback
-                                        // ["like", "dislike"].includes(detail.id) &&
-                                        // setFeedback(detail.pressed ? detail.id : "")
-
                                         switch (detail.id) {
                                             case "dislike":
                                                 console.log("dislike");
@@ -149,7 +121,6 @@ export default function Messages(
                                                     pressedIconName: "thumbs-down-filled",
                                                     text: "Not helpful",
                                                     pressed: message.userFeedback === 'dislike',
-                                                    // disabled: true
                                                 }
                                             ]
                                         },
@@ -176,20 +147,8 @@ export default function Messages(
                                                     <ReactMarkdown>
                                                         {(message.id && message.id in glossaryBlurbs) ? glossaryBlurbs[message.id] : ""}
                                                     </ReactMarkdown>
-
                                                 </StatusIndicator>
                                         },
-                                        // {
-                                        //     type: "icon-button",
-                                        //     id: "check",
-                                        //     iconName: "check",
-                                        //     text: "Data Quality Check",
-                                        //     // popoverFeedback: (
-                                        //     //   <StatusIndicator type="loading">
-                                        //     //     Copied to clipboard
-                                        //     //   </StatusIndicator>
-                                        //     // )
-                                        // }
                                     ]}
                                 />
                                 : null}
@@ -205,4 +164,9 @@ export default function Messages(
             </div>
         </div>
     );
-}
+}, (prevProps, nextProps) => {
+    // Only re-render if these props change
+    return prevProps.messages.length === nextProps.messages.length &&
+           prevProps.isLoading === nextProps.isLoading &&
+           JSON.stringify(prevProps.glossaryBlurbs) === JSON.stringify(nextProps.glossaryBlurbs);
+});

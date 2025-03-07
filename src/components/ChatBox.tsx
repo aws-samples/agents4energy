@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import dynamic from 'next/dynamic'
 import { Schema } from '@/../amplify/data/resource'
 import { Message } from '@/utils/types'
@@ -46,6 +46,44 @@ interface ChatBoxProps {
     }
 }
 
+const ChatInput = memo(function ChatInput({ onSubmit, isLoading }: { 
+    onSubmit: (value: string) => void,
+    isLoading: boolean 
+}) {
+    const [userPrompt, setUserPrompt] = useState('');
+
+    const handleSubmit = ({ detail }: { detail: { value: string } }) => {
+        onSubmit(detail.value);
+        setUserPrompt('');
+    };
+
+    return (
+        <FormField
+            stretch
+            constraintText={
+                <>
+                    Use of this service is subject to the{' '}
+                    <Link href="#" external variant="primary" fontSize="inherit">
+                        AWS Responsible AI Policy
+                    </Link>
+                    .
+                </>
+            }
+        >
+            <PromptInput
+                onChange={({ detail }) => setUserPrompt(detail.value)}
+                onAction={handleSubmit}
+                value={userPrompt}
+                actionButtonAriaLabel={isLoading ? 'Send message button - suppressed' : 'Send message'}
+                actionButtonIconName="send"
+                ariaLabel={isLoading ? 'Prompt input - suppressed' : 'Prompt input'}
+                placeholder="Ask a question"
+                autoFocus
+            />
+        </FormField>
+    );
+});
+
 const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
     const { chatSession, getGlossary, glossaryBlurbs } = props;
 
@@ -56,58 +94,50 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
     }]);
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
     const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([]);
-    const [userPrompt, setUserPrompt] = useState<string>('');
     const [isGenAiResponseLoading, setIsGenAiResponseLoading] = useState(false);
+
+    // Move the check outside useEffect
+    const shouldSetDefaultPrompts = !messages.length && 
+        chatSession?.aiBotInfo?.aiBotId && 
+        chatSession.aiBotInfo.aiBotId in defaultAgents;
 
     // Subscribe to messages of the active chat session
     useEffect(() => {
         console.log("ChatBox: Subscribing to messages of the active chat session")
-        //Set the default prompts if this is the first message
-
-        if (!chatSession) return
+        if (!chatSession) return;
 
         const sub = amplifyClient.models.ChatMessage.observeQuery({
             filter: {
                 chatSessionId: { eq: chatSession.id }
             }
         }).subscribe({
-            next: ({ items }) => { //isSynced is an option here to
+            next: ({ items }) => {
                 setMessages((prevMessages) => {
-                    //If the message has type plot, attach the previous tool_table_events and tool_table_trend messages to it.
                     const sortedMessages = combineAndSortMessages(prevMessages, items)
-
-                    const sortedMessageWithPlotContext = sortedMessages.map((message, index) => {
+                    return sortedMessages.map((message, index) => {
                         const messageCatigory = getMessageCatigory(message)
                         if (messageCatigory === 'tool_plot') {
-                            //Get the messages with a lower index than the tool_plot's index
                             const earlierMessages = sortedMessages.slice(0, index).reverse()
-
-                            const earlierEventsTable = earlierMessages.find((previousMessage) => {
-                                const previousMessageCatigory = getMessageCatigory(previousMessage)
-                                return previousMessageCatigory === 'tool_table_events'
-                            })
-
-                            const earlierTrendTable = earlierMessages.find((previousMessage) => {
-                                const previousMessageCatigory = getMessageCatigory(previousMessage)
-                                return previousMessageCatigory === 'tool_table_trend'
-                            })
-
+                            const earlierEventsTable = earlierMessages.find(msg => 
+                                getMessageCatigory(msg) === 'tool_table_events'
+                            )
+                            const earlierTrendTable = earlierMessages.find(msg => 
+                                getMessageCatigory(msg) === 'tool_table_trend'
+                            )
                             return {
                                 ...message,
                                 previousTrendTableMessage: earlierTrendTable,
                                 previousEventTableMessage: earlierEventsTable
                             }
-                        } else return message
+                        }
+                        return message
                     })
-                    return sortedMessageWithPlotContext
                 })
             }
-        }
-        )
+        });
+
         return () => sub.unsubscribe();
-
-
-    }, [chatSession])
+    }, [chatSession]);
 
     // Subscribe to the token stream for this chat session
     useEffect(() => {
@@ -161,6 +191,13 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
 
     }, [chatSession])
 
+    // Separate useEffect for setting default prompts
+    useEffect(() => {
+        if (shouldSetDefaultPrompts) {
+            setSuggestedPromptes(defaultAgents[chatSession!.aiBotInfo!.aiBotId!].samplePrompts);
+        }
+    }, [shouldSetDefaultPrompts]);
+
     // This runs when the chat session messages change
     // The blurb below sets the suggested prompts and the isLoading indicator
     useEffect(() => {
@@ -186,15 +223,6 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
             createdAt: new Date().toISOString()
         }))
 
-
-        //Set the default prompts if this is the first message
-        if (
-            !messages.length && //No messages currently in the chat
-            chatSession &&
-            chatSession.aiBotInfo &&
-            chatSession.aiBotInfo.aiBotId &&
-            chatSession.aiBotInfo.aiBotId in defaultAgents
-        ) setSuggestedPromptes(defaultAgents[chatSession.aiBotInfo.aiBotId].samplePrompts)
 
         //If there are no messages, or the last message is an AI message with no tool calls, prepare for a human message
         if (
@@ -356,7 +384,6 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
         }
         // await addChatMessage({ body: body, role: "human" })
         sendMessageToChatBot(value);
-        setUserPrompt("")
     }
 
     async function sendMessageToChatBot(prompt: string) {
@@ -448,36 +475,7 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
                 }
                 fitHeight
                 // disableContentPaddings
-                footer={
-                    <FormField
-                        stretch
-                        constraintText={
-                            <>
-                                Use of this service is subject to the{' '}
-                                <Link href="#" external variant="primary" fontSize="inherit">
-                                    AWS Responsible AI Policy
-                                </Link>
-                                .
-                            </>
-                        }
-                    >
-
-                        {/* During loading, action button looks enabled but functionality is disabled. */}
-                        {/* This will be fixed once prompt input receives an update where the action button can receive focus while being disabled. */}
-                        {/* In the meantime, changing aria labels of prompt input and action button to reflect this. */}
-
-                        <PromptInput
-                            onChange={({ detail }) => setUserPrompt(detail.value)}
-                            onAction={addUserChatMessage}
-                            value={userPrompt}
-                            actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
-                            actionButtonIconName="send"
-                            ariaLabel={isGenAiResponseLoading ? 'Prompt input - suppressed' : 'Prompt input'}
-                            placeholder="Ask a question"
-                            autoFocus
-                        />
-                    </FormField>
-                }
+                footer={<ChatInput onSubmit={value => addUserChatMessage({ detail: { value } })} isLoading={isGenAiResponseLoading} />}
             >
                 <Messages
                     messages={[
