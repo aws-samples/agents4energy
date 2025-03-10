@@ -480,7 +480,11 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
                 <Messages
                     messages={[
                         ...messages,
-                        ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
+                        ...((
+                            characterStreamMessage.content !== "" &&
+                            messages.length &&
+                            !messages[messages.length - 1].responseComplete //If the last message is not complete, show the character stream message
+                        ) ? [characterStreamMessage] : [])
                     ]}
                     updateMessage={updateChatMessage}
                     getGlossary={getGlossary}
