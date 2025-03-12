@@ -424,80 +424,87 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
         //     id="chat-container"
         // >
         <>
-        {/* <div style={{
+            {/* <div style={{
             marginTop: '60px'
         }}></div> */}
-        <Box>
-            <Container
-                header={
-                    <>
-                        <Header variant="h3">Generative AI chat - {chatSession?.aiBotInfo?.aiBotName}</Header>
-                        <span className='prompt-label'>Try one of these example prompts</span>
-                        <ButtonDropdown
-                            ariaLabel="Suggested Prompts"
-                            items={[
-                                ...suggestedPrompts.map((prompt) => ({ id: prompt, text: prompt })),
-                            ]}
-                            onItemClick={({ detail }) => {
-                                addUserChatMessage({ detail: { value: detail.id } });
-                            }}
-                        />
-                        <span className='prompt-label'>
-                            <Button
-                                onClick={async () => {
-                                    if (chatSession?.id && window.confirm('Are you sure you want to delete this chat session? This action cannot be undone.')) {
-                                        await amplifyClient.models.ChatSession.delete({ id: chatSession.id })
-                                    }
+            <Box>
+                <Container
+                    header={
+                        <>
+                            <Header variant="h3">Generative AI chat - {chatSession?.aiBotInfo?.aiBotName}</Header>
+                            <span className='prompt-label'>Try one of these example prompts</span>
+                            <ButtonDropdown
+                                ariaLabel="Suggested Prompts"
+                                items={[
+                                    ...suggestedPrompts.map((prompt) => ({ id: prompt, text: prompt })),
+                                ]}
+                                onItemClick={({ detail }) => {
+                                    addUserChatMessage({ detail: { value: detail.id } });
                                 }}
-                            >x</Button>
-                        </span>
-                    </>
-                }
-                fitHeight
-                // disableContentPaddings
-                footer={
-                    <FormField
-                        stretch
-                        constraintText={
-                            <>
-                                Use of this service is subject to the{' '}
-                                <Link href="#" external variant="primary" fontSize="inherit">
-                                    AWS Responsible AI Policy
-                                </Link>
-                                .
-                            </>
-                        }
-                    >
+                            />
+                            <span className='prompt-label'>
+                                <Button
+                                    onClick={async () => {
+                                        if (chatSession?.id && window.confirm('Are you sure you want to delete this chat session? This action cannot be undone.')) {
+                                            await amplifyClient.models.ChatSession.delete({ id: chatSession.id })
+                                        }
+                                    }}
+                                >x</Button>
+                            </span>
+                        </>
+                    }
+                    fitHeight
+                    // disableContentPaddings
+                    footer={
+                        <FormField
+                            stretch
+                            constraintText={
+                                <>
+                                    Use of this service is subject to the{' '}
+                                    <Link href="#" external variant="primary" fontSize="inherit">
+                                        AWS Responsible AI Policy
+                                    </Link>
+                                    .
+                                </>
+                            }
+                        >
 
-                        {/* During loading, action button looks enabled but functionality is disabled. */}
-                        {/* This will be fixed once prompt input receives an update where the action button can receive focus while being disabled. */}
-                        {/* In the meantime, changing aria labels of prompt input and action button to reflect this. */}
+                            {/* During loading, action button looks enabled but functionality is disabled. */}
+                            {/* This will be fixed once prompt input receives an update where the action button can receive focus while being disabled. */}
+                            {/* In the meantime, changing aria labels of prompt input and action button to reflect this. */}
 
-                        <PromptInput
-                            onChange={({ detail }) => setUserPrompt(detail.value)}
-                            onAction={addUserChatMessage}
-                            value={userPrompt}
-                            actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
-                            actionButtonIconName="send"
-                            ariaLabel={isGenAiResponseLoading ? 'Prompt input - suppressed' : 'Prompt input'}
-                            placeholder="Ask a question"
-                            autoFocus
-                        />
-                    </FormField>
-                }
-            >
-                <Messages
-                    messages={[
-                        ...messages,
-                        ...(characterStreamMessage.content !== "" ? [characterStreamMessage] : [])
-                    ]}
-                    updateMessage={updateChatMessage}
-                    getGlossary={getGlossary}
-                    isLoading={isGenAiResponseLoading}
-                    glossaryBlurbs={glossaryBlurbs}
-                />
-            </Container>
-        </Box>
+                            <PromptInput
+                                onChange={({ detail }) => setUserPrompt(detail.value)}
+                                onAction={addUserChatMessage}
+                                value={userPrompt}
+                                actionButtonAriaLabel={isGenAiResponseLoading ? 'Send message button - suppressed' : 'Send message'}
+                                actionButtonIconName="send"
+                                ariaLabel={isGenAiResponseLoading ? 'Prompt input - suppressed' : 'Prompt input'}
+                                placeholder="Ask a question"
+                                autoFocus
+                            />
+                        </FormField>
+                    }
+                >
+                    <Messages
+                        messages={[
+                            ...messages,
+                            ...(
+                                (
+                                    characterStreamMessage.content !== "" &&
+                                    messages.length &&
+                                    !messages[messages.length - 1].responseComplete //If the last message is not complete, show the character stream message
+                                )
+                                    ? [characterStreamMessage] : []
+                            )
+                        ]}
+                        updateMessage={updateChatMessage}
+                        getGlossary={getGlossary}
+                        isLoading={isGenAiResponseLoading}
+                        glossaryBlurbs={glossaryBlurbs}
+                    />
+                </Container>
+            </Box>
         </>
         //</div>
     )
