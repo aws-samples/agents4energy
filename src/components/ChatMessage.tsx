@@ -36,21 +36,19 @@ export default function Messages(
 
     // Scroll to the bottom function
     const scrollToBottom = () => {
-        // Target the messages-container div directly using the ref
-        const messagesContainer = document.querySelector('.messages-container');
+        // Use the ref directly to get the parent container
+        const messagesContainer = messagesEndRef.current?.parentElement;
         
         if (messagesContainer) {
             // If we found the messages container, scroll it
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        } else if (messagesEndRef.current) {
-            // Fallback: scroll into view using the ref
-            messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
         }
     };
 
-    // Uncomment this to enable auto-scrolling when messages change
+    // Enable auto-scrolling when messages change
     useEffect(() => {
-        scrollToBottom();
+        // Use a small timeout to ensure the DOM has updated
+        setTimeout(scrollToBottom, 50);
     }, [messages]);
 
     return (
