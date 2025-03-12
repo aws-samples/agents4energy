@@ -1,7 +1,7 @@
 "use client"
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-import React, { useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic'
 
 import ChatBubble from '@cloudscape-design/chat-components/chat-bubble';
@@ -21,7 +21,7 @@ const ChatUIMessage = dynamic(() => import('./ChatMessageElements'), { ssr: fals
 
 import '@/app/styles/chat.scss';
 
-export default function Messages(
+export default memo(function Messages(
     { messages = [], getGlossary, isLoading, glossaryBlurbs, updateMessage }:
         {
             messages: Array<Message>,
@@ -38,7 +38,7 @@ export default function Messages(
     const scrollToBottom = () => {
         // Use the ref directly to get the parent container
         const messagesContainer = messagesEndRef.current?.parentElement;
-        
+
         if (messagesContainer) {
             // If we found the messages container, scroll it
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -52,17 +52,17 @@ export default function Messages(
     }, [messages]);
 
     return (
-        <div 
-        className='messages-container'
-        style={{
-            height: 'calc(100vh - 400px)',
-            // height: '100%',
-            overflow: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
-            scrollBehavior: 'smooth'
-        }}
+        <div
+            className='messages-container'
+            style={{
+                height: 'calc(100vh - 400px)',
+                // height: '100%',
+                overflow: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                scrollBehavior: 'smooth'
+            }}
         >
             {messages.map((message, index) => {
 
@@ -210,4 +210,12 @@ export default function Messages(
             <div ref={messagesEndRef} style={{ height: 0 }} />
         </div>
     );
-}
+}, (prevProps, nextProps) => {
+    // Only re-render if these props change
+    return prevProps.messages.length === nextProps.messages.length &&
+        prevProps.isLoading === nextProps.isLoading &&
+        JSON.stringify(prevProps.glossaryBlurbs) === JSON.stringify(nextProps.glossaryBlurbs) &&
+        prevProps.messages.length > 0 &&
+        nextProps.messages.length > 0 &&
+        prevProps.messages[prevProps.messages.length - 1].content === nextProps.messages[nextProps.messages.length - 1].content;
+});
