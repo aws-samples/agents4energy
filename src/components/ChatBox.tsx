@@ -37,6 +37,11 @@ const FormField = dynamic(
     () => import('@cloudscape-design/components/form-field'),
     { ssr: false }
 );
+const Box = dynamic(
+    () => import('@cloudscape-design/components/box'),
+    { ssr: false }
+);
+
 
 interface ChatBoxProps {
     chatSession: Schema['ChatSession']['type'] | undefined,
@@ -406,21 +411,23 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
     }
 
     return (
-        <div
-            className='chat-container'
-            style={{
-                // maxHeight: '100%', // Constrain to parent height
-                // height: '100%',    // Take full height
-                // display: 'flex',
-                // flexDirection: 'column-reverse', //The intent is for this to enable auto-scrolling
-                overflow: 'auto',
-                // flex: '1 1 auto',
-                // padding: '20px', // Add container padding
-                // width: '100%',
-                // border: '1px solid #ccc',
-                // borderRadius: '4px',
-            }}
-        >
+        // <div
+        //     className='chat-container'
+        //     style={{
+        //         height: 'calc(100vh - 146px)',
+        //         // overflow: 'auto',
+        //         // display: 'flex',
+        //         // flexDirection: 'column',
+        //         position: 'relative',
+        //         // scrollBehavior: 'smooth'
+        //     }}
+        //     id="chat-container"
+        // >
+        <>
+        {/* <div style={{
+            marginTop: '60px'
+        }}></div> */}
+        <Box>
             <Container
                 header={
                     <>
@@ -490,7 +497,9 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
                     glossaryBlurbs={glossaryBlurbs}
                 />
             </Container>
-        </div>
+        </Box>
+        </>
+        //</div>
     )
 }
 
