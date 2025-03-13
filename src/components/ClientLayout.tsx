@@ -2,14 +2,14 @@
 
 import React from 'react';
 import TopNavBar from '@/components/TopNavBar';
-import Box from "@cloudscape-design/components/box";
+// import Box from "@cloudscape-design/components/box";
 
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Box>
+    <div>
       <TopNavBar />
-      <Box>{children}</Box>
-    </Box>
+      <div>{children}</div>
+    </div>
   );
 }
