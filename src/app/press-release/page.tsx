@@ -68,15 +68,6 @@ export default function PressRelease() {
                 <li>Petrophysics - Reservoir characterization and complex calculations</li>
               </ul>
               Additional agents will be added in the future to fill in the rest of the structure for oil & gas with power & utilities agents to also be added in the future.
-              <Box padding={{ top: 's' }}>
-                <Image
-                  src="/assets/images/A4E-Open-Source-Architecture.png"
-                  alt="Agent Architecture"
-                  width={800}
-                  height={450}
-                  style={{ maxWidth: '100%', height: 'auto' }}
-                />
-              </Box>
             </ExpandableSection>
 
             <ExpandableSection header="What LLMs does Agents4Energy use?">
@@ -100,15 +91,7 @@ export default function PressRelease() {
             </ExpandableSection>
 
             <ExpandableSection header="Is there an architecture diagram?">
-              <Box padding={{ top: 's' }}>
-                <Image
-                  src="/assets/images/A4E-Reference-Architecture.png"
-                  alt="Agents4Energy Reference Architecture"
-                  width={800}
-                  height={450}
-                  style={{ maxWidth: '100%', height: 'auto' }}
-                />
-              </Box>
+              Yes, the reference architecture can be viewed in the GitHub repository README file with additional information published as part of the AWS Solution Guidance.
             </ExpandableSection>
 
             <ExpandableSection header="Are you going to support third-party agents or Agentic Workflows?">
