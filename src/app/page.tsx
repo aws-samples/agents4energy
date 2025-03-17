@@ -45,7 +45,7 @@ export default function Home() {
                   variant="h1"
                   padding="n"
                 >
-                  Agents4Energy
+                  Agents4Energy - Sample
                 </Box>
                 <Box
                   fontSize="display-l"

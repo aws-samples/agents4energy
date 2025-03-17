@@ -486,10 +486,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
 
         const columnNames = Object.keys(queryResponseData[0])
 
-        // console.log('Column Names: ', columnNames)
-
-
-
         const columns: GridColDef<TransformToDataRowsOutputData>[] = columnNames
           .filter((columnName) => !nonDefaultColumns.includes(columnName))
           .map((name) => ({
@@ -597,7 +593,6 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     }
   }, [props.message, messageContentCategory, MessageTable, MessagePlot])
 
-  // async function getGlossary(message: Schema["ChatMessage"]["type"]) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function getGlossary(message: Message) {
 
@@ -612,10 +607,9 @@ export default function ChatUIMessage(props: ChatUIMessageProps) {
     `
     const newBlurb = await invokeBedrockModelParseBodyGetText(getGlossaryPrompt)
     if (!newBlurb) throw new Error("No glossary blurb returned")
-    setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb })) //TODO fix this
+    setGlossaryBlurbs((prevGlossaryBlurbs) => ({ ...prevGlossaryBlurbs, [message.chatSessionId || "ShouldNeverHappen"]: newBlurb }))
   }
 
-  // async function getDataQualityCheck(message: Schema["ChatMessage"]["type"]) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function getDataQualityCheck(message: Message) {
     setDataQualityBlurb("")

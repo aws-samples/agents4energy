@@ -102,10 +102,6 @@ export default memo(function Messages(
                                 ariaLabel="Chat bubble actions"
                                 variant="icon"
                                 onItemClick={async ({ detail }) => {
-                                    //TODO: Impliment user feedback
-                                    // ["like", "dislike"].includes(detail.id) &&
-                                    // setFeedback(detail.pressed ? detail.id : "")
-
                                     switch (detail.id) {
                                         case "dislike":
                                             console.log("dislike");
