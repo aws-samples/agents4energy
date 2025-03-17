@@ -39,8 +39,6 @@ function Page() {
   const [uploadedFileKeys, setUploadedFileKeys] = React.useState<string[]>([])
   const [additionalS3PrefixSegment, setAdditionalS3PrefixSegment] = React.useState("")
   const [s3Assets, setS3Assets] = useState<S3Asset[]>([]);
-  // const [selectedObject, setSelectedObject] = useState<string | null>(null);
-  // const [nextToken, setNextToken] = useState<string | null>(); // TODO: Impliment Paganation
 
   useEffect(() => {
     onFetchObjects(s3PathSegments.join("")).then((objects) => {
