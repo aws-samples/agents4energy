@@ -13,7 +13,8 @@ export const storage = defineStorage({
       allow.authenticated.to(['read']),
     ],
     'regulatory-agent/*': [
-      allow.authenticated.to(['read']),
+      allow.authenticated.to(['read'])
+    
     ],
   })
 });
