@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic'
 import { Schema } from '@/../amplify/data/resource'
 import { Message } from '@/utils/types'
@@ -60,9 +60,12 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
         index: -1
     }]);
     const [characterStreamMessage, setCharacterStreamMessage] = useState<Message>({ role: "ai", content: "", createdAt: new Date().toISOString() });
-    const [suggestedPrompts, setSuggestedPromptes] = useState<string[]>([]);
+    const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
     const [userPrompt, setUserPrompt] = useState<string>('');
     const [isGenAiResponseLoading, setIsGenAiResponseLoading] = useState(false);
+
+    const messagesString = useMemo(() => JSON.stringify(messages), [messages]);
+    const chatSessionString = useMemo(() => JSON.stringify(chatSession), [chatSession]);
 
     // Subscribe to messages of the active chat session
     useEffect(() => {
@@ -169,87 +172,22 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
     // This runs when the chat session messages change
     // The blurb below sets the suggested prompts and the isLoading indicator
     useEffect(() => {
-
-        // console.log("initialActiveChatSession hash: ", createHash('md5').update("dasf").digest('hex'))
-        console.log("Messages: ", messages)
-        // console.log("initialActiveChatSession: ", initialActiveChatSession)
-
-        // console.log("Messages hash: ", createHash('md5').update(JSON.stringify(messages)).digest('hex'))
-        // console.log("initialActiveChatSession hash: ", createHash('md5').update(JSON.stringify(initialActiveChatSession || "")).digest('hex'))
-
-        //Reset the character stream when we get a new message
-        setCharacterStream(() => {
-            console.log("Resetting character stream")
-            return [{
-                content: "\n\n\n",
-                index: -1
-            }]
-        })
-        setCharacterStreamMessage(() => ({
-            content: "",
-            role: "ai",
-            createdAt: new Date().toISOString()
-        }))
-
-
-        //Set the default prompts if this is the first message
-        if (
-            !messages.length && //No messages currently in the chat
-            chatSession &&
-            chatSession.aiBotInfo &&
-            chatSession.aiBotInfo.aiBotId &&
-            chatSession.aiBotInfo.aiBotId in defaultAgents
-        ) setSuggestedPromptes(defaultAgents[chatSession.aiBotInfo.aiBotId].samplePrompts)
-
-        //If there are no messages, or the last message is an AI message with no tool calls, prepare for a human message
-        if (
-            messages.length &&
-            messages[messages.length - 1].role === "ai" &&
-            (!messages[messages.length - 1].tool_calls || messages[messages.length - 1].tool_calls === "[]") &&
-            messages[messages.length - 1].responseComplete
-        ) {
-            console.log('Ready for human response')
-            setIsGenAiResponseLoading(false)
-
-            async function fetchAndSetSuggestedPrompts() {
-                setSuggestedPromptes([])
-                if (!chatSession || !chatSession.id) throw new Error("No active chat session")
-
-                const suggestedPromptsResponse = await amplifyClient.queries.invokeBedrockWithStructuredOutput({
-                    chatSessionId: chatSession.id,
-                    lastMessageText: "Suggest three follow up prompts",
-                    usePastMessages: true,
-                    outputStructure: JSON.stringify({
-                        title: "RecommendNextPrompt", //title and description help the llm to know how to fill the arguments out
-                        description: "Help the user chose the next prompt to send.",
-                        type: "object",
-                        properties: {// Change anyting in the properties according to the json schema reference: https://json-schema.org/understanding-json-schema/reference
-                            suggestedPrompts: {
-                                type: 'array',
-                                items: {
-                                    type: 'string'
-                                },
-                                minItems: 3,
-                                maxItems: 3,
-                                description: `
-                                    Prompts to suggest to a user when interacting with a large language model
-                                    `
-                            }
-                        },
-                        required: ['suggestedPrompts'],
-                    })
-                })
-                console.log("Suggested Prompts Response: ", suggestedPromptsResponse)
-                if (suggestedPromptsResponse.data) {
-                    const newSuggestedPrompts = jsonParseHandleError(suggestedPromptsResponse.data)
-                    if (newSuggestedPrompts) setSuggestedPromptes(newSuggestedPrompts.suggestedPrompts as string[])
-                    // const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
-                } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
-            }
-            fetchAndSetSuggestedPrompts()
-        } else if (messages.length) setIsGenAiResponseLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
-
-    }, [JSON.stringify(messages), JSON.stringify(chatSession)])
+        if (messagesString && chatSessionString) {
+            if (messagesString === "[]" && chatSessionString === "null") {
+                setIsGenAiResponseLoading(false)
+                if (suggestedPrompts.length === 0) {
+                    async function fetchAndSetSuggestedPrompts() {
+                        const suggestedPromptsResponse = await amplifyClient.models.ChatSession.get({ id: "suggestedPrompts" })
+                        if (suggestedPromptsResponse.data) {
+                            const data = suggestedPromptsResponse.data as unknown as { suggestedPrompts: string[] }
+                            if (data.suggestedPrompts) setSuggestedPrompts(data.suggestedPrompts)
+                        } else console.log('No suggested prompts found in response: ', suggestedPromptsResponse)
+                    }
+                    fetchAndSetSuggestedPrompts()
+                }
+            } else if (messagesString.length) setIsGenAiResponseLoading(true)
+        }
+    }, [messagesString, chatSessionString, suggestedPrompts.length])
 
     async function updateChatMessage(props: { message: Message }) {
         const targetChatSessionId = chatSession?.id;

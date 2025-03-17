@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import ContentLayout from "@cloudscape-design/components/content-layout";
 import Box from "@cloudscape-design/components/box";
 import Container from "@cloudscape-design/components/container";

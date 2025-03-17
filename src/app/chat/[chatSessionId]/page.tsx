@@ -1,6 +1,6 @@
 "use client"
 import { stringify } from 'yaml'
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic'
 
 import type { Schema } from '@/../amplify/data/resource';
@@ -68,7 +68,6 @@ const jsonParseHandleError = (jsonString: string) => {
         console.warn(`Could not parse string: ${jsonString}`)
     }
 }
-
 
 function Page({ params }: { params?: { chatSessionId: string } }) {
 
@@ -138,12 +137,62 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
 
     }, [user, initialActiveChatSession, params?.chatSessionId])
 
-    // Groupd the user's chat sessions
+    const groupChatsByMonth = useCallback((chatSessions: Array<Schema["ChatSession"]["type"]>): SideNavigationProps.Item[] => {
+        const grouped = chatSessions
+            .sort((a, b) => (a.createdAt && b.createdAt) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0)
+            .reduce((acc: { [key: string]: Array<Schema["ChatSession"]["type"]> }, session) => {
+                if (!session.createdAt) throw new Error("Chat session missing createdAt timestamp");
+
+                const date = new Date(session.createdAt);
+                const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+                if (!acc[monthYear]) {
+                    acc[monthYear] = [];
+                }
+
+                const insertIndex = acc[monthYear].findIndex(existingSession =>
+                    existingSession.createdAt && session.createdAt &&
+                    existingSession.createdAt < session.createdAt
+                );
+                // If no index found (insertIndex === -1), push to end, otherwise insert at index
+                if (insertIndex === -1) {
+                    acc[monthYear].push(session);
+                } else {
+                    acc[monthYear].splice(insertIndex, 0, session);
+                }
+                return acc;
+            }, {});
+
+        return Object.entries(grouped).map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
+            type: "section",
+            text: monthYear,
+            items: [{
+                type: "link",
+                href: `/chat`,
+                text: "",
+                info: <Tiles
+                    onChange={({ detail }) => {
+                        router.push(`/chat/${detail.value}`);
+                    }}
+                    value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
+                    items={
+                        groupedChatSessions.map((groupedChatSession) => ({
+                            controlId: groupedChatSession.id,
+                            label: groupedChatSession.firstMessageSummary?.slice(0, 50),
+                            description: `${formatDate(groupedChatSession.createdAt)} - AI: ${groupedChatSession.aiBotInfo?.aiBotName || 'Unknown'}`,
+                            value: groupedChatSession.id
+                        }))
+                    }
+                />
+            }]
+        }));
+    }, [router, params]);
+
     useEffect(() => {
         console.log("Grouping Chat Sessions")
         const newGroupedChatSessions = groupChatsByMonth(chatSessions)
         setGroupedChatSessions(newGroupedChatSessions)
-    }, [chatSessions])
+    }, [chatSessions, groupChatsByMonth])
 
     async function createChatSession(chatSession: Schema['ChatSession']['createType']) {
         // setMessages([])
@@ -196,61 +245,6 @@ function Page({ params }: { params?: { chatSessionId: string } }) {
             // const newSuggestedPrompts = JSON.parse(suggestedPromptsResponse.data).suggestedPrompts as string[]
         } else console.log('Error Generating Glossary: ', generateGlossaryResponse)
     }
-
-
-
-    // Helper function to group chat sessions by month
-    const groupChatsByMonth = (chatSessions: Array<Schema["ChatSession"]["type"]>): SideNavigationProps.Item[] => {
-        const grouped = chatSessions
-            .sort((a, b) => (a.createdAt && b.createdAt) ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : 0)
-            .reduce((acc: { [key: string]: Array<Schema["ChatSession"]["type"]> }, session) => {
-                if (!session.createdAt) throw new Error("Chat session missing createdAt timestamp");
-
-                const date = new Date(session.createdAt);
-                const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
-
-                if (!acc[monthYear]) {
-                    acc[monthYear] = [];
-                }
-
-                const insertIndex = acc[monthYear].findIndex(existingSession =>
-                    existingSession.createdAt && session.createdAt &&
-                    existingSession.createdAt < session.createdAt
-                );
-                // If no index found (insertIndex === -1), push to end, otherwise insert at index
-                if (insertIndex === -1) {
-                    acc[monthYear].push(session);
-                } else {
-                    acc[monthYear].splice(insertIndex, 0, session);
-                }
-                return acc;
-            }, {});
-
-        return Object.entries(grouped).map(([monthYear, groupedChatSessions]): SideNavigationProps.Item => ({
-            type: "section",
-            text: monthYear,
-            items: [{
-                type: "link",
-                href: `/chat`,
-                text: "",
-                info: <Tiles
-                    onChange={({ detail }) => {
-                        router.push(`/chat/${detail.value}`);
-                    }}
-                    value={(params && params.chatSessionId) ? params.chatSessionId : "No Active Chat Session"}
-
-                    items={
-                        groupedChatSessions.map((groupedChatSession) => ({
-                            controlId: groupedChatSession.id,
-                            label: groupedChatSession.firstMessageSummary?.slice(0, 50),
-                            description: `${formatDate(groupedChatSession.createdAt)} - AI: ${groupedChatSession.aiBotInfo?.aiBotName || 'Unknown'}`,
-                            value: groupedChatSession.id
-                        }))
-                    }
-                />
-            }]
-        }));
-    };
 
     return (
         <div className='page-container'>
