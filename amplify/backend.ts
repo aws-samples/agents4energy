@@ -107,7 +107,6 @@ backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   )
 )
 
-//This may be unneccessary TODO figur out if this is required.
 backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     resources: [
