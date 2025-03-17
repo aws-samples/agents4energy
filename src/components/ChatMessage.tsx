@@ -101,7 +101,8 @@ export default memo(function Messages(
                             <ButtonGroup
                                 ariaLabel="Chat bubble actions"
                                 variant="icon"
-                                onItemClick={async ({ detail }) => {
+                                onItemClick={async ({ detail }) => { go-live-updates
+
                                     switch (detail.id) {
                                         case "dislike":
                                             console.log("dislike");
