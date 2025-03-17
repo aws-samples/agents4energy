@@ -24,7 +24,7 @@ const MAX_RETRIES = 3
 
 const PlanStepSchema = z.object({
     title: z.string(),
-    role: z.enum(['ai', 'human']),//TODO: add the human role so human input can be awaited.
+    role: z.enum(['ai', 'human']),
     description: z.string(),
     toolCalls: z.array(z.any()).optional(),
     result: z.string().optional()

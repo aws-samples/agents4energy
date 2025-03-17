@@ -101,10 +101,7 @@ export default memo(function Messages(
                             <ButtonGroup
                                 ariaLabel="Chat bubble actions"
                                 variant="icon"
-                                onItemClick={async ({ detail }) => {
-                                    //TODO: Impliment user feedback
-                                    // ["like", "dislike"].includes(detail.id) &&
-                                    // setFeedback(detail.pressed ? detail.id : "")
+                                onItemClick={async ({ detail }) => { go-live-updates
 
                                     switch (detail.id) {
                                         case "dislike":

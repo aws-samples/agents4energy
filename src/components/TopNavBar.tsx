@@ -12,19 +12,10 @@ import logoSmallTopNavigation from '@/a4e-logo.png';
 
 const TopNavBar = () => {
   // const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
-  const { signOut } = useAuthenticator(context => [context.user]);
+  const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
   // const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
 
   const { userAttributes } = useUserAttributes();
-
-  // //TODO Impliment the dropdown menu for the user menu
-  // const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
-  //   setAnchorElUser(event.currentTarget);
-  // };
-
-  // const handleCloseUserMenu = () => {
-  //   setAnchorElUser(null);
-  // };
 
   // To support dark mode
   const [useDarkMode, setUseDarkMode] = useState(false);
@@ -38,51 +29,25 @@ const TopNavBar = () => {
       <TopNavigation
         identity={{
           href: "/",
-          title: "Agents4Energy",
+          title: "Agents4Energy - Sample",
           logo: {
             src: logoSmallTopNavigation.src,
             alt: "A4E"
           }
         }}
         utilities={[
-          {
-            type: "menu-dropdown",
+          ...(authStatus === 'authenticated' ? [{
+            type: "menu-dropdown" as const,
             text: userAttributes?.email || "Customer Name",
             // description: userAttributes?.email || "email@example.com",
-            iconName: "user-profile",
-            onItemClick: (item) => {
+            iconName: "user-profile" as const,
+            onItemClick: (item: { detail: { id: string } }) => {
               if (item.detail.id === 'signout') signOut()
             },
             items: [
-              // { id: "profile", text: "Profile" },
-              // { id: "preferences", text: "Preferences" },
-              // { id: "security", text: "Security" },
-              // {
-              //   id: "support-group",
-              //   text: "Support",
-              //   items: [
-              //     {
-              //       id: "documentation",
-              //       text: "Documentation",
-              //       href: "#",
-              //       external: true,
-              //       externalIconAriaLabel:
-              //         " (opens in new tab)"
-              //     },
-              //     { id: "support", text: "Support" },
-              //     {
-              //       id: "feedback",
-              //       text: "Feedback",
-              //       href: "#",
-              //       external: true,
-              //       externalIconAriaLabel:
-              //         " (opens in new tab)"
-              //     }
-              //   ]
-              // },
               { id: "signout", text: "Sign out"}
             ]
-          },
+          }] : [])
         ]}
       />
       <div className='dark-mode-toggle'>

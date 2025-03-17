@@ -86,8 +86,6 @@ export const queryGQLToolBuilder = (props: { amplifyClientWrapper: AmplifyClient
                     console.log('Invoke production agent (timeout is expected): ', error)
                 })
 
-
-                //TODO: Replace this with a subscription
                 const waitForResponse = async (): Promise<ChatMessage[]> => {
                     return new Promise((resolve) => {
                         // Every few seconds check if the most recent chat message has the correct type

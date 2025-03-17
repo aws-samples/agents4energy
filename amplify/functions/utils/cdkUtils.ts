@@ -65,7 +65,7 @@ export const addLlmAgentPolicies = (props: {
             ],
             resources: [
                 `arn:aws:glue:${props.rootStack.region}:${props.rootStack.account}:catalog`,
-                `arn:aws:glue:${props.rootStack.region}:${props.rootStack.account}:database/*`,//TODO look at scoping this down
+                `arn:aws:glue:${props.rootStack.region}:${props.rootStack.account}:database/*`,
                 `arn:aws:glue:${props.rootStack.region}:${props.rootStack.account}:table/*`
             ],
         })
