@@ -32,10 +32,6 @@ export const cdkNagSupperssionsHandler = (stack: Stack) => {
     {
       id: 'AwsSolutions-RDS10',
       reason: `This rds database in this sample is meant to be deleted and not for production traffic.`
-    },
-    {
-      id: 'AwsSolutions-SMG4',
-      reason: 'This demo does not require secret rotation'//TODO fix this
     }
   ];
 

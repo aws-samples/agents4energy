@@ -34,8 +34,7 @@ import { AppConfigurator } from './custom/appConfigurator'
 import { cdkNagSupperssionsHandler } from './custom/cdkNagHandler';
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
-
-import { petrophysicsAgentBuilder } from "./agents/petrophysics/petrophysics"
+import { petrophysicsAgentBuilder } from './agents/petrophysicsAgent/petrophysicsAgent';
 
 const resourceTags = {
   Project: 'agents-for-energy',
@@ -108,7 +107,6 @@ backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   )
 )
 
-//This may be unneccessary TODO figure out if this is required.
 backend.invokeBedrockAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     resources: [
@@ -182,8 +180,7 @@ applyTagsToRootStack()
 ///////////////////////////////////////////////////////////
 /////// Create the Production Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
-const productionAgentStack = backend.createStack('prodAgentStack')
-//Deploy the test data to the s3 bucket
+const productionAgentStack = backend.createStack('prodAgentStack');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentStack, 'sample-deployment', {
@@ -274,8 +271,7 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
 ///////////////////////////////////////////////////////////
 /////// Create the Maintenance Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
-const maintenanceAgentStack = backend.createStack('maintenanceAgentStack');
-
+const maintenanceAgentStack = backend.createStack('maintAgentStack')
 const {defaultDatabaseName, maintenanceAgent, maintenanceAgentAlias} = maintenanceAgentBuilder(maintenanceAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
@@ -292,9 +288,7 @@ backend.addOutput({
 ///////////////////////////////////////////////////////////
 /////// Create the Regulatory Agent Stack /////////////////
 ///////////////////////////////////////////////////////////
-
 const regulatoryAgentStack = backend.createStack('regAgentStack')
-
 const { regulatoryAgent, regulatoryAgentAlias, metric } = regulatoryAgentBuilder(regulatoryAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
@@ -310,21 +304,20 @@ backend.addOutput({
 ///////////////////////////////////////////////////////////
 /////// Create the Petrophysics Agent Stack ///////////////
 ///////////////////////////////////////////////////////////
-
-const petrophysicsAgentStack = backend.createStack('petrophysicsAgentStack');
-
-const { agent: petrophysicsAgent, agentAlias: petrophysicsAgentAlias } = petrophysicsAgentBuilder(petrophysicsAgentStack, {
+const petrophysicsAgentStack = backend.createStack('petroAgentStack')
+const { petrophysicsAgent, petrophysicsAgentAlias } = petrophysicsAgentBuilder(petrophysicsAgentStack, {
   vpc: vpc,
   s3Deployment: uploadToS3Deployment, // This causes the assets here to not deploy until the s3 upload is complete.
   s3Bucket: backend.storage.resources.bucket
-});
-
+})
 backend.addOutput({
   custom: {
     petrophysicsAgentId: petrophysicsAgent.attrAgentId,
     petrophysicsAgentAliasId: petrophysicsAgentAlias.attrAgentAliasId,
   },
-});
+})
+
+
 
 ///////////////////////////////////////////////////////////
 /////// Create the Configurator Stack /////////////////////
@@ -344,4 +337,3 @@ new AppConfigurator(configuratorStack, 'appConfigurator', {
   preSignUpFunction: backend.preSignUp.resources.lambda,
   cognitoUserPool: backend.auth.resources.userPool,
 })
-

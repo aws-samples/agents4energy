@@ -83,10 +83,6 @@ const schema = a.schema({
       planGoal: a.string(),
       planSteps: a.string().array(),
       pastSteps: a.string().array(),
-      // planState: a.customType({
-      //   plan: a.json().array(),
-      //   pastSteps: a.json().array(),
-      // })
     })
     .authorization((allow) => [allow.owner(), allow.authenticated().to(['read'])]), //The allow.authenticated() allows other users to view chat sessions.
 
@@ -95,7 +91,6 @@ const schema = a.schema({
       chatSessionId: a.id(),
       session: a.belongsTo("ChatSession", "chatSessionId"),
       content: a.string().required(),
-      // contentBlocks: a.json(),
       trace: a.string(),
       role: a.enum(["human", "ai", "tool"]),
       chatSessionIdDashFieldName: a.string().default("none"), //This exists to let agents pull their messages in a multi agent environment
@@ -105,7 +100,8 @@ const schema = a.schema({
       tool_call_id: a.string(), //This is the langchain tool call id
       tool_name: a.string(),
       tool_calls: a.json(),
-      responseComplete: a.boolean().default(false)
+      responseComplete: a.boolean().default(false),
+      userFeedback: a.enum(["like", "dislike", "none"])
     })
     .secondaryIndexes((index) => [
       index("chatSessionId").sortKeys(["createdAt"]),
