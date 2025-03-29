@@ -1,12 +1,14 @@
-https://ocdimage.emnrd.nm.gov/imaging/WellFileView.aspx?RefType=WF&RefID=30039077300000
+# Production Agent Demo Script
+
+[Well File View](https://ocdimage.emnrd.nm.gov/imaging/WellFileView.aspx?RefType=WF&RefID=30039077300000)
 
 Petroleum engineers spend a lot of their time reading well reports. In this demo I'll show how you can make that process much more efficient.
 
 Here we have a sample set of pdf documents from the state of New Mexico's website about a certain well in the San Juan basin.
 
-Now say this well developed a hole in tubing. Traditionally, I'd have to go read all of these documents and take notes to understand what happened in the past on this well. That can take a lot of time and it can be quite tedious. 
+Now say this well developed a hole in tubing. Traditionally, I'd have to go read all of these documents and take notes to understand what happened in the past on this well. That can take a lot of time and it can be quite tedious.
 
-Instead of doing that, I can let an AI agent read all these PDFs for me, then summarize their information and plot the well’s production with these events. That way I can quickly get the context I need to write a procedure and fix this well.
+Instead of doing that, I can let an AI agent read all these PDFs for me, then summarize their information and plot the well's production with these events. That way I can quickly get the context I need to write a procedure and fix this well.
 
 Here is a demo of that happening. This is a chat with the AI agent. I've asked it to make a table with detailed information about all of the events.
 
