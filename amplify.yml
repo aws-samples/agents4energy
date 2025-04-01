@@ -2,15 +2,14 @@ version: 1
 env:
   variables:
     NODE_OPTIONS: "--max-old-space-size=4096"
-
 backend:
   phases:
     preBuild:
       commands:
         - echo "Build environment is $CODEBUILD_BUILD_IMAGE"
-        - nvm install 20
-        - nvm use 20
-        - node -v
+        - echo "Current Node version $(node -v)"
+        - n 20
+        - echo "Updated Node version $(node -v)"
         - npm -v
         - npm config set registry https://registry.npmjs.org/
         - npm config set strict-ssl false
@@ -30,9 +29,9 @@ frontend:
     preBuild:
       commands:
         - echo "Build environment is $CODEBUILD_BUILD_IMAGE"
-        - nvm install 20
-        - nvm use 20
-        - node -v
+        - echo "Current Node version $(node -v)"
+        - n 20
+        - echo "Updated Node version $(node -v)"
         - npm -v
         - npm config set registry https://registry.npmjs.org/
         - npm config set strict-ssl false
