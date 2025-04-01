@@ -7,6 +7,7 @@
     "cdkDiff": "cdk diff --ci --app \"npx tsx amplify/backend.ts\" --output .amplify/artifacts/cdk.out --context amplify-backend-name=$(whoami) --context amplify-backend-namespace=$(node -e \"console.log(require('./package.json').name)\") --context amplify-backend-type=sandbox",
     "dev": "next dev",
     "build": "next build",
+    "build:backend": "echo \"No backend build needed\"",
     "start": "next start",
     "lint": "next lint"
   },
