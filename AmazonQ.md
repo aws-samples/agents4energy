@@ -23,7 +23,6 @@
 
 1. **Node.js Version Configuration**
    - Added `.nvmrc` file to specify Node.js v20.9.0
-   - Updated `amplify.yml` to use Node.js v20 in the build environment using the `n` version manager
    - Added `engines` field to package.json to specify Node.js >=20.0.0
 
 2. **Amplify CLI Version Update**
@@ -32,13 +31,10 @@
    - These versions align with the current Amplify Hosting service requirements
 
 3. **Build Process Improvements**
-   - Modified `amplify.yml` to skip the non-existent backend build script
-   - Added pre-installation of problematic packages
-   - Configured npm with retry settings and disabled strict SSL
+   - Added missing `build:backend` script to package.json
+   - Kept original amplify.yml configuration
    - Used `--legacy-peer-deps` flag to handle dependency conflicts
-
-4. **Memory Configuration**
-   - Added NODE_OPTIONS to increase available memory for build processes
+   - Pre-installed problematic packages (camelcase and camel-case)
 
 ## Best Practices for Dependency Management
 
