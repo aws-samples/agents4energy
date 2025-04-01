@@ -17,8 +17,8 @@ backend:
       commands:
         # Use npm install instead of npm ci to be more resilient
         - npm install --legacy-peer-deps --no-audit
-        # Continue with the rest of the build process
-        - npm run build:backend
+        # Skip the backend build since the script doesn't exist
+        - echo "Skipping backend build"
 frontend:
   phases:
     preBuild:
