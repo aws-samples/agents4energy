@@ -3,36 +3,14 @@ backend:
   phases:
     preBuild:
       commands:
-        - npm config set registry https://registry.npmjs.org/
-        - npm config set strict-ssl false
-        - npm config set fetch-retries 5
-        - npm config set fetch-retry-factor 2
-        - npm config set fetch-retry-mintimeout 10000
-        - npm config set fetch-retry-maxtimeout 60000
-        # Try to install packages individually to bypass the 403 errors
-        - npm install --no-save --no-package-lock camelcase@6.3.0
-        - npm install --no-save --no-package-lock camel-case@4.1.2
+        - echo "Build environment is $CODEBUILD_BUILD_IMAGE"
+        # - aws ecr-public get-login-password | docker login --username AWS --password-stdin public.ecr.aws
     build:
       commands:
-        # Use npm install instead of npm ci to be more resilient
-        - npm install --legacy-peer-deps --no-audit
-        # Continue with the rest of the build process
-        - npm run build:backend
+        - npm ci --cache .npm --prefer-offline
+        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --debug
 frontend:
   phases:
-    preBuild:
-      commands:
-        - npm config set registry https://registry.npmjs.org/
-        - npm config set strict-ssl false
-        - npm config set fetch-retries 5
-        - npm config set fetch-retry-factor 2
-        - npm config set fetch-retry-mintimeout 10000
-        - npm config set fetch-retry-maxtimeout 60000
-        # Try to install packages individually to bypass the 403 errors
-        - npm install --no-save --no-package-lock camelcase@6.3.0
-        - npm install --no-save --no-package-lock camel-case@4.1.2
-        # Use npm install instead of npm ci to be more resilient
-        - npm install --legacy-peer-deps --no-audit
     build:
       commands:
         - npm run build
@@ -42,4 +20,6 @@ frontend:
       - '**/*'
   cache:
     paths:
+      - .next/cache/**/*
+      - .npm/**/*
       - node_modules/**/*

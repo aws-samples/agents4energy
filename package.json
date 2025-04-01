@@ -7,7 +7,6 @@
     "cdkDiff": "cdk diff --ci --app \"npx tsx amplify/backend.ts\" --output .amplify/artifacts/cdk.out --context amplify-backend-name=$(whoami) --context amplify-backend-namespace=$(node -e \"console.log(require('./package.json').name)\") --context amplify-backend-type=sandbox",
     "dev": "next dev",
     "build": "next build",
-    "build:backend": "echo \"No backend build needed\"",
     "start": "next start",
     "lint": "next lint"
   },
@@ -27,7 +26,7 @@
     "@mui/material": "^6.4.3",
     "@mui/x-data-grid": "^7.22.1",
     "aws-amplify": "^6.12.2",
-    "bedrock-agents-cdk": "^0.0.6",
+    "bedrock-agents-cdk": "^0.0.11",
     "chart.js": "^4.4.6",
     "chartjs-adapter-date-fns": "^3.0.0",
     "chartjs-plugin-annotation": "^3.1.0",
@@ -52,8 +51,8 @@
     "yaml": "^2.7.0"
   },
   "devDependencies": {
-    "@aws-amplify/backend": "^1.15.0",
-    "@aws-amplify/backend-cli": "^1.6.0",
+    "@aws-amplify/backend": "^1.13.0",
+    "@aws-amplify/backend-cli": "^1.4.7",
     "@aws-appsync/utils": "^1.9.0",
     "@aws-sdk/client-appsync": "^3.670.0",
     "@aws-sdk/client-athena": "^3.679.0",
@@ -74,7 +73,7 @@
     "aws-cdk-lib": "^2.177.0",
     "aws-sdk": "^2.1691.0",
     "constructs": "^10.4.2",
-    "esbuild": "^0.25.2",
+    "esbuild": "^0.24.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.14",
     "jsdom": "^25.0.1",
@@ -82,9 +81,5 @@
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
-  },
-  "engines": {
-    "node": ">=20.0.0",
-    "npm": ">=10.0.0"
   }
 }
