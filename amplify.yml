@@ -4,13 +4,26 @@ backend:
     preBuild:
       commands:
         - echo "Build environment is $CODEBUILD_BUILD_IMAGE"
-        # - aws ecr-public get-login-password | docker login --username AWS --password-stdin public.ecr.aws
+        - npm config set registry https://registry.npmjs.org/
+        - npm config set strict-ssl false
+        - npm config set fetch-retries 5
+        - npm config set fetch-retry-factor 2
+        - npm config set fetch-retry-mintimeout 10000
+        - npm config set fetch-retry-maxtimeout 60000
     build:
       commands:
-        - npm ci --cache .npm --prefer-offline
-        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID --debug
+        - npm ci --no-audit
 frontend:
   phases:
+    preBuild:
+      commands:
+        - npm config set registry https://registry.npmjs.org/
+        - npm config set strict-ssl false
+        - npm config set fetch-retries 5
+        - npm config set fetch-retry-factor 2
+        - npm config set fetch-retry-mintimeout 10000
+        - npm config set fetch-retry-maxtimeout 60000
+        - npm ci --no-audit
     build:
       commands:
         - npm run build
@@ -20,6 +33,4 @@ frontend:
       - '**/*'
   cache:
     paths:
-      - .next/cache/**/*
-      - .npm/**/*
       - node_modules/**/*
