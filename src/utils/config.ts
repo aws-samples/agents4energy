@@ -64,8 +64,11 @@ export const defaultAgents: { [key: string]: BaseAgent | BedrockAgent | LangGrap
         agentId: outputs.custom.petrophysicsAgentId,
         agentAliasId: outputs.custom.petrophysicsAgentAliasId,
         samplePrompts: [
-            "How does rock physics affect oil and gas production?",
-            "Calculate the expected AVO Class for a gas saturated sandstone with 25% porosity, overlain by shale with Vp of 3200 m/s, Vs of 1800 m/s, and density of 2.4 g/cc"
-        ],
+            "Give me a summary fluid substitution modeling",
+            "Give me the inputs of Gassmann equation",
+            "What are AVO classes?",
+            "Calculate the intercept and gradient value of the wet sandstone with vp=3.5 km/s, vs=1.95 km/s, bulk density=2.23 gm/cc when it is overlain by a shale? Determine the AVO class.",
+            "A wet sandstone has vp=3.5 km/s, vs=1.95 km/s, bulk density=2.23 gm/cc. What are the expected seismic velocities of the sandstone if the desired ﬂuid saturation is 80% oil? Use standard assumptions."
+            ],
     } as BedrockAgent
 }
