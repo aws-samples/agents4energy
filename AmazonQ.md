@@ -21,20 +21,15 @@
 
 ## Applied Solutions
 
-1. **Node.js Version Configuration**
-   - Added `.nvmrc` file to specify Node.js v20.9.0
-   - Added `engines` field to package.json to specify Node.js >=20.0.0
+1. **Build Configuration Alignment**
+   - Synchronized package.json and amplify.yml with main branch
+   - Using standard Amplify build configuration with npm ci
+   - Removed custom build:backend script
 
-2. **Amplify CLI Version Update**
-   - Updated @aws-amplify/backend from 1.13.0 to 1.15.0
-   - Updated @aws-amplify/backend-cli from 1.4.7 to 1.6.0
-   - These versions align with the current Amplify Hosting service requirements
-
-3. **Build Process Improvements**
-   - Added missing `build:backend` script to package.json
-   - Kept original amplify.yml configuration
-   - Used `--legacy-peer-deps` flag to handle dependency conflicts
-   - Pre-installed problematic packages (camelcase and camel-case)
+2. **Dependency Management**
+   - Using npm ci with cache for faster, more reliable builds
+   - Using --prefer-offline flag to prioritize cached packages
+   - Properly configured cache paths for node_modules and .npm
 
 ## Best Practices for Dependency Management
 
