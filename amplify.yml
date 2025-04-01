@@ -1,47 +1,37 @@
 version: 1
-env:
-  variables:
-    NODE_OPTIONS: "--max-old-space-size=4096"
 backend:
   phases:
     preBuild:
       commands:
-        - echo "Build environment is $CODEBUILD_BUILD_IMAGE"
-        - echo "Current Node version $(node -v)"
-        - n 20
-        - echo "Updated Node version $(node -v)"
-        - npm -v
         - npm config set registry https://registry.npmjs.org/
         - npm config set strict-ssl false
         - npm config set fetch-retries 5
         - npm config set fetch-retry-factor 2
         - npm config set fetch-retry-mintimeout 10000
         - npm config set fetch-retry-maxtimeout 60000
-        # Pre-install problematic packages
+        # Try to install packages individually to bypass the 403 errors
         - npm install --no-save --no-package-lock camelcase@6.3.0
         - npm install --no-save --no-package-lock camel-case@4.1.2
     build:
       commands:
+        # Use npm install instead of npm ci to be more resilient
         - npm install --legacy-peer-deps --no-audit
-        - echo "Skipping backend build - no build:backend script defined"
+        # Continue with the rest of the build process
+        - npm run build:backend
 frontend:
   phases:
     preBuild:
       commands:
-        - echo "Build environment is $CODEBUILD_BUILD_IMAGE"
-        - echo "Current Node version $(node -v)"
-        - n 20
-        - echo "Updated Node version $(node -v)"
-        - npm -v
         - npm config set registry https://registry.npmjs.org/
         - npm config set strict-ssl false
         - npm config set fetch-retries 5
         - npm config set fetch-retry-factor 2
         - npm config set fetch-retry-mintimeout 10000
         - npm config set fetch-retry-maxtimeout 60000
-        # Pre-install problematic packages
+        # Try to install packages individually to bypass the 403 errors
         - npm install --no-save --no-package-lock camelcase@6.3.0
         - npm install --no-save --no-package-lock camel-case@4.1.2
+        # Use npm install instead of npm ci to be more resilient
         - npm install --legacy-peer-deps --no-audit
     build:
       commands:
