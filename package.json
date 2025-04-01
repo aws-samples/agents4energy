@@ -51,8 +51,8 @@
     "yaml": "^2.7.0"
   },
   "devDependencies": {
-    "@aws-amplify/backend": "^1.13.0",
-    "@aws-amplify/backend-cli": "^1.4.7",
+    "@aws-amplify/backend": "^1.15.0",
+    "@aws-amplify/backend-cli": "^1.6.0",
     "@aws-appsync/utils": "^1.9.0",
     "@aws-sdk/client-appsync": "^3.670.0",
     "@aws-sdk/client-athena": "^3.679.0",
@@ -81,5 +81,9 @@
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
   }
 }
