@@ -23,7 +23,7 @@
 
 1. **Node.js Version Configuration**
    - Added `.nvmrc` file to specify Node.js v20.9.0
-   - Updated `amplify.yml` to use Node.js v20 in the build environment
+   - Updated `amplify.yml` to use Node.js v20 in the build environment using the `n` version manager
    - Added `engines` field to package.json to specify Node.js >=20.0.0
 
 2. **Amplify CLI Version Update**
