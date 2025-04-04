@@ -144,6 +144,9 @@ export class AuroraBedrockKnoledgeBase extends Construct {
                 \`, /* sql */ \`
                 CREATE INDEX on ${props.schemaName}.${tableName}
                 USING hnsw (${vectorField} vector_cosine_ops);
+                \`, /* sql */ \`
+                CREATE INDEX ON ${props.schemaName}.${tableName} 
+                USING gin (to_tsvector('simple', ${textField}));
                 \`
               ]
               
