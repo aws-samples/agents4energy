@@ -1,4 +1,3 @@
-
 import { stringify } from "yaml"
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib'
@@ -30,7 +29,7 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { AuroraBedrockKnoledgeBase } from "../../constructs/bedrockKnoledgeBase";
+import { AuroraBedrockKnowledgeBase } from "../../constructs/bedrockKnowledgeBase";
 
 import { addLlmAgentPolicies } from '../../functions/utils/cdkUtils'
 
@@ -103,6 +102,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         timeout: cdk.Duration.minutes(15),
         memorySize: 3000,
         role: lambdaLlmAgentRole,
+        logRetention: logs.RetentionDays.ONE_MONTH,
         environment: {
             DATA_BUCKET_NAME: props.s3Bucket.bucketName,
             // MODEL_ID: 'us.anthropic.claude-3-5-sonnet-20240620-v1:0'
@@ -124,11 +124,15 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     const pdfDlQueue = new sqs.Queue(scope, 'PdfToYamlDLQ', {
         retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days
+        encryption: sqs.QueueEncryption.KMS_MANAGED,
+        enforceSSL: true
     });
 
-    // Create the main queue for processing
+    // Create the main queue for processing with improved security
     const pdfProcessingQueue = new sqs.Queue(scope, 'PdfToYamlQueue', {
         visibilityTimeout: cdk.Duration.minutes(16), // Should match or exceed lambda timeout
+        encryption: sqs.QueueEncryption.KMS_MANAGED,
+        enforceSSL: true,
         deadLetterQueue: {
             queue: pdfDlQueue,
             maxReceiveCount: 3 // Number of retries before sending to DLQ
@@ -208,6 +212,11 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         enableDataApi: true,
         iamAuthentication: true,
         storageEncrypted: true,
+        backup: {
+            retention: cdk.Duration.days(7),
+            preferredWindow: '02:00-03:00'
+        },
+        deletionProtection: true,
         writer: rds.ClusterInstance.serverlessV2('writer'),
         serverlessV2MinCapacity: 0.5,
         serverlessV2MaxCapacity: 2,
@@ -216,7 +225,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
         vpc: props.vpc,
         port: 5432,
-        removalPolicy: cdk.RemovalPolicy.DESTROY
+        removalPolicy: cdk.RemovalPolicy.SNAPSHOT
     });
     hydrocarbonProductionDb.secret?.addRotationSchedule('RotationSchedule', {
         hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
@@ -226,12 +235,67 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     });
     const writerNode = hydrocarbonProductionDb.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
 
-    //Allow inbound traffic from the default SG in the VPC
-    hydrocarbonProductionDb.connections.securityGroups[0].addIngressRule(
-        ec2.Peer.securityGroupId(props.vpc.vpcDefaultSecurityGroup),
+    //Create a dedicated security group for database access
+    const dbAccessSecurityGroup = new ec2.SecurityGroup(scope, 'DbAccessSecurityGroup', {
+        vpc: props.vpc,
+        description: 'Security group for RDS database access',
+        allowAllOutbound: false
+    });
+    
+    // Add specific egress rule for database access only
+    dbAccessSecurityGroup.addEgressRule(
+        ec2.Peer.ipv4(props.vpc.vpcCidrBlock),
         ec2.Port.tcp(5432),
-        'Allow inbound traffic from default SG'
+        'Allow outbound traffic to database within VPC only'
     );
+    
+    // Add specific egress rule for S3 access
+    dbAccessSecurityGroup.addEgressRule(
+        ec2.Peer.ipv4('0.0.0.0/0'),
+        ec2.Port.tcp(443),
+        'Allow outbound HTTPS for S3 access'
+    );
+    
+    //Allow only specific inbound traffic on the database port
+    hydrocarbonProductionDb.connections.allowFrom(dbAccessSecurityGroup, ec2.Port.tcp(5432), 'Allow access from applications');
+
+    // Create VPC endpoints for AWS services to minimize public internet exposure
+    const s3Endpoint = new ec2.GatewayVpcEndpoint(scope, 'S3Endpoint', {
+        vpc: props.vpc,
+        service: ec2.GatewayVpcEndpointAwsService.S3
+    });
+
+    const secretsManagerEndpoint = new ec2.InterfaceVpcEndpoint(scope, 'SecretsManagerEndpoint', {
+        vpc: props.vpc,
+        service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+        privateDnsEnabled: true,
+        subnets: {
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS
+        }
+    });
+    
+    const athenaEndpoint = new ec2.InterfaceVpcEndpoint(scope, 'AthenaEndpoint', {
+        vpc: props.vpc,
+        service: ec2.InterfaceVpcEndpointAwsService.ATHENA,
+        privateDnsEnabled: true,
+        subnets: {
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS
+        }
+    });
+    
+    const lambdaEndpoint = new ec2.InterfaceVpcEndpoint(scope, 'LambdaEndpoint', {
+        vpc: props.vpc,
+        service: ec2.InterfaceVpcEndpointAwsService.LAMBDA,
+        privateDnsEnabled: true,
+        subnets: {
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS
+        }
+    });
+    
+    // Allow the security group to access the VPC endpoints
+    secretsManagerEndpoint.connections.allowFrom(dbAccessSecurityGroup, ec2.Port.tcp(443));
+    athenaEndpoint.connections.allowFrom(dbAccessSecurityGroup, ec2.Port.tcp(443));
+    lambdaEndpoint.connections.allowFrom(dbAccessSecurityGroup, ec2.Port.tcp(443));
 
     const athenaWorkgroup = new athena.CfnWorkGroup(scope, 'FedQueryWorkgroup', {
         name: `${stackName}-fed_query_workgroup`.slice(-64),
@@ -263,7 +327,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             SecretNamePrefix: `A4E`,
             SpillBucket: props.s3Bucket.bucketName,
             SpillPrefix: `athena-spill/${rootStack.stackName}`,
-            SecurityGroupIds: props.vpc.vpcDefaultSecurityGroup,
+            SecurityGroupIds: dbAccessSecurityGroup.securityGroupId,
             SubnetIds: props.vpc.privateSubnets.map(subnet => subnet.subnetId).join(',')
         })
     })
@@ -296,7 +360,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     },
     // });
 
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "TableDefinition", {
+    const sqlTableDefBedrockKnowledgeBase = new AuroraBedrockKnowledgeBase(scope, "TableDefinition", {
         vpc: props.vpc,
         bucket: props.s3Bucket,
         schemaName: 'bedrock_integration'
@@ -316,14 +380,14 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 chunkingStrategy: 'NONE' // This sets the whole file as a single chunk
             }
         },
-        knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
+        knowledgeBaseId: sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId
     })
 
-    // const petroleumEngineeringKnowledgeBase = new AuroraBedrockKnoledgeBase(scope, "PetrolumEngineeringKB", {
+    // const petroleumEngineeringKnowledgeBase = new AuroraBedrockKnowledgeBase(scope, "PetrolumEngineeringKB", {
     //     vpc: props.vpc,
     //     bucket: props.s3Bucket,
     //     schemaName: 'petroleum_kb',
-    //     vectorStorePostgresCluster: sqlTableDefBedrockKnoledgeBase.vectorStorePostgresCluster
+    //     vectorStorePostgresCluster: sqlTableDefBedrockKnowledgeBase.vectorStorePostgresCluster
     // })
 
     // const PetroWikiKnowledgeBase = new BedrockKnowledgeBaseOSS(scope, 'PetroWikiKnowledgeBase', {
@@ -376,7 +440,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     lambdaLlmAgentRole.addToPrincipalPolicy(new iam.PolicyStatement({
         actions: ["bedrock:StartIngestionJob"],
-        resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn]
+        resources: [sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn]
     }))
 
     // Create a Glue Database
@@ -434,6 +498,12 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         runtime: lambda.Runtime.NODEJS_LATEST,
         entry: path.join(__dirname, '..', '..', 'functions', 'configureProdDb', 'index.ts'),
         timeout: cdk.Duration.seconds(300),
+        vpc: props.vpc,
+        securityGroups: [dbAccessSecurityGroup],
+        vpcSubnets: {
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
+        logRetention: logs.RetentionDays.ONE_MONTH,
         environment: {
             CLUSTER_ARN: hydrocarbonProductionDb.clusterArn,
             SECRET_ARN: hydrocarbonProductionDb.secret!.secretArn,
@@ -441,7 +511,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
             S3_BUCKET_NAME: props.s3Bucket.bucketName,
             // ATHENA_SAMPLE_DATA_SOURCE_NAME: athenaPostgresCatalog.name,
-            TABLE_DEF_KB_ID: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            TABLE_DEF_KB_ID: sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId,
             TABLE_DEF_KB_DS_ID: productionAgentTableDefDataSource.attrDataSourceId,
         },
     });
@@ -480,7 +550,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     configureProdDbFunction.addToRolePolicy(
         new iam.PolicyStatement({
             actions: ['bedrock:startIngestionJob'],
-            resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn],
+            resources: [sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn],
         })
     )
 
@@ -516,7 +586,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         action: 'startIngestionJob',
         parameters: {
             dataSourceId: productionAgentTableDefDataSource.attrDataSourceId,
-            knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            knowledgeBaseId: sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId,
         },
         physicalResourceId: cr.PhysicalResourceId.of('startKbIngestion'),
     }
@@ -527,7 +597,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         policy: cr.AwsCustomResourcePolicy.fromStatements([
             new iam.PolicyStatement({
                 actions: ['bedrock:startIngestionJob'],
-                resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn],
+                resources: [sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn],
             }),
         ]),
     });
@@ -549,10 +619,16 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         },
         timeout: cdk.Duration.minutes(15),
         role: lambdaLlmAgentRole,
+        vpc: props.vpc,
+        securityGroups: [dbAccessSecurityGroup],
+        vpcSubnets: {
+            subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        },
+        logRetention: logs.RetentionDays.ONE_MONTH,
         environment: {
             ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
             S3_BUCKET_NAME: props.s3Bucket.bucketName,
-            TABLE_DEF_KB_ID: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            TABLE_DEF_KB_ID: sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId,
             TABLE_DEF_KB_DS_ID: productionAgentTableDefDataSource.attrDataSourceId,
             PROD_GLUE_DB_NAME: productionGlueDatabase.ref
         }
@@ -749,7 +825,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         wellFileDriveBucket: wellFileDriveBucket,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
-        sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
+        sqlTableDefBedrockKnowledgeBase: sqlTableDefBedrockKnowledgeBase,
         petroleumEngineeringKnowledgeBase: petroleumEngineeringKnowledgeBase,
         athenaWorkgroup: athenaWorkgroup,
         // athenaPostgresCatalog: athenaPostgresCatalog

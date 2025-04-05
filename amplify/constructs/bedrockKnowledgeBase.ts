@@ -5,6 +5,7 @@ import {
   aws_bedrock as bedrock,
   aws_rds as rds,
   aws_iam as iam,
+  aws_secretsmanager as secretsmanager,
   aws_lambda as lambda,
   custom_resources as cr
 } from 'aws-cdk-lib';
@@ -17,40 +18,7 @@ export interface KnowledgeBaseProps {
   vectorStorePostgresCluster?: rds.DatabaseCluster;
 }
 
-
-
-// const ExecuteSQLStatementRescource = (scope: Construct, id: string, props: {
-//   vectorStorePostgresCluster: rds.DatabaseCluster | rds.ServerlessCluster,
-//   sqlCommand: string
-// }) => (
-//   new cr.AwsCustomResource(scope, id, {
-//     onCreate: {
-//       service: 'RDSDataService',
-//       action: 'executeStatement',
-//       parameters: {
-// resourceArn: props.vectorStorePostgresCluster.clusterArn,
-// database: defaultDatabaseName,
-// sql: props.sqlCommand,
-// secretArn: props.vectorStorePostgresCluster.secret!.secretArn,
-//       },
-//       physicalResourceId: cr.PhysicalResourceId.of(id),
-//     },
-//     policy: cr.AwsCustomResourcePolicy.fromStatements([
-//       new iam.PolicyStatement({
-//         actions: [
-//           'rds-data:ExecuteStatement',
-//         ],
-//         resources: [props.vectorStorePostgresCluster.clusterArn],
-//       }),
-//       new iam.PolicyStatement({
-//         actions: ['secretsmanager:GetSecretValue'],
-//         resources: [props.vectorStorePostgresCluster.secret!.secretArn],
-//       }),
-//     ]),
-//   })
-// )
-
-export class AuroraBedrockKnoledgeBase extends Construct {
+export class AuroraBedrockKnowledgeBase extends Construct {
   public readonly knowledgeBase: bedrock.CfnKnowledgeBase;
   public readonly embeddingModelArn: string
   public readonly vectorStorePostgresCluster: rds.DatabaseCluster
@@ -63,13 +31,14 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     this.vectorStoreSchemaName = props.schemaName
 
     const defaultDatabaseName = 'bedrock_vector_db'
-    // const schemaName = 'bedrock_integration'
     const tableName = 'bedrock_kb'
     const primaryKeyField = 'id'
     const vectorField = 'embedding'
     const textField = 'chunks'
     const metadataField = 'metadata'
     const vectorDimensions = 1024
+
+    const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
 
     const rootStack = cdk.Stack.of(scope).nestedStackParent
     if (!rootStack) throw new Error('Root stack not found')
@@ -79,12 +48,13 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     //If a database cluster is not supplied in the props, create one
     this.vectorStorePostgresCluster = props.vectorStorePostgresCluster ? props.vectorStorePostgresCluster :
-      new rds.DatabaseCluster(scope, `VectorStoreAuroraCluster-${id}`, {
-        // const vectorStorePostgresCluster = new rds.DatabaseCluster(scope, 'VectorStoreAuroraCluster-1', {
+      new rds.DatabaseCluster(scope, `VectorStore-${id}-${stackUUID}`, {
         engine: rds.DatabaseClusterEngine.auroraPostgres({
           version: rds.AuroraPostgresEngineVersion.VER_16_4,
         }),
         enableDataApi: true,
+        iamAuthentication: true,
+        storageEncrypted: true,
         defaultDatabaseName: defaultDatabaseName,
         writer: rds.ClusterInstance.serverlessV2('writer'),
         serverlessV2MinCapacity: 0.5,
@@ -93,29 +63,22 @@ export class AuroraBedrockKnoledgeBase extends Construct {
           subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
         },
         vpc: props.vpc,
-        port: 2000,
-        removalPolicy: cdk.RemovalPolicy.DESTROY
+        port: 5432,
+        backup: {
+          retention: cdk.Duration.days(7),
+          preferredWindow: '03:00-04:00'
+        },
+        deletionProtection: true,
+        removalPolicy: cdk.RemovalPolicy.SNAPSHOT
       });
+    this.vectorStorePostgresCluster.secret?.addRotationSchedule('RotationSchedule', {
+      hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
+        functionName: `SecretRotation-${id}-${stackUUID}`
+      }),
+      automaticallyAfter: cdk.Duration.days(30),
+    });
     // Wait until this writer node is created before running sql queries against the db
     this.vectorStoreWriterNode = this.vectorStorePostgresCluster.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
-
-    // const sqlCommands = [
-    //   /* sql */ `
-    //   CREATE EXTENSION IF NOT EXISTS vector;
-    //   `, /* sql */ `
-    //   CREATE SCHEMA ${props.schemaName};
-    //   `,/* sql */`
-    //   CREATE TABLE ${props.schemaName}.${tableName} (
-    //   ${primaryKeyField} uuid PRIMARY KEY,
-    //   ${vectorField} vector(${vectorDimensions}),
-    //   ${textField} text, 
-    //   ${metadataField} json
-    //   );
-    //   `, /* sql */ `
-    //   CREATE INDEX on ${props.schemaName}.${tableName}
-    //   USING hnsw (${vectorField} vector_cosine_ops);
-    //   `
-    // ]
 
     // Create a Lambda function that runs SQL statements to prepare the postgres cluster to be a vector store
     const prepVectorStoreFunction = new lambda.Function(scope, `PrepVectorStoreFunction-${id}`, {
@@ -145,7 +108,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
                 CREATE INDEX on ${props.schemaName}.${tableName}
                 USING hnsw (${vectorField} vector_cosine_ops);
                 \`, /* sql */ \`
-                CREATE INDEX ON ${props.schemaName}.${tableName} 
+                CREATE INDEX on ${props.schemaName}.${tableName} 
                 USING gin (to_tsvector('simple', ${textField}));
                 \`
               ]
@@ -177,7 +140,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
       actions: ['secretsmanager:GetSecretValue'],
       resources: [this.vectorStorePostgresCluster.secret!.secretArn],
     }))
-    
+
 
     // Create a Custom Resource that invokes the lambda function
     const prepVectorStore = new cr.AwsCustomResource(scope, `PrepVectorStoreCluster-${id}`, {
@@ -201,46 +164,7 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
     prepVectorStore.node.addDependency(this.vectorStoreWriterNode)
 
-    // //// Here we execute the sql statements sequentially.
-    // const createPGExtenstion = ExecuteSQLStatementRescource(this, 'createPGExtenstion', {
-    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
-    //   sqlCommand: /* sql */`
-    //     CREATE EXTENSION IF NOT EXISTS vector;
-    //     `
-    // })
-    // createPGExtenstion.node.addDependency(writerNode)
-
-    // const createSchema = ExecuteSQLStatementRescource(this, 'createSchema', {
-    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
-    //   sqlCommand: /* sql */`
-    //     CREATE SCHEMA ${schemaName};
-    //     `
-    // })
-    // createSchema.node.addDependency(createPGExtenstion)
-
-    // const createVectorTable = ExecuteSQLStatementRescource(this, 'createVectorTable', {
-    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
-    //   sqlCommand: /* sql */`
-    //     CREATE TABLE ${schemaName}.${tableName} (
-    //     ${primaryKeyField} uuid PRIMARY KEY,
-    //     ${vectorField} vector(${vectorDimensions}),
-    //     ${textField} text, 
-    //     ${metadataField} json
-    //   );
-    //     `
-    // })
-    // createVectorTable.node.addDependency(createSchema)
-
-    // const createIndex = ExecuteSQLStatementRescource(this, 'createIndex', {
-    //   vectorStorePostgresCluster: vectorStorePostgresCluster,
-    //   sqlCommand: /* sql */`
-    //     CREATE INDEX on ${schemaName}.${tableName}
-    //     USING hnsw (${vectorField} vector_cosine_ops);
-    //     `
-    // })
-    // createIndex.node.addDependency(createVectorTable)
-
-    const knoledgeBaseRole = new iam.Role(this, `KbRole-${id}`,{//'sqlTableKbRole', {
+    const knowledgeBaseRole = new iam.Role(this, `KbRole-${id}`,{//'sqlTableKbRole', {
       assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
       inlinePolicies: {
         'KnowledgeBasePolicies': new iam.PolicyDocument({
@@ -277,8 +201,8 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     })
 
     this.knowledgeBase = new bedrock.CfnKnowledgeBase(this, "KnowledgeBase", {
-      name: `${id}-${rootStack.stackName.slice(-4)}`,
-      roleArn: knoledgeBaseRole.roleArn,
+      name: `${id.slice(0, 60)}-${stackUUID}`,
+      roleArn: knowledgeBaseRole.roleArn,
       description: 'This knowledge base stores sql table definitions',
       knowledgeBaseConfiguration: {
         type: 'VECTOR',

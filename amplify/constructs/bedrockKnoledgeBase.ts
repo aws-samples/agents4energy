@@ -63,8 +63,13 @@ export class AuroraBedrockKnoledgeBase extends Construct {
           subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
         },
         vpc: props.vpc,
-        port: 2000,
-        removalPolicy: cdk.RemovalPolicy.DESTROY
+        port: 5432,
+        backup: {
+          retention: cdk.Duration.days(7),
+          preferredWindow: '03:00-04:00'
+        },
+        deletionProtection: true,
+        removalPolicy: cdk.RemovalPolicy.SNAPSHOT
       });
     this.vectorStorePostgresCluster.secret?.addRotationSchedule('RotationSchedule', {
       hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
@@ -74,24 +79,6 @@ export class AuroraBedrockKnoledgeBase extends Construct {
     });
     // Wait until this writer node is created before running sql queries against the db
     this.vectorStoreWriterNode = this.vectorStorePostgresCluster.node.findChild('writer').node.defaultChild as rds.CfnDBInstance
-
-    // const sqlCommands = [
-    //   /* sql */ `
-    //   CREATE EXTENSION IF NOT EXISTS vector;
-    //   `, /* sql */ `
-    //   CREATE SCHEMA ${props.schemaName};
-    //   `,/* sql */`
-    //   CREATE TABLE ${props.schemaName}.${tableName} (
-    //   ${primaryKeyField} uuid PRIMARY KEY,
-    //   ${vectorField} vector(${vectorDimensions}),
-    //   ${textField} text, 
-    //   ${metadataField} json
-    //   );
-    //   `, /* sql */ `
-    //   CREATE INDEX on ${props.schemaName}.${tableName}
-    //   USING hnsw (${vectorField} vector_cosine_ops);
-    //   `
-    // ]
 
     // Create a Lambda function that runs SQL statements to prepare the postgres cluster to be a vector store
     const prepVectorStoreFunction = new lambda.Function(scope, `PrepVectorStoreFunction-${id}`, {
@@ -120,6 +107,9 @@ export class AuroraBedrockKnoledgeBase extends Construct {
                 \`, /* sql */ \`
                 CREATE INDEX on ${props.schemaName}.${tableName}
                 USING hnsw (${vectorField} vector_cosine_ops);
+                \`, /* sql */ \`
+                CREATE INDEX on ${props.schemaName}.${tableName} 
+                USING gin (to_tsvector('simple', ${textField}));
                 \`
               ]
               
