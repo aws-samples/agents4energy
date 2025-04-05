@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es2020",
+    "target": "es2021",
     "module": "esnext",
     "moduleResolution": "node",
     "composite": true,
@@ -9,11 +9,17 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "lib": ["es2021"],
     "paths": {
       "$amplify/*": [
         "../.amplify/generated/*"
-      ]
+      ],
+      "@/*": ["../src/*"]
     }
   },
-  "include": ["**/*.ts"]
+  "include": [
+    "**/*.ts", 
+    "../.amplify/generated/env/*.ts",
+    "../src/utils/**/*.ts"
+  ]
 }
