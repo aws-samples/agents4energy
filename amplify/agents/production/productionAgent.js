@@ -443,6 +443,16 @@ function productionAgentBuilder(scope, props) {
             }
         }
     }));
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            'ec2:CreateNetworkInterface',
+            'ec2:DescribeNetworkInterfaces',
+            'ec2:DeleteNetworkInterface',
+            'ec2:AssignPrivateIpAddresses',
+            'ec2:UnassignPrivateIpAddresses'
+        ],
+        resources: ['*']
+    }));
     (0, cdkUtils_1.addLlmAgentPolicies)({
         role: configureProdDbFunction.role,
         rootStack: rootStack,
@@ -530,6 +540,19 @@ function productionAgentBuilder(scope, props) {
             PROD_GLUE_DB_NAME: productionGlueDatabase.ref
         }
     });
+    // Add VPC network interface permissions to the Lambda role
+    lambdaLlmAgentRole.addToPrincipalPolicy(
+        new aws_cdk_lib_1.aws_iam.PolicyStatement({
+            actions: [
+                'ec2:CreateNetworkInterface',
+                'ec2:DescribeNetworkInterfaces',
+                'ec2:DeleteNetworkInterface',
+                'ec2:AssignPrivateIpAddresses',
+                'ec2:UnassignPrivateIpAddresses'
+            ],
+            resources: ['*']
+        })
+    );
     // recordTableDefAndStarkKBIngestionJob.addTest
     // // Trigger the recordTableDefAndStarkKBIngestionJob on the sample data source
     // new cr.AwsCustomResource(scope, `RecordAndIngestSampleData`, {

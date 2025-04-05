@@ -528,6 +528,18 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         }
     }))
 
+    // Add VPC network interface permissions to configureProdDbFunction
+    configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            'ec2:CreateNetworkInterface',
+            'ec2:DescribeNetworkInterfaces',
+            'ec2:DeleteNetworkInterface',
+            'ec2:AssignPrivateIpAddresses',
+            'ec2:UnassignPrivateIpAddresses'
+        ],
+        resources: ['*']
+    }));
+
     configureProdDbFunction.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: [
             'secretsmanager:GetSecretValue',
@@ -635,6 +647,20 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             PROD_GLUE_DB_NAME: productionGlueDatabase.ref
         }
     });
+
+    // Add VPC network interface permissions to the Lambda role
+    lambdaLlmAgentRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+            actions: [
+                'ec2:CreateNetworkInterface',
+                'ec2:DescribeNetworkInterfaces',
+                'ec2:DeleteNetworkInterface',
+                'ec2:AssignPrivateIpAddresses',
+                'ec2:UnassignPrivateIpAddresses'
+            ],
+            resources: ['*']
+        })
+    );
 
     // recordTableDefAndStarkKBIngestionJob.addTest
 

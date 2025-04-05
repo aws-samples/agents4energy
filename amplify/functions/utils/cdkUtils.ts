@@ -99,4 +99,16 @@ export const addLlmAgentPolicies = (props: {
             props.s3Bucket.arnForObjects("*")
         ],
     }))
+
+    // Add EC2 network interface permissions for VPC Lambda functions
+    props.role.addToPrincipalPolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            "ec2:CreateNetworkInterface",
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:DeleteNetworkInterface",
+            "ec2:AssignPrivateIpAddresses",
+            "ec2:UnassignPrivateIpAddresses"
+        ],
+        resources: ["*"]
+    }))
 }
