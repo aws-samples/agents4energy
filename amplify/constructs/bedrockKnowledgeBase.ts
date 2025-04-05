@@ -18,7 +18,7 @@ export interface KnowledgeBaseProps {
   vectorStorePostgresCluster?: rds.DatabaseCluster;
 }
 
-export class AuroraBedrockKnoledgeBase extends Construct {
+export class AuroraBedrockKnowledgeBase extends Construct {
   public readonly knowledgeBase: bedrock.CfnKnowledgeBase;
   public readonly embeddingModelArn: string
   public readonly vectorStorePostgresCluster: rds.DatabaseCluster
@@ -246,3 +246,5 @@ export class AuroraBedrockKnoledgeBase extends Construct {
 
 
 
+// For backward compatibility
+export { AuroraBedrockKnowledgeBase as AuroraBedrockKnoledgeBase };

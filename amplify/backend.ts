@@ -198,7 +198,7 @@ const {
   wellFileDriveBucket,
   defaultProdDatabaseName,
   hydrocarbonProductionDb,
-  sqlTableDefBedrockKnoledgeBase,
+  sqlTableDefBedrockKnowledgeBase,
   petroleumEngineeringKnowledgeBase,
   athenaWorkgroup,
   // athenaPostgresCatalog,
