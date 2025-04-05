@@ -11,6 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
+    "jsx": "preserve",
     "lib": ["es2021", "dom"],
     "paths": {
       "$amplify/*": [
@@ -21,10 +22,14 @@
   },
   "include": [
     "**/*.ts", 
+    "**/*.tsx",
     "../.amplify/generated/env/*.ts",
     "../src/**/*.ts",
     "../src/**/*.tsx",
     "../amplify_outputs.json",
     "../.amplify/**/*.json"
+  ],
+  "files": [
+    "../src/types.d.ts"
   ]
 }
