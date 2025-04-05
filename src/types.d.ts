@@ -1,24 +1,44 @@
 declare module "*.png" {
-  const value: string;
-  export default value;
+  const content: {
+    src: string;
+    height: number;
+    width: number;
+    blurDataURL?: string;
+  };
+  export default content;
 }
 
 declare module "*.jpg" {
-  const value: string;
-  export default value;
+  const content: {
+    src: string;
+    height: number;
+    width: number;
+    blurDataURL?: string;
+  };
+  export default content;
 }
 
 declare module "*.svg" {
-  const value: string;
-  export default value;
+  const content: {
+    src: string;
+    height: number;
+    width: number;
+    blurDataURL?: string;
+  };
+  export default content;
 }
 
 declare module "*.gif" {
-  const value: string;
-  export default value;
+  const content: {
+    src: string;
+    height: number;
+    width: number;
+    blurDataURL?: string;
+  };
+  export default content;
 }
 
 declare module "*.json" {
   const value: any;
   export default value;
-} 
+}
