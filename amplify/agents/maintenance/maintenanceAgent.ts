@@ -74,7 +74,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         vpc: props.vpc,
         port: postgresPort,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
-        
+        deletionProtection: false
     });
     maintDb.secret?.addRotationSchedule('RotationSchedule', {
         hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({

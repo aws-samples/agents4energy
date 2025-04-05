@@ -68,8 +68,8 @@ export class AuroraBedrockKnowledgeBase extends Construct {
           retention: cdk.Duration.days(7),
           preferredWindow: '03:00-04:00'
         },
-        deletionProtection: true,
-        removalPolicy: cdk.RemovalPolicy.SNAPSHOT
+        deletionProtection: false,
+        removalPolicy: cdk.RemovalPolicy.DESTROY
       });
     this.vectorStorePostgresCluster.secret?.addRotationSchedule('RotationSchedule', {
       hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
