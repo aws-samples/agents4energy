@@ -238,7 +238,7 @@ delayResource.node.addDependency(wellFileDriveBucket)
 uploadToS3Deployment.node.addDependency(delayResource) //Don't deploy files until the resources handling uploads are deployed
 
 backend.productionAgentFunction.addEnvironment('DATA_BUCKET_NAME', backend.storage.resources.bucket.bucketName)
-backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId)
+backend.productionAgentFunction.addEnvironment('AWS_KNOWLEDGE_BASE_ID', sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId)
 backend.productionAgentFunction.addEnvironment('PETROLEUM_ENG_KNOWLEDGE_BASE_ID', petroleumEngineeringKnowledgeBase.knowledgeBaseId)
 backend.productionAgentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', athenaWorkgroup.name)
 backend.productionAgentFunction.addEnvironment('DATABASE_NAME', defaultProdDatabaseName)
@@ -262,7 +262,7 @@ backend.productionAgentFunction.resources.lambda.addToRolePolicy(
   new iam.PolicyStatement({
     actions: ["bedrock:Retrieve"],
     resources: [
-      sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn,
+      sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn,
       petroleumEngineeringKnowledgeBase.knowledgeBaseArn
     ],
   })

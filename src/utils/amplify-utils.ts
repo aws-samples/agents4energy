@@ -4,6 +4,7 @@ import { Message, ToolMessageContentType, messageContentType } from './types'
 
 import { type Schema } from "../../amplify/data/resource";
 
+// @ts-ignore - Ignoring type issues with generateClient
 export const amplifyClient = generateClient<Schema>();
 
 type BedrockAnthropicBodyType = {
