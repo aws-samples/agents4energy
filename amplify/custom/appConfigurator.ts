@@ -34,7 +34,7 @@ export interface AppConfiguratorProps {
   preSignUpFunction: lambda.IFunction
   cognitoUserPool: cdk.aws_cognito.IUserPool
   appSyncApi: cdk.aws_appsync.IGraphqlApi
-  // sqlTableDefBedrockKnoledgeBase: bedrock.KnowledgeBase
+  // sqlTableDefBedrockKnowledgeBase: bedrock.KnowledgeBase
 }
 
 
