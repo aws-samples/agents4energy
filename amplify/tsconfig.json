@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
     "lib": ["es2021"],
     "paths": {
       "$amplify/*": [
@@ -20,6 +21,7 @@
   "include": [
     "**/*.ts", 
     "../.amplify/generated/env/*.ts",
-    "../src/utils/**/*.ts"
+    "../src/utils/**/*.ts",
+    "../amplify_outputs.json"
   ]
 }
