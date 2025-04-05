@@ -1,5 +1,23 @@
 // import { BedrockAgent } from "@aws-sdk/client-bedrock-agent"
-import outputs from '@/../amplify_outputs.json';
+// Create a dummy amplify outputs object that will be used during development/building
+// and replaced with the real one during deployment
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-require-imports */
+
+// This is a fallback for local development and build time
+// In production, this will be replaced by the actual outputs
+const outputs = {
+  custom: {
+    maintenanceAgentId: 'PLACEHOLDER',
+    maintenanceAgentAliasId: 'PLACEHOLDER',
+    regulatoryAgentId: 'PLACEHOLDER',
+    regulatoryAgentAliasId: 'PLACEHOLDER',
+    petrophysicsAgentId: 'PLACEHOLDER',
+    petrophysicsAgentAliasId: 'PLACEHOLDER'
+  }
+};
 
 type BaseAgent = {
     name: string

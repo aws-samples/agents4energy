@@ -36,6 +36,12 @@ import { cdkNagSupperssionsHandler } from './custom/cdkNagHandler';
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
 import { petrophysicsAgentBuilder } from './agents/petrophysicsAgent/petrophysicsAgent';
 
+// Set Docker context for Amplify builds
+process.env.CDK_DOCKER_IMAGES_FROM_PUBLIC_REPOSITORIES = 'true';
+
+// Override Docker image for Python 3.12 to use 3.9 instead
+process.env.AWS_CDK_DOCKER_IMAGES_PYTHON312 = 'public.ecr.aws/sam/build-python3.9:latest';
+
 const resourceTags = {
   Project: 'agents-for-energy',
   Environment: 'dev',
