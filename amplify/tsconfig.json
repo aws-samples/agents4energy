@@ -8,20 +8,10 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
     "paths": {
       "$amplify/*": [
         "../.amplify/generated/*"
       ]
     }
-  },
-  "include": [
-    "**/*.ts",
-    "../.amplify/generated/env/*.ts",
-    "../src/utils/types.ts",
-    "../src/utils/amplify-utils.ts"
-  ]
+  }
 }
