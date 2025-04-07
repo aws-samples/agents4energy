@@ -126,7 +126,7 @@ export const handler: Schema["invokeProductionAgent"]["functionHandler"] = async
         console.log("Invoking Production Agent. Latest Message:\n", stringify(messages[messages.length - 1].content))
 
         const ragContext = await queryKnowledgeBase({
-            knowledgeBaseId: env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID,
+            knowledgeBaseId: process.env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID || "",
             query: getLangChainMessageTextContent(messages[messages.length - 1]) || ""
         })
 

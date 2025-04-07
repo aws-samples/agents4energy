@@ -60,7 +60,7 @@ import { aws_apigatewayv2 as apigatewayv2 } from 'aws-cdk-lib';
 import { aws_apigatewayv2_integrations as apigatewayv2_integrations } from 'aws-cdk-lib';
 import { aws_apprunner as apprunner } from 'aws-cdk-lib';
 import { aws_appstream as appstream } from 'aws-cdk-lib';
-import { aws_appsync as appsync_alpha } from '@aws-cdk/aws-appsync-alpha';
+import { aws_appsync as appsync } from 'aws-cdk-lib';
 import { aws_batch as batch } from 'aws-cdk-lib';
 import { aws_cassandra as cassandra } from 'aws-cdk-lib';
 import { aws_codebuild as codebuild } from 'aws-cdk-lib';
@@ -70,7 +70,7 @@ import { aws_codepipeline as codepipeline } from 'aws-cdk-lib';
 import { aws_codepipeline_actions as codepipeline_actions } from 'aws-cdk-lib';
 import { aws_codestarconnections as codestarconnections } from 'aws-cdk-lib';
 import { aws_codestarnotifications as codestarnotifications } from 'aws-cdk-lib';
-import { aws_cognito_identitypool as identitypool } from '@aws-cdk/aws-cognito-identitypool-alpha';
+import { aws_cognito as cognito } from 'aws-cdk-lib';
 import { aws_docdb as docdb } from 'aws-cdk-lib';
 import { aws_dynamodb_global as dynamodb_global } from '@aws-cdk/aws-dynamodb-global-alpha';
 import { aws_gamelift as gamelift } from 'aws-cdk-lib';
@@ -270,14 +270,14 @@ export function configureApp(scope: Construct) {
 }
 
 export interface AppConfiguratorProps {
-  hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster,
-  defaultProdDatabaseName: string,
-  athenaWorkgroup: cdk.aws_athena.CfnWorkGroup,
+  hydrocarbonProductionDb: cdk.aws_rds.ServerlessCluster | cdk.aws_rds.DatabaseCluster;
+  defaultProdDatabaseName: string;
+  athenaWorkgroup: cdk.aws_athena.CfnWorkGroup;
   // athenaPostgresCatalog: cdk.aws_athena.CfnDataCatalog
-  s3Bucket: cdk.aws_s3.IBucket
-  preSignUpFunction: lambda.IFunction
-  cognitoUserPool: cdk.aws_cognito.IUserPool
-  appSyncApi: cdk.aws_appsync.IGraphqlApi
+  s3Bucket: cdk.aws_s3.IBucket;
+  preSignUpFunction: lambda.IFunction;
+  cognitoUserPool: cdk.aws_cognito.IUserPool;
+  appSyncApi: cdk.aws_appsync.IGraphqlApi;
   // sqlTableDefBedrockKnowledgeBase: bedrock.KnowledgeBase
 }
 }

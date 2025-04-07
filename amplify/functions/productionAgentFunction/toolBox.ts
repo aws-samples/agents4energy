@@ -53,7 +53,7 @@ export const retrievePetroleumEngineeringKnowledgeTool = tool(
     async ({ concepts }) => {
 
         const contextResponse = await queryKnowledgeBase({
-            knowledgeBaseId: env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID,
+            knowledgeBaseId: process.env.PETROLEUM_ENG_KNOWLEDGE_BASE_ID || "",
             query: concepts
         })
 
@@ -88,7 +88,7 @@ export const getTableDefinitionsTool = tool(
         // console.log('Getting relevant tables for table features:\n', tableFeatures)
 
         const relevantTables = await queryKnowledgeBase({
-            knowledgeBaseId: env.AWS_KNOWLEDGE_BASE_ID,
+            knowledgeBaseId: process.env.AWS_KNOWLEDGE_BASE_ID || "",
             query: tableFeatures
         }
         )
@@ -201,9 +201,9 @@ export const executeSQLQueryTool = tool(
 
             const queryExecutionId = await startQueryExecution({
                 query: query,
-                workgroup: env.ATHENA_WORKGROUP_NAME,
+                workgroup: process.env.ATHENA_WORKGROUP_NAME || "",
             });
-            await waitForQueryToComplete(queryExecutionId, env.ATHENA_WORKGROUP_NAME);
+            await waitForQueryToComplete(queryExecutionId, process.env.ATHENA_WORKGROUP_NAME || "");
             const results = await getQueryResults(queryExecutionId);
             // console.log('Athena Query Result:\n', results);
 
