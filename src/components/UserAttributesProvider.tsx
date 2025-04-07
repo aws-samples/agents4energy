@@ -1,44 +1,43 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { fetchUserAttributes, FetchUserAttributesOutput } from 'aws-amplify/auth';
+'use client';
 
-// Define the type for your context value
-interface UserContextType {
-  userAttributes: FetchUserAttributesOutput | null;
-}
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuthenticator } from '@aws-amplify/ui-react';
+import { fetchUserAttributes } from 'aws-amplify/auth';
 
-// Create the context with the correct type
-const UserContext = createContext<UserContextType | undefined>(undefined);
+// Create context
+const UserAttributesContext = createContext<Record<string, string> | null>(null);
 
-export function UserAttributesProvider({ children }: { children: ReactNode }) {
-  const [userAttributes, setUserAttributes] = useState<FetchUserAttributesOutput | null>(null);
+// Create provider component
+export function UserAttributesProvider({ children }: { children: React.ReactNode }) {
+  const [userAttributes, setUserAttributes] = useState<Record<string, string> | null>(null);
+  const { authStatus } = useAuthenticator((context) => [context.authStatus]);
 
   useEffect(() => {
-    const fetchAttributes = async () => {
-      try {
-        const userAttributesResponse = await fetchUserAttributes();
-        if (userAttributesResponse) setUserAttributes(userAttributesResponse);
-      } catch (error) {
-        console.error('Error fetching user attributes:', error);
+    async function getUserAttributes() {
+      if (authStatus === 'authenticated') {
+        try {
+          const attributes = await fetchUserAttributes();
+          setUserAttributes(attributes);
+        } catch (error) {
+          console.error('Error fetching user attributes:', error);
+        }
+      } else {
         setUserAttributes(null);
       }
-    };
+    }
 
-    fetchAttributes();
-  }, []);
+    getUserAttributes();
+  }, [authStatus]);
 
-  // Pass the object as the value
   return (
-    <UserContext.Provider value={{ userAttributes }}>
+    <UserAttributesContext.Provider value={userAttributes}>
       {children}
-    </UserContext.Provider>
+    </UserAttributesContext.Provider>
   );
 }
 
-// Custom hook to use the context
+// Create hook for using the context
 export function useUserAttributes() {
-  const context = useContext(UserContext);
-  if (context === undefined) {
-    throw new Error('useUserAttributes must be used within a UserProvider');
-  }
+  const context = useContext(UserAttributesContext);
   return context;
 }
