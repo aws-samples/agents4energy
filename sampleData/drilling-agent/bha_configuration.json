@@ -1,0 +1,269 @@
+{
+  "well_info": {
+    "well_id": "PERM-W023",
+    "field": "Delaware Basin",
+    "operator": "Permian Energy",
+    "rig": "Nabors 711",
+    "section": "12.25\" Hole Section",
+    "date": "2024-04-02"
+  },
+  "bha_details": {
+    "bha_number": "BHA-04",
+    "bha_type": "Rotary Steerable",
+    "total_length": 312.45,
+    "hole_size": 12.25,
+    "planned_footage": 4000
+  },
+  "survey_tools": {
+    "mwd_type": "Halliburton Sperry XMWD",
+    "gamma_enabled": true,
+    "resistivity_enabled": true,
+    "pressure_while_drilling": true,
+    "annular_pressure_enabled": true,
+    "vibration_monitoring": true,
+    "shock_monitoring": true,
+    "stick_slip_detection": true,
+    "survey_accuracy": "±0.1° Inc, ±1.0° Azi",
+    "telemetry_type": "EM/Mud Pulse Hybrid",
+    "max_data_rate": "12 bits/sec"
+  },
+  "directional_tools": {
+    "steering_tool": "Baker Hughes AutoTrak™ X-treme",
+    "max_dogleg": 8.0,
+    "max_build_rate": 6.5,
+    "max_turn_rate": 5.5,
+    "bias_unit": "Push-the-bit",
+    "steering_force": "Hydraulic",
+    "continuous_rotation": true,
+    "max_rpm": 220,
+    "max_operating_temp": 302,
+    "flow_range": "600-1200 gpm"
+  },
+  "components": [
+    {
+      "position": 1,
+      "component": "Bit",
+      "description": "Smith PDC MSi816XBPX",
+      "size": 12.25,
+      "length": 1.08,
+      "weight": 120,
+      "connections": {
+        "up": "6-5/8 REG Box",
+        "down": "N/A"
+      },
+      "details": {
+        "type": "PDC",
+        "nozzles": "6 x 13/32\"",
+        "TFA": 0.98,
+        "IADC_Code": "M323",
+        "features": ["8 blades", "16mm cutters", "depth of cut control", "anti-whirl design"]
+      }
+    },
+    {
+      "position": 2,
+      "component": "Motor/RSS",
+      "description": "AutoTrak X-treme",
+      "size": 9.625,
+      "length": 28.52,
+      "weight": 6200,
+      "connections": {
+        "up": "6-5/8 REG Box",
+        "down": "6-5/8 REG Pin"
+      },
+      "details": {
+        "max_differential_pressure": 1200,
+        "flow_range": "600-1200 gpm",
+        "max_torque": 12500,
+        "power_section": "5:6 Lobe 7.5 Stage",
+        "stabilization": "Full Gauge"
+      }
+    },
+    {
+      "position": 3,
+      "component": "MWD",
+      "description": "Halliburton XMWD",
+      "size": 8.0,
+      "length": 31.85,
+      "weight": 3200,
+      "connections": {
+        "up": "6-5/8 REG Box",
+        "down": "6-5/8 REG Pin"
+      },
+      "details": {
+        "sensors": ["Directional", "Gamma", "Resistivity", "PWD", "Vibration"],
+        "power_source": "Lithium Battery Pack",
+        "battery_life": "300 hours",
+        "data_storage": "32 GB",
+        "sample_rate": "1-30 second samples"
+      }
+    },
+    {
+      "position": 4,
+      "component": "Stabilizer",
+      "description": "Integral Blade Stabilizer",
+      "size": 12.125,
+      "length": 6.25,
+      "weight": 2100,
+      "connections": {
+        "up": "6-5/8 REG Box",
+        "down": "6-5/8 REG Pin"
+      },
+      "details": {
+        "blade_count": 3,
+        "blade_design": "Straight",
+        "blade_material": "Tungsten Carbide",
+        "blade_length": 3.5,
+        "clearance": 0.125
+      }
+    },
+    {
+      "position": 5,
+      "component": "HWDP",
+      "description": "Heavy Weight Drill Pipe",
+      "size": 5.0,
+      "length": 90.0,
+      "weight": 9900,
+      "connections": {
+        "up": "4-1/2 IF Box",
+        "down": "6-5/8 REG Pin"
+      },
+      "details": {
+        "count": 3,
+        "unit_length": 30.0,
+        "weight_per_foot": 33.0,
+        "ID": 3.0,
+        "OD": 5.0,
+        "material": "S-135"
+      }
+    },
+    {
+      "position": 6,
+      "component": "Jar",
+      "description": "Hydro-Mechanical Drilling Jar",
+      "size": 6.75,
+      "length": 32.25,
+      "weight": 2200,
+      "connections": {
+        "up": "4-1/2 IF Box",
+        "down": "4-1/2 IF Pin"
+      },
+      "details": {
+        "type": "Hydro-Mechanical",
+        "stroke_length": 24.0,
+        "max_jarring_force": 250000,
+        "compression_setting": 60000,
+        "tension_setting": 80000
+      }
+    },
+    {
+      "position": 7,
+      "component": "Accelerator",
+      "description": "Hydraulic Accelerator",
+      "size": 6.75,
+      "length": 10.5,
+      "weight": 850,
+      "connections": {
+        "up": "4-1/2 IF Box",
+        "down": "4-1/2 IF Pin"
+      },
+      "details": {
+        "type": "Hydraulic",
+        "stroke_length": 6.0,
+        "amplification_factor": 2.5,
+        "compression_setting": "Auto",
+        "tension_setting": "Auto"
+      }
+    },
+    {
+      "position": 8,
+      "component": "HWDP",
+      "description": "Heavy Weight Drill Pipe",
+      "size": 5.0,
+      "length": 90.0,
+      "weight": 9900,
+      "connections": {
+        "up": "4-1/2 IF Box",
+        "down": "4-1/2 IF Pin"
+      },
+      "details": {
+        "count": 3,
+        "unit_length": 30.0,
+        "weight_per_foot": 33.0,
+        "ID": 3.0,
+        "OD": 5.0,
+        "material": "S-135"
+      }
+    },
+    {
+      "position": 9,
+      "component": "Drill Pipe",
+      "description": "5\" 19.5 ppf S-135 Range 2",
+      "size": 5.0,
+      "length": 5000.0,
+      "weight": 97500,
+      "connections": {
+        "up": "4-1/2 IF Box",
+        "down": "4-1/2 IF Pin"
+      },
+      "details": {
+        "count": 167,
+        "unit_length": 30.0,
+        "weight_per_foot": 19.5,
+        "ID": 4.276,
+        "OD": 5.0,
+        "material": "S-135",
+        "connection_type": "4-1/2 IF"
+      }
+    }
+  ],
+  "hydraulics": {
+    "pump_output": 850,
+    "standpipe_pressure": 3350,
+    "surface_pressure_loss": 750,
+    "annular_pressure_loss": 1250,
+    "bit_pressure_drop": 1350,
+    "ecd_at_bit": 10.8,
+    "system_power": 1250,
+    "hssi_at_bit": 3.5,
+    "jet_velocity": 325,
+    "impact_force": 8750
+  },
+  "torque_drag_model": {
+    "max_hook_load": 450000,
+    "rotating_off_bottom": 120000,
+    "rotating_on_bottom": 160000,
+    "tripping_in": 100000,
+    "tripping_out": 180000,
+    "slack_off": 80000,
+    "pickup": 180000,
+    "max_torque": 28000,
+    "rotating_torque": 18000,
+    "sliding_torque": 14000
+  },
+  "job_objectives": {
+    "primary": "Drill 12.25\" hole section from 8456' to 12550'",
+    "secondary": "Maintain wellbore trajectory within 15ft of plan",
+    "tertiary": "Optimize drilling parameters for maximum ROP while preserving wellbore quality"
+  },
+  "special_instructions": [
+    "Run in hole to casing shoe and perform leak-off test",
+    "Circulate at shoe to ensure good hole cleaning",
+    "Monitor ECD closely in high pressure zone from 10000'-10500'",
+    "Use conservative drilling parameters through potential loss zones",
+    "Carefully monitor vibration and implement mitigation strategies if levels exceed 3.0 g",
+    "Take surveys every 90' while drilling the curve section",
+    "Take surveys every 150' while drilling the lateral section"
+  ],
+  "operational_limitations": {
+    "max_weight_on_bit": 45000,
+    "min_weight_on_bit": 15000,
+    "max_rotary_speed": 150,
+    "min_rotary_speed": 60,
+    "max_flow_rate": 900,
+    "min_flow_rate": 600,
+    "max_pressure": 4500,
+    "max_torque": 22000,
+    "max_vibration": 3.0,
+    "max_stick_slip": 25
+  }
+} 

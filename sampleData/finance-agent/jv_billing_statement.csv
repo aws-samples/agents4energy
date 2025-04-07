@@ -1,0 +1,53 @@
+Statement_ID,Billing_Period,Invoice_Date,Due_Date,Project_ID,Project_Name,Operator,Working_Interest_Owner,WI_Percentage,COPAS_Overhead_Rate,Working_Interest_Type,Status,Invoice_Currency,Currency_Rate,Invoice_Amount,Balance_Due
+JV-BILL-2024-0401,Mar-2024,2024-04-01,2024-05-01,PERMIAN-ALPHA,East Permian Development Project,Permian Energy Corporation,EastTexas Oil & Gas,10.25,3.5,Non-Operator,Issued,USD,1.0,125786.45,125786.45
+JV-BILL-2024-0402,Mar-2024,2024-04-01,2024-05-01,PERMIAN-ALPHA,East Permian Development Project,Permian Energy Corporation,Western Petroleum Partners,15.75,3.5,Non-Operator,Issued,USD,1.0,193246.95,193246.95
+JV-BILL-2024-0403,Mar-2024,2024-04-01,2024-05-01,PERMIAN-ALPHA,East Permian Development Project,Permian Energy Corporation,New Mexico Resources LLC,8.5,3.5,Non-Operator,Issued,USD,1.0,104251.05,104251.05
+JV-BILL-2024-0404,Mar-2024,2024-04-01,2024-05-01,PERMIAN-ALPHA,East Permian Development Project,Permian Energy Corporation,Gulf Coast Energy Fund,12.35,3.5,Non-Operator,Issued,USD,1.0,151453.57,151453.57
+JV-BILL-2024-0405,Mar-2024,2024-04-01,2024-05-01,PERMIAN-ALPHA,East Permian Development Project,Permian Energy Corporation,Rocky Mountain Exploration,7.8,3.5,Non-Operator,Issued,USD,1.0,95689.32,95689.32
+JV-BILL-2024-0501,Mar-2024,2024-04-01,2024-05-01,EAGLE-FORD-BRAVO,South Texas Eagle Ford Project,Permian Energy Corporation,Gulf Coast Energy Fund,22.5,4.0,Non-Operator,Issued,USD,1.0,315972.68,315972.68
+JV-BILL-2024-0502,Mar-2024,2024-04-01,2024-05-01,EAGLE-FORD-BRAVO,South Texas Eagle Ford Project,Permian Energy Corporation,Coastal Exploration Company,18.75,4.0,Non-Operator,Issued,USD,1.0,263310.57,263310.57
+JV-BILL-2024-0503,Mar-2024,2024-04-01,2024-05-01,EAGLE-FORD-BRAVO,South Texas Eagle Ford Project,Permian Energy Corporation,Texan Shale Partners,15.0,4.0,Non-Operator,Issued,USD,1.0,210648.45,210648.45
+JV-BILL-2024-0601,Mar-2024,2024-04-01,2024-05-01,BAKKEN-GAMMA,Northern Bakken Development,Northern Plains Operators,Permian Energy Corporation,35.0,3.75,Non-Operator,Received,USD,1.0,583912.44,583912.44
+JV-BILL-2024-0701,Mar-2024,2024-04-01,2024-05-01,GOM-DELTA,Gulf of Mexico Deepwater,Offshore Operations Inc.,Permian Energy Corporation,22.5,5.0,Non-Operator,Received,USD,1.0,1245678.90,1245678.90
+
+Category,PERMIAN-ALPHA AFE Cost Categories,Gross Cost,Permian Energy Corporation (45.35%),EastTexas Oil & Gas (10.25%),Western Petroleum Partners (15.75%),New Mexico Resources LLC (8.5%),Gulf Coast Energy Fund (12.35%),Rocky Mountain Exploration (7.8%)
+Drilling,Drilling Rig Costs,852500.00,386658.75,87381.25,134268.75,72462.50,105283.75,66495.00
+Drilling,Directional Drilling Services,156800.00,71110.80,16072.00,24696.00,13328.00,19364.80,12230.40
+Drilling,Mud Logging Services,48950.00,22199.33,5017.38,7709.63,4160.75,6045.33,3818.10
+Drilling,Mud and Chemicals,205370.00,93135.30,21050.43,32345.78,17456.45,25363.20,16018.86
+Drilling,Casing and Equipment,425680.00,193045.88,43632.20,67044.60,36182.80,52571.48,33202.96
+Drilling,Cementing Services,112500.00,51018.75,11531.25,17718.75,9562.50,13893.75,8775.00
+Drilling,Drill Bits,39500.00,17913.25,4048.75,6221.25,3357.50,4878.25,3081.00
+Completion,Completion Equipment,316750.00,143646.13,32466.88,49887.13,26923.75,39118.63,24706.50
+Completion,Frac Services and Materials,485300.00,220083.55,49743.25,76434.75,41250.50,59934.55,37853.40
+Completion,Workover Rig Services,128500.00,58274.75,13171.25,20238.75,10922.50,15869.75,10023.00
+Facilities,Production Equipment,345200.00,156548.20,35383.00,54369.00,29342.00,42632.20,26925.60
+Facilities,Flowlines and Gathering,195680.00,88740.88,20057.20,30844.60,16632.80,24166.48,15263.04
+Facilities,Tank Battery Installation,87450.00,39658.58,8963.63,13773.38,7433.25,10800.08,6821.10
+Operations,Lease Operating Expenses,52890.00,23985.62,5421.23,8330.18,4495.65,6531.92,4125.42
+Operations,Maintenance and Repairs,32560.00,14765.96,3337.40,5128.20,2767.60,4021.16,2539.68
+Overhead,COPAS Overhead,122500.00,55553.75,12556.25,19293.75,10412.50,15128.75,9555.00
+Overhead,Administrative Costs,68500.00,31064.75,7021.25,10788.75,5822.50,8459.75,5343.00
+Overhead,Technical and Engineering,42560.00,19300.96,4362.40,6703.20,3617.60,5256.16,3319.68
+Total,,3719190.00,1686704.15,381216.08,585797.38,315731.15,459320.01,289977.23
+
+Category,EAGLE-FORD-BRAVO AFE Cost Categories,Gross Cost,Permian Energy Corporation (43.75%),Gulf Coast Energy Fund (22.5%),Coastal Exploration Company (18.75%),Texan Shale Partners (15.0%)
+Drilling,Drilling Rig Costs,725350.00,317340.63,163204.13,136003.44,108802.75
+Drilling,Directional Drilling Services,128970.00,56424.38,29018.25,24181.88,19345.50
+Drilling,Mud Logging Services,42580.00,18628.75,9580.50,7983.75,6387.00
+Drilling,Mud and Chemicals,183950.00,80478.13,41388.75,34490.63,27592.50
+Drilling,Casing and Equipment,356780.00,156091.25,80275.50,66896.25,53517.00
+Drilling,Cementing Services,95680.00,41860.00,21528.00,17940.00,14352.00
+Drilling,Drill Bits,31250.00,13671.88,7031.25,5859.38,4687.50
+Completion,Completion Equipment,285690.00,124989.38,64280.25,53566.88,42853.50
+Completion,Frac Services and Materials,425860.00,186313.75,95818.50,79848.75,63879.00
+Completion,Workover Rig Services,98750.00,43203.13,22218.75,18515.63,14812.50
+Facilities,Production Equipment,265470.00,116143.13,59730.75,49775.63,39820.50
+Facilities,Flowlines and Gathering,142890.00,62514.38,32150.25,26791.88,21433.50
+Facilities,Tank Battery Installation,78560.00,34370.00,17676.00,14730.00,11784.00
+Operations,Lease Operating Expenses,38950.00,17040.63,8763.75,7303.13,5842.50
+Operations,Maintenance and Repairs,26890.00,11764.38,6050.25,5041.88,4033.50
+Overhead,COPAS Overhead (4.0%),118250.00,51734.38,26606.25,22171.88,17737.50
+Overhead,Administrative Costs,56450.00,24696.88,12701.25,10584.38,8467.50
+Overhead,Technical and Engineering,35860.00,15688.75,8068.50,6723.75,5379.00
+Total,,3138230.00,1372953.13,706091.00,588408.44,470734.50 

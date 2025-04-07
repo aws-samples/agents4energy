@@ -1,0 +1,336 @@
+{
+  "metadata": {
+    "unit": "CDU-101",
+    "description": "Crude Distillation Unit Process Data",
+    "timeframe": "April 1-3, 2024",
+    "sampling_rate": "15 minutes"
+  },
+  "tags": {
+    "TI-101": {"description": "Crude inlet temperature", "units": "°C", "normal_range": [25, 35]},
+    "TI-102": {"description": "Preheater outlet temperature", "units": "°C", "normal_range": [250, 270]},
+    "TI-103": {"description": "Furnace outlet temperature", "units": "°C", "normal_range": [340, 360]},
+    "TI-104": {"description": "Column top temperature", "units": "°C", "normal_range": [115, 125]},
+    "TI-105": {"description": "Column bottom temperature", "units": "°C", "normal_range": [360, 375]},
+    "PI-101": {"description": "Crude feed pressure", "units": "bar", "normal_range": [4.5, 5.5]},
+    "PI-102": {"description": "Column top pressure", "units": "bar", "normal_range": [1.0, 1.3]},
+    "PI-103": {"description": "Column bottom pressure", "units": "bar", "normal_range": [1.2, 1.5]},
+    "FI-101": {"description": "Crude feed flow rate", "units": "m³/h", "normal_range": [380, 420]},
+    "FI-102": {"description": "Column reflux flow rate", "units": "m³/h", "normal_range": [180, 220]},
+    "FI-103": {"description": "Column overhead product flow", "units": "m³/h", "normal_range": [75, 90]},
+    "FI-104": {"description": "Kerosene draw flow rate", "units": "m³/h", "normal_range": [55, 70]},
+    "FI-105": {"description": "Light gasoil draw flow rate", "units": "m³/h", "normal_range": [85, 110]},
+    "FI-106": {"description": "Heavy gasoil draw flow rate", "units": "m³/h", "normal_range": [65, 85]},
+    "FI-107": {"description": "Residue product flow rate", "units": "m³/h", "normal_range": [80, 100]},
+    "LI-101": {"description": "Column bottom level", "units": "%", "normal_range": [45, 55]},
+    "LI-102": {"description": "Reflux drum level", "units": "%", "normal_range": [40, 60]},
+    "QI-101": {"description": "Furnace firing duty", "units": "MW", "normal_range": [28, 32]},
+    "AI-101": {"description": "Feed API gravity", "units": "°API", "normal_range": [32, 36]},
+    "AI-102": {"description": "Naphtha product density", "units": "kg/m³", "normal_range": [710, 730]}
+  },
+  "data": [
+    {
+      "timestamp": "2024-04-01T00:00:00",
+      "values": {
+        "TI-101": 29.5, "TI-102": 262.3, "TI-103": 352.4, "TI-104": 119.7, "TI-105": 367.2,
+        "PI-101": 5.1, "PI-102": 1.18, "PI-103": 1.32,
+        "FI-101": 398.2, "FI-102": 201.5, "FI-103": 82.3, "FI-104": 63.1, "FI-105": 95.4, "FI-106": 74.8, "FI-107": 91.2,
+        "LI-101": 51.2, "LI-102": 48.7,
+        "QI-101": 29.7,
+        "AI-101": 34.2, "AI-102": 719.8
+      }
+    },
+    {
+      "timestamp": "2024-04-01T00:15:00",
+      "values": {
+        "TI-101": 29.6, "TI-102": 261.8, "TI-103": 351.9, "TI-104": 119.5, "TI-105": 367.0,
+        "PI-101": 5.12, "PI-102": 1.19, "PI-103": 1.33,
+        "FI-101": 399.1, "FI-102": 201.3, "FI-103": 82.5, "FI-104": 63.0, "FI-105": 95.7, "FI-106": 74.9, "FI-107": 91.0,
+        "LI-101": 51.0, "LI-102": 49.1,
+        "QI-101": 29.6,
+        "AI-101": 34.2, "AI-102": 720.1
+      }
+    },
+    {
+      "timestamp": "2024-04-01T00:30:00",
+      "values": {
+        "TI-101": 29.8, "TI-102": 262.0, "TI-103": 352.1, "TI-104": 119.6, "TI-105": 367.1,
+        "PI-101": 5.09, "PI-102": 1.18, "PI-103": 1.32,
+        "FI-101": 398.5, "FI-102": 201.0, "FI-103": 82.1, "FI-104": 63.2, "FI-105": 95.3, "FI-106": 74.7, "FI-107": 91.1,
+        "LI-101": 50.8, "LI-102": 49.3,
+        "QI-101": 29.5,
+        "AI-101": 34.1, "AI-102": 720.0
+      }
+    },
+    {
+      "timestamp": "2024-04-01T12:00:00",
+      "values": {
+        "TI-101": 30.2, "TI-102": 264.8, "TI-103": 353.6, "TI-104": 120.3, "TI-105": 368.7,
+        "PI-101": 5.18, "PI-102": 1.21, "PI-103": 1.36,
+        "FI-101": 402.4, "FI-102": 204.5, "FI-103": 83.7, "FI-104": 64.5, "FI-105": 96.8, "FI-106": 76.3, "FI-107": 92.8,
+        "LI-101": 50.6, "LI-102": 51.2,
+        "QI-101": 30.2,
+        "AI-101": 33.9, "AI-102": 718.6
+      }
+    },
+    {
+      "timestamp": "2024-04-02T00:00:00",
+      "values": {
+        "TI-101": 29.7, "TI-102": 261.9, "TI-103": 351.8, "TI-104": 119.3, "TI-105": 366.9,
+        "PI-101": 5.08, "PI-102": 1.17, "PI-103": 1.31,
+        "FI-101": 397.6, "FI-102": 200.8, "FI-103": 81.9, "FI-104": 62.8, "FI-105": 94.9, "FI-106": 74.3, "FI-107": 90.7,
+        "LI-101": 50.9, "LI-102": 48.5,
+        "QI-101": 29.4,
+        "AI-101": 34.3, "AI-102": 719.5
+      }
+    },
+    {
+      "timestamp": "2024-04-02T06:00:00",
+      "values": {
+        "TI-101": 29.9, "TI-102": 254.2, "TI-103": 343.1, "TI-104": 117.5, "TI-105": 360.6,
+        "PI-101": 5.05, "PI-102": 1.16, "PI-103": 1.30,
+        "FI-101": 385.4, "FI-102": 194.6, "FI-103": 78.8, "FI-104": 60.2, "FI-105": 91.7, "FI-106": 71.8, "FI-107": 87.9,
+        "LI-101": 49.5, "LI-102": 46.8,
+        "QI-101": 28.6,
+        "AI-101": 34.7, "AI-102": 721.3
+      }
+    },
+    {
+      "timestamp": "2024-04-02T06:15:00",
+      "values": {
+        "TI-101": 29.8, "TI-102": 251.7, "TI-103": 341.2, "TI-104": 116.9, "TI-105": 358.3,
+        "PI-101": 5.03, "PI-102": 1.15, "PI-103": 1.28,
+        "FI-101": 382.1, "FI-102": 192.3, "FI-103": 77.5, "FI-104": 59.6, "FI-105": 90.8, "FI-106": 70.4, "FI-107": 86.3,
+        "LI-101": 48.7, "LI-102": 45.9,
+        "QI-101": 28.2,
+        "AI-101": 34.8, "AI-102": 722.1
+      }
+    },
+    {
+      "timestamp": "2024-04-02T06:30:00",
+      "values": {
+        "TI-101": 29.9, "TI-102": 248.3, "TI-103": 338.6, "TI-104": 116.1, "TI-105": 355.8,
+        "PI-101": 5.00, "PI-102": 1.14, "PI-103": 1.26,
+        "FI-101": 378.9, "FI-102": 189.6, "FI-103": 76.4, "FI-104": 58.7, "FI-105": 89.5, "FI-106": 68.9, "FI-107": 84.8,
+        "LI-101": 47.9, "LI-102": 45.1,
+        "QI-101": 27.7,
+        "AI-101": 34.9, "AI-102": 722.9
+      }
+    },
+    {
+      "timestamp": "2024-04-02T06:45:00",
+      "values": {
+        "TI-101": 30.1, "TI-102": 251.9, "TI-103": 341.7, "TI-104": 116.7, "TI-105": 358.9,
+        "PI-101": 4.97, "PI-102": 1.14, "PI-103": 1.26,
+        "FI-101": 381.2, "FI-102": 191.4, "FI-103": 77.2, "FI-104": 59.3, "FI-105": 90.4, "FI-106": 70.1, "FI-107": 85.8,
+        "LI-101": 47.5, "LI-102": 45.8,
+        "QI-101": 28.1,
+        "AI-101": 34.8, "AI-102": 722.4
+      }
+    },
+    {
+      "timestamp": "2024-04-02T07:00:00",
+      "values": {
+        "TI-101": 30.2, "TI-102": 253.8, "TI-103": 343.5, "TI-104": 117.3, "TI-105": 360.7,
+        "PI-101": 4.99, "PI-102": 1.15, "PI-103": 1.27,
+        "FI-101": 383.6, "FI-102": 193.2, "FI-103": 78.1, "FI-104": 60.0, "FI-105": 91.3, "FI-106": 71.2, "FI-107": 87.1,
+        "LI-101": 48.2, "LI-102": 46.4,
+        "QI-101": 28.5,
+        "AI-101": 34.7, "AI-102": 721.8
+      }
+    },
+    {
+      "timestamp": "2024-04-02T12:00:00",
+      "values": {
+        "TI-101": 30.0, "TI-102": 261.5, "TI-103": 351.2, "TI-104": 119.2, "TI-105": 366.4,
+        "PI-101": 5.06, "PI-102": 1.18, "PI-103": 1.32,
+        "FI-101": 397.3, "FI-102": 200.4, "FI-103": 81.8, "FI-104": 62.7, "FI-105": 95.1, "FI-106": 74.1, "FI-107": 90.5,
+        "LI-101": 50.5, "LI-102": 48.9,
+        "QI-101": 29.5,
+        "AI-101": 34.3, "AI-102": 719.2
+      }
+    },
+    {
+      "timestamp": "2024-04-03T00:00:00",
+      "values": {
+        "TI-101": 30.3, "TI-102": 262.8, "TI-103": 354.2, "TI-104": 121.3, "TI-105": 369.7,
+        "PI-101": 5.23, "PI-102": 1.22, "PI-103": 1.35,
+        "FI-101": 403.6, "FI-102": 203.9, "FI-103": 83.1, "FI-104": 64.7, "FI-105": 96.9, "FI-106": 76.8, "FI-107": 92.5,
+        "LI-101": 51.7, "LI-102": 50.2,
+        "QI-101": 30.3,
+        "AI-101": 33.8, "AI-102": 718.2
+      }
+    },
+    {
+      "timestamp": "2024-04-03T03:00:00",
+      "values": {
+        "TI-101": 30.6, "TI-102": 263.7, "TI-103": 354.9, "TI-104": 121.6, "TI-105": 370.3,
+        "PI-101": 5.27, "PI-102": 1.23, "PI-103": 1.37,
+        "FI-101": 405.8, "FI-102": 205.2, "FI-103": 83.9, "FI-104": 65.2, "FI-105": 97.8, "FI-106": 77.3, "FI-107": 93.4,
+        "LI-101": 52.3, "LI-102": 50.9,
+        "QI-101": 30.8,
+        "AI-101": 33.6, "AI-102": 717.5
+      }
+    },
+    {
+      "timestamp": "2024-04-03T06:00:00",
+      "values": {
+        "TI-101": 30.9, "TI-102": 265.1, "TI-103": 356.3, "TI-104": 122.4, "TI-105": 371.8,
+        "PI-101": 5.32, "PI-102": 1.26, "PI-103": 1.39,
+        "FI-101": 407.9, "FI-102": 207.3, "FI-103": 84.6, "FI-104": 65.9, "FI-105": 98.4, "FI-106": 78.2, "FI-107": 94.8,
+        "LI-101": 53.1, "LI-102": 51.7,
+        "QI-101": 31.2,
+        "AI-101": 33.4, "AI-102": 716.8
+      }
+    },
+    {
+      "timestamp": "2024-04-03T06:15:00",
+      "values": {
+        "TI-101": 31.1, "TI-102": 266.3, "TI-103": 357.2, "TI-104": 122.8, "TI-105": 372.6,
+        "PI-101": 5.39, "PI-102": 1.28, "PI-103": 1.41,
+        "FI-101": 409.2, "FI-102": 208.7, "FI-103": 85.2, "FI-104": 66.3, "FI-105": 99.2, "FI-106": 78.9, "FI-107": 95.3,
+        "LI-101": 53.8, "LI-102": 52.4,
+        "QI-101": 31.6,
+        "AI-101": 33.3, "AI-102": 716.5
+      }
+    },
+    {
+      "timestamp": "2024-04-03T06:30:00",
+      "values": {
+        "TI-101": 31.0, "TI-102": 267.5, "TI-103": 358.8, "TI-104": 123.5, "TI-105": 374.1,
+        "PI-101": 5.47, "PI-102": 1.30, "PI-103": 1.43,
+        "FI-101": 412.3, "FI-102": 210.9, "FI-103": 86.1, "FI-104": 67.2, "FI-105": 100.3, "FI-106": 79.8, "FI-107": 96.4,
+        "LI-101": 54.3, "LI-102": 53.1,
+        "QI-101": 32.2,
+        "AI-101": 33.1, "AI-102": 715.9
+      }
+    },
+    {
+      "timestamp": "2024-04-03T06:45:00",
+      "values": {
+        "TI-101": 31.2, "TI-102": 269.2, "TI-103": 360.7, "TI-104": 124.1, "TI-105": 375.8,
+        "PI-101": 5.54, "PI-102": 1.32, "PI-103": 1.46,
+        "FI-101": 415.8, "FI-102": 213.6, "FI-103": 87.3, "FI-104": 68.0, "FI-105": 101.7, "FI-106": 80.9, "FI-107": 97.9,
+        "LI-101": 55.1, "LI-102": 54.2,
+        "QI-101": 32.9,
+        "AI-101": 32.9, "AI-102": 715.1
+      }
+    },
+    {
+      "timestamp": "2024-04-03T07:00:00",
+      "values": {
+        "TI-101": 31.3, "TI-102": 271.4, "TI-103": 362.9, "TI-104": 125.3, "TI-105": 377.9,
+        "PI-101": 5.65, "PI-102": 1.35, "PI-103": 1.49,
+        "FI-101": 419.6, "FI-102": 216.8, "FI-103": 88.7, "FI-104": 69.1, "FI-105": 103.2, "FI-106": 82.4, "FI-107": 99.1,
+        "LI-101": 55.9, "LI-102": 55.8,
+        "QI-101": 33.8,
+        "AI-101": 32.7, "AI-102": 714.2
+      }
+    }
+  ],
+  "alarms": [
+    {
+      "timestamp": "2024-04-02T06:15:00",
+      "tag": "TI-102",
+      "type": "LOW",
+      "message": "Preheater outlet temperature below minimum threshold",
+      "severity": "WARNING",
+      "acknowledged": true,
+      "acknowledged_by": "Operator215",
+      "acknowledged_at": "2024-04-02T06:17:23"
+    },
+    {
+      "timestamp": "2024-04-02T06:45:00",
+      "tag": "PI-101",
+      "type": "LOW",
+      "message": "Crude feed pressure below minimum threshold",
+      "severity": "WARNING",
+      "acknowledged": true,
+      "acknowledged_by": "Operator215",
+      "acknowledged_at": "2024-04-02T06:46:12"
+    },
+    {
+      "timestamp": "2024-04-03T06:45:00",
+      "tag": "TI-105",
+      "type": "HIGH",
+      "message": "Column bottom temperature above maximum threshold",
+      "severity": "WARNING",
+      "acknowledged": true,
+      "acknowledged_by": "Operator318",
+      "acknowledged_at": "2024-04-03T06:48:35"
+    },
+    {
+      "timestamp": "2024-04-03T07:00:00",
+      "tag": "TI-104",
+      "type": "HIGH",
+      "message": "Column top temperature above maximum threshold",
+      "severity": "WARNING",
+      "acknowledged": true,
+      "acknowledged_by": "Operator318",
+      "acknowledged_at": "2024-04-03T07:01:42"
+    },
+    {
+      "timestamp": "2024-04-03T07:00:00",
+      "tag": "PI-102",
+      "type": "HIGH",
+      "message": "Column top pressure above maximum threshold",
+      "severity": "WARNING",
+      "acknowledged": true,
+      "acknowledged_by": "Operator318",
+      "acknowledged_at": "2024-04-03T07:02:15"
+    },
+    {
+      "timestamp": "2024-04-03T07:00:00",
+      "tag": "LI-102",
+      "type": "HIGH",
+      "message": "Reflux drum level above maximum threshold",
+      "severity": "ALERT",
+      "acknowledged": true,
+      "acknowledged_by": "Operator318",
+      "acknowledged_at": "2024-04-03T07:03:08"
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2024-04-02T06:00:00",
+      "type": "OPERATOR_ACTION",
+      "message": "Crude feed rate reduced due to upstream furnace maintenance",
+      "user": "Supervisor103",
+      "details": "Feed rate reduced to 385 m³/h as per Operations Manager instruction"
+    },
+    {
+      "timestamp": "2024-04-02T07:30:00",
+      "type": "OPERATOR_ACTION",
+      "message": "Furnace firing duty increased to return to normal operating temperatures",
+      "user": "Operator215",
+      "details": "Incremental increase to furnace duty to recover from upstream maintenance"
+    },
+    {
+      "timestamp": "2024-04-02T10:15:00",
+      "type": "MAINTENANCE",
+      "message": "Crude feed control valve FV-101 calibration check",
+      "user": "Maintenance512",
+      "details": "Routine calibration check - valve response found within acceptable range"
+    },
+    {
+      "timestamp": "2024-04-03T05:30:00",
+      "type": "PROCESS_CHANGE",
+      "message": "Crude oil source change",
+      "user": "Supervisor117",
+      "details": "Switched from Nigerian Bonny Light to Saudi Arabian Light crude"
+    },
+    {
+      "timestamp": "2024-04-03T06:45:00",
+      "type": "OPERATOR_ACTION",
+      "message": "Increased reflux ratio to control overhead product specifications",
+      "user": "Operator318",
+      "details": "Increased ratio due to heavier components in overhead - response to product analysis"
+    },
+    {
+      "timestamp": "2024-04-03T07:15:00",
+      "type": "MAINTENANCE",
+      "message": "Reflux pump PM-102 switched from A to B due to abnormal vibration",
+      "user": "Supervisor117",
+      "details": "Maintenance team notified to inspect PM-102A"
+    }
+  ]
+} 
