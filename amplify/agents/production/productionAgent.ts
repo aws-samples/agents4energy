@@ -30,7 +30,7 @@ import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { AuroraBedrockKnoledgeBase } from "../../constructs/bedrockKnoledgeBase";
+import { AuroraBedrockKnowledgeBase } from "../../constructs/bedrockKnowledgeBase";
 
 import { addLlmAgentPolicies } from '../../functions/utils/cdkUtils'
 
@@ -296,7 +296,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     //     },
     // });
 
-    const sqlTableDefBedrockKnoledgeBase = new AuroraBedrockKnoledgeBase(scope, "TableDefinition", {
+    const sqlTableDefBedrockKnowledgeBase = new AuroraBedrockKnowledgeBase(scope, "TableDefinition", {
         vpc: props.vpc,
         bucket: props.s3Bucket,
         schemaName: 'bedrock_integration'
@@ -316,14 +316,14 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
                 chunkingStrategy: 'NONE' // This sets the whole file as a single chunk
             }
         },
-        knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId
+        knowledgeBaseId: sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId
     })
 
-    // const petroleumEngineeringKnowledgeBase = new AuroraBedrockKnoledgeBase(scope, "PetrolumEngineeringKB", {
+    // const petroleumEngineeringKnowledgeBase = new AuroraBedrockKnowledgeBase(scope, "PetrolumEngineeringKB", {
     //     vpc: props.vpc,
     //     bucket: props.s3Bucket,
     //     schemaName: 'petroleum_kb',
-    //     vectorStorePostgresCluster: sqlTableDefBedrockKnoledgeBase.vectorStorePostgresCluster
+    //     vectorStorePostgresCluster: sqlTableDefBedrockKnowledgeBase.vectorStorePostgresCluster
     // })
 
     // const PetroWikiKnowledgeBase = new BedrockKnowledgeBaseOSS(scope, 'PetroWikiKnowledgeBase', {
@@ -376,7 +376,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
 
     lambdaLlmAgentRole.addToPrincipalPolicy(new iam.PolicyStatement({
         actions: ["bedrock:StartIngestionJob"],
-        resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn]
+        resources: [sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn]
     }))
 
     // Create a Glue Database
@@ -441,7 +441,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
             ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
             S3_BUCKET_NAME: props.s3Bucket.bucketName,
             // ATHENA_SAMPLE_DATA_SOURCE_NAME: athenaPostgresCatalog.name,
-            TABLE_DEF_KB_ID: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            TABLE_DEF_KB_ID: sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId,
             TABLE_DEF_KB_DS_ID: productionAgentTableDefDataSource.attrDataSourceId,
         },
     });
@@ -480,7 +480,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
     configureProdDbFunction.addToRolePolicy(
         new iam.PolicyStatement({
             actions: ['bedrock:startIngestionJob'],
-            resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn],
+            resources: [sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn],
         })
     )
 
@@ -516,7 +516,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         action: 'startIngestionJob',
         parameters: {
             dataSourceId: productionAgentTableDefDataSource.attrDataSourceId,
-            knowledgeBaseId: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            knowledgeBaseId: sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId,
         },
         physicalResourceId: cr.PhysicalResourceId.of('startKbIngestion'),
     }
@@ -527,7 +527,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         policy: cr.AwsCustomResourcePolicy.fromStatements([
             new iam.PolicyStatement({
                 actions: ['bedrock:startIngestionJob'],
-                resources: [sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseArn],
+                resources: [sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseArn],
             }),
         ]),
     });
@@ -552,7 +552,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         environment: {
             ATHENA_WORKGROUP_NAME: athenaWorkgroup.name,
             S3_BUCKET_NAME: props.s3Bucket.bucketName,
-            TABLE_DEF_KB_ID: sqlTableDefBedrockKnoledgeBase.knowledgeBase.attrKnowledgeBaseId,
+            TABLE_DEF_KB_ID: sqlTableDefBedrockKnowledgeBase.knowledgeBase.attrKnowledgeBaseId,
             TABLE_DEF_KB_DS_ID: productionAgentTableDefDataSource.attrDataSourceId,
             PROD_GLUE_DB_NAME: productionGlueDatabase.ref
         }
@@ -749,7 +749,7 @@ export function productionAgentBuilder(scope: Construct, props: ProductionAgentP
         wellFileDriveBucket: wellFileDriveBucket,
         defaultProdDatabaseName: defaultProdDatabaseName,
         hydrocarbonProductionDb: hydrocarbonProductionDb,
-        sqlTableDefBedrockKnoledgeBase: sqlTableDefBedrockKnoledgeBase,
+        sqlTableDefBedrockKnowledgeBase: sqlTableDefBedrockKnowledgeBase,
         petroleumEngineeringKnowledgeBase: petroleumEngineeringKnowledgeBase,
         athenaWorkgroup: athenaWorkgroup,
         // athenaPostgresCatalog: athenaPostgresCatalog
