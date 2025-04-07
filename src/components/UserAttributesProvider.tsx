@@ -17,7 +17,14 @@ export function UserAttributesProvider({ children }: { children: React.ReactNode
       if (authStatus === 'authenticated') {
         try {
           const attributes = await fetchUserAttributes();
-          setUserAttributes(attributes);
+          // Convert attributes to Record<string, string> format
+          const attributesRecord: Record<string, string> = {};
+          Object.entries(attributes).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              attributesRecord[key] = String(value);
+            }
+          });
+          setUserAttributes(attributesRecord);
         } catch (error) {
           console.error('Error fetching user attributes:', error);
         }

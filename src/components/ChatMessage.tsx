@@ -31,7 +31,7 @@ export default memo(function Messages(
             updateMessage: (props: { message: Message }) => Promise<void>
         }
 ) {
-    const { userAttributes } = useUserAttributes();
+    const userAttributes = useUserAttributes();
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Scroll to the bottom function

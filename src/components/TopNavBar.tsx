@@ -15,7 +15,7 @@ const TopNavBar = () => {
   const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
   // const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
 
-  const { userAttributes } = useUserAttributes();
+  const userAttributes = useUserAttributes();
 
   // To support dark mode
   const [useDarkMode, setUseDarkMode] = useState(false);

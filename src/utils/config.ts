@@ -22,7 +22,21 @@ export type LangGraphAgent = BaseAgent & {
 // Helper function to safely get agent IDs
 const getAgentId = (agentKey: string) => {
     try {
-        return agentConfig.agents[agentKey]?.agentId || outputs.custom?.[`${agentKey}AgentId`] || '';
+        // First try to get from agent config
+        if (agentKey in agentConfig.agents) {
+            const agent = agentConfig.agents[agentKey as keyof typeof agentConfig.agents];
+            if (agent && 'agentId' in agent) {
+                return agent.agentId;
+            }
+        }
+        
+        // Then try to get from outputs
+        const customKey = `${agentKey}AgentId`;
+        if (outputs.custom && customKey in outputs.custom) {
+            return outputs.custom[customKey as keyof typeof outputs.custom] as string;
+        }
+        
+        return '';
     } catch (e) {
         console.warn(`Failed to get agentId for ${agentKey}:`, e);
         return '';
@@ -32,7 +46,21 @@ const getAgentId = (agentKey: string) => {
 // Helper function to safely get agent alias IDs
 const getAgentAliasId = (agentKey: string) => {
     try {
-        return agentConfig.agents[agentKey]?.agentAliasId || outputs.custom?.[`${agentKey}AgentAliasId`] || '';
+        // First try to get from agent config
+        if (agentKey in agentConfig.agents) {
+            const agent = agentConfig.agents[agentKey as keyof typeof agentConfig.agents];
+            if (agent && 'agentAliasId' in agent) {
+                return agent.agentAliasId;
+            }
+        }
+        
+        // Then try to get from outputs
+        const customKey = `${agentKey}AgentAliasId`;
+        if (outputs.custom && customKey in outputs.custom) {
+            return outputs.custom[customKey as keyof typeof outputs.custom] as string;
+        }
+        
+        return '';
     } catch (e) {
         console.warn(`Failed to get agentAliasId for ${agentKey}:`, e);
         return '';
