@@ -39,6 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+*.d.ts
+*.d.ts.map
+*.js.map
+# Compiled JavaScript files
+amplify/**/*.js
+src/**/*.js
+test/**/*.js
 
 # amplify
 .amplify
