@@ -110,7 +110,7 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
             }
         })
         return () => sub.unsubscribe();
-    }, [chatSession?.id]) // Only re-subscribe when the chat session ID changes
+    }, [chatSession]) // Re-subscribe when the chat session changes
 
     // Subscribe to the token stream for this chat session
     useEffect(() => {
@@ -237,7 +237,7 @@ const ChatBox: React.FC<ChatBoxProps> = (props: ChatBoxProps) => {
             fetchAndSetSuggestedPrompts()
         } else if (messages.length) setIsGenAiResponseLoading(true) //This is so if you re-load a page while the agent is processing is loading is set to true.
 
-    }, [messagesString, chatSessionString, suggestedPrompts.length])
+    }, [messagesString, chatSessionString, suggestedPrompts.length, chatSession, messages])
 
     async function updateChatMessage(props: { message: Message }) {
         const targetChatSessionId = chatSession?.id;
