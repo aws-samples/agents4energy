@@ -1,6 +1,19 @@
 # Agents4Energy 
 Agents4Energy (A4E) is an easily configurable and deployable, set of open-source agentic workflows to help customers in Energy industry accelerate their workloads on AWS. A4E enables industry professionals to use generative AI assistants for a range of common energy industry use cases such as reservoir characterization, well workover assessment, field data analysis, supply chain optimization, and asset integrity management.
 
+## Available Agents
+- Production Agent - Production optimization and monitoring
+- Maintenance Agent - Equipment maintenance and reliability
+- Regulatory Agent - Compliance and regulatory reporting
+- Petrophysics Agent - Well log analysis and interpretation
+- Drilling Agent - Drilling operations and optimization
+- Finance Agent - Joint venture accounting and financial analysis
+- Land Agent - Lease management and title analysis
+- Refining Agent - Refinery operations and troubleshooting
+- Trading Agent - Energy trading strategies and risk analysis
+- Logistics Agent - Supply chain optimization
+- Decarb Agent - Carbon capture and emissions reduction
+
 ![A4E Constructs](assets/images/A4E-Open-Source-Architecture.png)
 
 It is no exaggeration to say that generative artificial intelligence (GenAI) is fundamentally revolutionizing the way we work.  Large Language Model (LLM) capabilities have bridged the communication gap between humans and computers fostering a new way of working that is already proving magnitiude shifts in productivity.  Agents and agentic workflows are terms that are no longer just for the techhies, being mentinoed every day in the news, talk shows, and around the water cooler.  This blog focuses on the energy industry, but every industry is being disrupted, and the landscape is changing on a weekly, or even daily basis.
