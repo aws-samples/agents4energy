@@ -35,6 +35,15 @@ import { cdkNagSupperssionsHandler } from './custom/cdkNagHandler';
 
 import { addLlmAgentPolicies } from './functions/utils/cdkUtils'
 import { petrophysicsAgentBuilder } from './agents/petrophysicsAgent/petrophysicsAgent';
+import { financeAgentBuilder } from './agents/finance/financeAgent';
+import { landAgentBuilder } from './agents/land/landAgent';
+import { safetyAgentBuilder } from './agents/safety/safetyAgent';
+import { drillingAgentBuilder } from './agents/drilling/drillingAgent';
+import { refiningAgentBuilder } from './agents/refining/refiningAgent';
+import { tradingAgentBuilder } from './agents/trading/tradingAgent';
+import { logisticsAgentBuilder } from './agents/logistics/logisticsAgent';
+import { decarbAgentBuilder } from './agents/decarb/decarbAgent';
+import { StructuredDataSetup } from './data/structured-data-setup';
 
 const resourceTags = {
   Project: 'agents-for-energy',
@@ -191,6 +200,42 @@ const uploadToS3Deployment = new s3Deployment.BucketDeployment(productionAgentSt
   // destinationKeyPrefix: '/'
 });
 
+// Create the structured data setup
+const structuredDataSetup = new StructuredDataSetup(productionAgentStack, 'StructuredDataSetup', {
+  bucket: backend.storage.resources.bucket
+});
+
+// Add permissions to the production agent function
+structuredDataSetup.addPermissionsToAgentFunction(backend.productionAgentFunction.resources.lambda);
+
+// Add environment variables to the production agent function
+backend.productionAgentFunction.resources.lambda.addEnvironment('ATHENA_WORKGROUP_NAME', structuredDataSetup.athenaWorkgroup.name);
+backend.productionAgentFunction.resources.lambda.addEnvironment('DATABASE_NAME', 'agents4energy_db');
+
+// Add permissions for other agent functions if they exist
+const otherAgentTypes = [
+  'regulatory',
+  'drilling',
+  'petrophysics',
+  'finance',
+  'land',
+  'refining',
+  'trading',
+  'logistics',
+  'decarb'
+];
+
+otherAgentTypes.forEach(agentType => {
+  const functionName = `${agentType}AgentFunction`;
+  const agentFunction = backend.functions.getFunction(functionName)?.resources.lambda;
+  
+  if (agentFunction) {
+    structuredDataSetup.addPermissionsToAgentFunction(agentFunction);
+    agentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', structuredDataSetup.athenaWorkgroup.name);
+    agentFunction.addEnvironment('DATABASE_NAME', 'agents4energy_db');
+  }
+});
+
 const {
   convertPdfToYamlFunction,
   triggerCrawlerSfnFunction,
@@ -317,7 +362,133 @@ backend.addOutput({
   },
 })
 
+///////////////////////////////////////////////////////////
+/////// Create the Finance Agent Stack ////////////////////
+///////////////////////////////////////////////////////////
+const financeAgentStack = backend.createStack('financeAgentStack')
+const { financeAgent, financeAgentAlias } = financeAgentBuilder(financeAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment,
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    financeAgentId: financeAgent.attrAgentId,
+    financeAgentAliasId: financeAgentAlias.attrAgentAliasId,
+  },
+})
 
+///////////////////////////////////////////////////////////
+/////// Create the Land Agent Stack //////////////////////
+///////////////////////////////////////////////////////////
+const landAgentStack = backend.createStack('landAgentStack')
+const { landAgent, landAgentAlias } = landAgentBuilder(landAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment,
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    landAgentId: landAgent.attrAgentId,
+    landAgentAliasId: landAgentAlias.attrAgentAliasId,
+  },
+})
+
+///////////////////////////////////////////////////////////
+/////// Create the Safety Agent Stack ////////////////////
+///////////////////////////////////////////////////////////
+const safetyAgentStack = backend.createStack('safetyAgentStack')
+const { safetyAgent, safetyAgentAlias } = safetyAgentBuilder(safetyAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment,
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    safetyAgentId: safetyAgent.attrAgentId,
+    safetyAgentAliasId: safetyAgentAlias.attrAgentAliasId,
+  },
+})
+
+///////////////////////////////////////////////////////////
+/////// Create the Drilling Agent Stack //////////////////
+///////////////////////////////////////////////////////////
+const drillingAgentStack = backend.createStack('drillingAgentStack')
+const { drillingAgent, drillingAgentAlias } = drillingAgentBuilder(drillingAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment,
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    drillingAgentId: drillingAgent.attrAgentId,
+    drillingAgentAliasId: drillingAgentAlias.attrAgentAliasId,
+  },
+})
+
+///////////////////////////////////////////////////////////
+/////// Create the Refining Agent Stack //////////////////
+///////////////////////////////////////////////////////////
+const refiningAgentStack = backend.createStack('refiningAgentStack')
+const { refiningAgent, refiningAgentAlias } = refiningAgentBuilder(refiningAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment,
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    refiningAgentId: refiningAgent.attrAgentId,
+    refiningAgentAliasId: refiningAgentAlias.attrAgentAliasId,
+  },
+})
+
+///////////////////////////////////////////////////////////
+/////// Create the Trading Agent Stack ///////////////////
+///////////////////////////////////////////////////////////
+const tradingAgentStack = backend.createStack('tradingAgentStack')
+const { tradingAgent, tradingAgentAlias } = tradingAgentBuilder(tradingAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment,
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    tradingAgentId: tradingAgent.attrAgentId,
+    tradingAgentAliasId: tradingAgentAlias.attrAgentAliasId,
+  },
+})
+
+///////////////////////////////////////////////////////////
+/////// Create the Logistics Agent Stack /////////////////
+///////////////////////////////////////////////////////////
+const logisticsAgentStack = backend.createStack('logisticsAgentStack')
+const { logisticsAgent, logisticsAgentAlias } = logisticsAgentBuilder(logisticsAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment,
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    logisticsAgentId: logisticsAgent.attrAgentId,
+    logisticsAgentAliasId: logisticsAgentAlias.attrAgentAliasId,
+  },
+})
+
+///////////////////////////////////////////////////////////
+/////// Create the Decarb Agent Stack ////////////////////
+///////////////////////////////////////////////////////////
+const decarbAgentStack = backend.createStack('decarbAgentStack')
+const { decarbAgent, decarbAgentAlias } = decarbAgentBuilder(decarbAgentStack, {
+  vpc: vpc,
+  s3Deployment: uploadToS3Deployment,
+  s3Bucket: backend.storage.resources.bucket
+})
+backend.addOutput({
+  custom: {
+    decarbAgentId: decarbAgent.attrAgentId,
+    decarbAgentAliasId: decarbAgentAlias.attrAgentAliasId,
+  },
+})
 
 ///////////////////////////////////////////////////////////
 /////// Create the Configurator Stack /////////////////////
@@ -327,7 +498,7 @@ backend.addOutput({
 // Create a stack with the resources to configure the app
 const configuratorStack = backend.createStack('configuratorStack')
 
-new AppConfigurator(configuratorStack, 'appConfigurator', {
+new AppConfigurator(configuratorStack, {
   hydrocarbonProductionDb: hydrocarbonProductionDb,
   defaultProdDatabaseName: defaultProdDatabaseName,
   athenaWorkgroup: athenaWorkgroup,

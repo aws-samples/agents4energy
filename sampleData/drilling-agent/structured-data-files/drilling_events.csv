@@ -1,11 +1,11 @@
-event_id,well_id,event_date,event_type,severity,description,downtime_hours,cost_impact_usd,resolution
-EVENT-001,WELL-001,2023-01-15,Stuck Pipe,High,Differential sticking at 8500 ft,48,120000,Worked pipe free with spotting fluid
-EVENT-002,WELL-002,2023-01-25,Lost Circulation,Medium,Partial losses at 6200 ft,12,35000,LCM pill successfully deployed
-EVENT-003,WELL-003,2023-02-10,BHA Failure,High,Downhole motor failure,36,95000,Pulled out and replaced BHA
-EVENT-004,WELL-001,2023-01-28,Wellbore Instability,Medium,Tight hole conditions while tripping,18,42000,Increased mud weight and reamed
-EVENT-005,WELL-004,2023-02-18,Lost Circulation,Low,Minor losses at 9800 ft,6,15000,LCM pill successfully deployed
-EVENT-006,WELL-005,2023-03-05,Stuck Pipe,High,Pack-off at 7200 ft,72,180000,Jarring operations successful
-EVENT-007,WELL-006,2023-03-20,BHA Failure,Medium,MWD tool failure,24,65000,Pulled out and replaced MWD
-EVENT-008,WELL-007,2023-03-30,Wellbore Instability,High,Severe washout at 9500 ft,54,145000,Set cement plug and sidetrack
-EVENT-009,WELL-008,2023-03-25,Lost Circulation,Medium,Partial losses at 10200 ft,18,48000,LCM pill successfully deployed
-EVENT-010,WELL-009,2023-04-22,BHA Failure,Low,Bit damage,12,30000,Pulled out and replaced bit
+event_id,well_id,event_date,event_type,depth_ft,duration_hrs,description,resolution,impact_severity
+E-2023-001,W-2023-001,2023-01-10,Lost Circulation,8500,6.5,Lost returns at 8500 ft,LCM pill pumped,Medium
+E-2023-002,W-2023-002,2023-02-15,Stuck Pipe,12300,12.0,Differential sticking in shale section,Worked pipe free with jar,High
+E-2023-003,W-2023-003,2023-03-20,Wellbore Instability,7200,8.5,Hole collapse in unstable formation,Increased mud weight,Medium
+E-2023-004,W-2023-004,2023-04-25,Equipment Failure,15400,4.0,Top drive failure,Replaced component,Low
+E-2023-005,W-2023-005,2023-05-30,Kick,9800,10.5,Gas kick while drilling,Well controlled with BOP,High
+E-2023-006,W-2023-006,2023-06-15,Lost Circulation,6500,5.0,Partial losses in fractured zone,LCM pill pumped,Low
+E-2023-007,W-2023-007,2023-01-25,Stuck Pipe,11200,18.0,Mechanical sticking in dogleg,Backed off and sidetracked,High
+E-2023-008,W-2023-008,2023-03-01,Wellbore Instability,9500,7.5,Tight hole conditions,Reamed and conditioned hole,Medium
+E-2023-009,W-2023-009,2023-04-05,Equipment Failure,14200,3.5,Mud pump failure,Repaired pump,Low
+E-2023-010,W-2023-010,2023-05-10,Kick,11800,9.0,Water kick while drilling,Well controlled with BOP,Medium

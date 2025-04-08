@@ -1,11 +1,11 @@
-core_id,well_id,formation,depth_start_ft,depth_end_ft,porosity_avg,permeability_md,water_saturation,oil_saturation,lithology
-CORE-001,WELL-001,Eagle Ford,9200,9260,0.16,0.08,0.35,0.65,Shale
-CORE-002,WELL-002,Permian,7500,7580,0.12,0.05,0.42,0.58,Limestone
-CORE-003,WELL-003,Bakken,8800,8870,0.14,0.07,0.38,0.62,Shale
-CORE-004,WELL-004,Eagle Ford,9800,9880,0.19,0.12,0.30,0.70,Shale
-CORE-005,WELL-005,Marcellus,6900,6980,0.08,0.02,0.48,0.52,Shale
-CORE-006,WELL-006,Permian,8100,8180,0.13,0.06,0.40,0.60,Dolomite
-CORE-007,WELL-007,Bakken,9200,9280,0.15,0.09,0.36,0.64,Shale
-CORE-008,WELL-008,Eagle Ford,10100,10180,0.17,0.10,0.32,0.68,Shale
-CORE-009,WELL-009,Marcellus,7200,7280,0.09,0.03,0.45,0.55,Shale
-CORE-010,WELL-010,Permian,8400,8480,0.14,0.07,0.38,0.62,Limestone
+core_id,well_id,top_depth_ft,bottom_depth_ft,recovery_pct,porosity_avg,permeability_avg_md,water_saturation_avg,oil_saturation_avg,lab_name,analysis_date
+C-2023-001,W-2023-001,8500,8550,95,0.12,45.3,0.35,0.65,CoreLab,2023-02-10
+C-2023-002,W-2023-001,10200,10250,92,0.18,120.5,0.25,0.75,CoreLab,2023-02-10
+C-2023-003,W-2023-002,12300,12350,88,0.15,85.2,0.30,0.70,Weatherford,2023-03-15
+C-2023-004,W-2023-002,14500,14550,90,0.10,25.8,0.45,0.55,Weatherford,2023-03-15
+C-2023-005,W-2023-003,7200,7250,94,0.22,180.3,0.20,0.80,CoreLab,2023-04-20
+C-2023-006,W-2023-003,9000,9050,91,0.16,95.7,0.28,0.72,CoreLab,2023-04-20
+C-2023-007,W-2023-004,15400,15450,85,0.08,15.2,0.50,0.50,Weatherford,2023-05-25
+C-2023-008,W-2023-004,17800,17850,87,0.09,18.5,0.48,0.52,Weatherford,2023-05-25
+C-2023-009,W-2023-007,11200,11250,93,0.14,65.8,0.32,0.68,CoreLab,2023-02-25
+C-2023-010,W-2023-008,9500,9550,90,0.17,105.2,0.27,0.73,Weatherford,2023-03-25

@@ -1,11 +1,11 @@
-well_id,rig_name,formation,start_date,end_date,depth_ft,days_on_well,avg_rop_ft_hr,mud_weight_ppg,bit_type,total_cost_usd
-WELL-001,Rig-42,Eagle Ford,2023-01-10,2023-02-05,12500,26,75.3,10.2,PDC,1250000
-WELL-002,Rig-37,Permian,2023-01-15,2023-02-28,9800,44,55.8,9.8,Tricone,1680000
-WELL-003,Rig-29,Bakken,2023-02-01,2023-03-10,11200,37,63.2,10.5,PDC,1420000
-WELL-004,Rig-42,Eagle Ford,2023-02-10,2023-03-05,13100,23,85.1,10.3,PDC,1180000
-WELL-005,Rig-51,Marcellus,2023-02-20,2023-04-05,8500,44,48.3,9.5,Tricone,1520000
-WELL-006,Rig-37,Permian,2023-03-05,2023-04-10,10200,36,70.8,9.9,PDC,1380000
-WELL-007,Rig-29,Bakken,2023-03-15,2023-04-25,11800,41,57.6,10.4,PDC,1580000
-WELL-008,Rig-42,Eagle Ford,2023-03-10,2023-04-05,12800,26,82.1,10.2,PDC,1280000
-WELL-009,Rig-51,Marcellus,2023-04-10,2023-05-20,8900,40,55.6,9.6,Tricone,1450000
-WELL-010,Rig-37,Permian,2023-04-15,2023-05-25,10500,40,65.6,10.0,PDC,1520000
+well_id,well_name,field_name,start_date,end_date,status,total_depth_ft,avg_rop_ft_hr,mud_weight_ppg,bha_type,drilling_days
+W-2023-001,Alpha-1,North Field,2023-01-05,2023-01-25,Completed,12500,45.2,10.2,PDC,20
+W-2023-002,Beta-2,South Field,2023-02-10,2023-03-05,Completed,15000,38.7,11.5,Tricone,23
+W-2023-003,Gamma-3,East Field,2023-03-15,2023-04-10,Completed,9800,52.3,9.8,PDC,26
+W-2023-004,Delta-4,West Field,2023-04-20,2023-05-15,Completed,18200,32.1,12.3,Hybrid,25
+W-2023-005,Epsilon-5,Central Field,2023-05-25,,In Progress,10500,41.8,10.5,PDC,15
+W-2023-006,Zeta-6,North Field,2023-06-10,,In Progress,8200,75.4,9.5,PDC,12
+W-2023-007,Eta-7,South Field,2023-01-15,2023-02-10,Completed,14300,36.9,11.8,Tricone,26
+W-2023-008,Theta-8,East Field,2023-02-20,2023-03-15,Completed,11200,48.5,10.1,PDC,23
+W-2023-009,Iota-9,West Field,2023-03-25,2023-04-20,Completed,16800,35.2,12.0,Hybrid,26
+W-2023-010,Kappa-10,Central Field,2023-05-01,2023-05-25,Completed,13500,42.7,10.8,PDC,24

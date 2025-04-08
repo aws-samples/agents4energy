@@ -50,6 +50,53 @@ To change which email address suffixes are allowed, follow these steps:
 1. Click "Configuration" and then "Environmental Variables"
 1. The variable named "ALLOWED_EMAIL_SUFFIXES" is a comma seperated list of allowed email suffixes. Change this variable to reflect the email addresses you would like to allow. If you add an empty element (ex: `@amazon.com,`), any email address will be allowed. 
 
+## Structured Data for All Agents
+
+Each agent has access to its own structured data through AWS Athena. The data is stored in CSV files in the S3 bucket and processed by a Glue crawler.
+
+### Directory Structure
+- `sampleData/production-agent/structured-data-files/` - Production agent data
+- `sampleData/regulatory-agent/structured-data-files/` - Regulatory agent data
+- `sampleData/drilling-agent/structured-data-files/` - Drilling agent data
+- `sampleData/petrophysics-agent/structured-data-files/` - Petrophysics agent data
+- `sampleData/finance-agent/structured-data-files/` - Finance agent data
+- `sampleData/land-agent/structured-data-files/` - Land agent data
+- `sampleData/refining-agent/structured-data-files/` - Refining agent data
+- `sampleData/trading-agent/structured-data-files/` - Trading agent data
+- `sampleData/logistics-agent/structured-data-files/` - Logistics agent data
+- `sampleData/decarb-agent/structured-data-files/` - Decarb agent data
+
+### Adding New Data
+1. Add your CSV files to the appropriate directory
+2. Deploy the solution or wait for the next automatic crawler run (every 5 minutes)
+3. The Glue crawler will automatically process the new data
+4. The Knowledge Base will be updated with the new table definitions
+5. The agent will be able to query the new data
+
+### Querying Data
+Each agent can query its data using Athena SQL. For example:
+```sql
+-- Find all open compliance issues
+SELECT * FROM agents4energy_db.compliance_reports WHERE status = 'Open'
+
+-- Find wells with high ROP
+SELECT * FROM agents4energy_db.drilling_operations WHERE avg_rop_ft_hr > 70
+```
+
+### Verifying the Setup
+You can run the verification script to check if the structured data setup is working correctly:
+
+```bash
+# Run with default settings (will try to detect bucket name automatically)
+node scripts/verify-structured-data.js
+
+# Or specify the stack name
+STACK_NAME=amplify-agentsforenergy-cm node scripts/verify-structured-data.js
+
+# Or specify the bucket name directly
+BUCKET_NAME=amplify-agentsforenergy-cm-filedrivebucket01be03e1-tgbpipx2uu7y node scripts/verify-structured-data.js
+```
+
 ## Production Agent
 
 ### Add new structured data

@@ -1,11 +1,11 @@
-report_id,facility_name,inspection_date,inspector,severity,finding,status,due_date,resolution_date
-REG-2023-001,Houston Refinery,2023-01-15,John Smith,High,Inadequate emergency response procedures,Open,2023-03-15,
-REG-2023-002,Dallas Processing Plant,2023-01-22,Maria Johnson,Medium,Incomplete hazardous waste documentation,Resolved,2023-02-22,2023-02-15
-REG-2023-003,Austin Terminal,2023-02-05,Robert Brown,Low,Minor labeling issues on storage tanks,Resolved,2023-03-05,2023-02-28
-REG-2023-004,San Antonio Facility,2023-02-18,Sarah Davis,High,Non-compliant air emissions monitoring,Open,2023-04-18,
-REG-2023-005,Corpus Christi Plant,2023-03-10,James Wilson,Medium,Outdated spill prevention plan,In Progress,2023-05-10,
-REG-2023-006,Houston Refinery,2023-03-25,John Smith,High,Inadequate safety training documentation,Open,2023-05-25,
-REG-2023-007,Dallas Processing Plant,2023-04-08,Maria Johnson,Low,Minor record-keeping discrepancies,Resolved,2023-05-08,2023-04-30
-REG-2023-008,Austin Terminal,2023-04-22,Robert Brown,Medium,Insufficient secondary containment,In Progress,2023-06-22,
-REG-2023-009,San Antonio Facility,2023-05-12,Sarah Davis,High,Expired permits for water discharge,Open,2023-07-12,
-REG-2023-010,Corpus Christi Plant,2023-05-28,James Wilson,Low,Incomplete training records,Resolved,2023-06-28,2023-06-20
+report_id,facility_name,inspection_date,inspector,status,findings,severity,due_date,completed_date
+CR-2023-001,North Platform Alpha,2023-01-15,John Smith,Closed,Minor leak in secondary containment,Low,2023-02-15,2023-02-10
+CR-2023-002,South Processing Facility,2023-02-03,Maria Johnson,Open,Incomplete safety documentation,Medium,2023-03-15,
+CR-2023-003,West Drilling Site,2023-02-17,Robert Chen,Closed,Improper waste disposal,High,2023-03-01,2023-02-28
+CR-2023-004,East Terminal,2023-03-05,Sarah Williams,Open,Missing emergency response plan,High,2023-04-05,
+CR-2023-005,Central Storage,2023-03-12,David Miller,Closed,Expired permits,Medium,2023-04-12,2023-04-10
+CR-2023-006,North Platform Beta,2023-04-02,John Smith,Open,Inadequate spill response equipment,Medium,2023-05-02,
+CR-2023-007,South Processing Facility,2023-04-18,Maria Johnson,Closed,Unreported minor spill,Low,2023-05-18,2023-05-15
+CR-2023-008,West Drilling Site,2023-05-07,Robert Chen,Open,Excessive flaring,High,2023-06-07,
+CR-2023-009,East Terminal,2023-05-23,Sarah Williams,Closed,Improper chemical storage,Medium,2023-06-23,2023-06-20
+CR-2023-010,Central Storage,2023-06-10,David Miller,Open,Inadequate worker training,Medium,2023-07-10,

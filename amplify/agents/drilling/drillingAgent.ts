@@ -1,201 +1,52 @@
 import * as cdk from 'aws-cdk-lib';
-import { aws_s3 as s3 } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import { aws_ec2 } from 'aws-cdk-lib';
-import * as iam from 'aws-cdk-lib/aws-iam';
-import { bedrock as cdkLabsBedrock } from '@cdklabs/generative-ai-cdk-constructs';
 import * as bedrock from 'aws-cdk-lib/aws-bedrock';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3Deployment from 'aws-cdk-lib/aws-s3-deployment';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import { Construct } from 'constructs';
 
-interface BedrockAgentBuilderProps {
-    description?: string;
-    modelId?: string;
-    environment?: string;
-    instruction?: string;
-    vpc: aws_ec2.Vpc;
-    s3Bucket: s3.IBucket;
-    s3Deployment: cdk.aws_s3_deployment.BucketDeployment;
-    drillingAgentId?: string;
-    drillingAgentAliasId?: string;
+export interface DrillingAgentProps {
+  vpc: ec2.Vpc;
+  s3Deployment: s3Deployment.BucketDeployment;
+  s3Bucket: s3.IBucket;
 }
 
-export function drillingAgentBuilder(scope: Construct, props: BedrockAgentBuilderProps) {
-    const resourcePrefix = scope.node.tryGetContext('resourcePrefix') || 'drilling';
-    const environment = props.environment || scope.node.tryGetContext('environment') || 'dev';
+export function drillingAgentBuilder(scope: Construct, props: DrillingAgentProps) {
+  // Create the drilling agent
+  const drillingAgent = new bedrock.CfnAgent(scope, 'DrillingAgent', {
+    agentName: 'DrillingAgent',
+    instruction: `You are the Drilling Agent, specialized in drilling operations and optimization for energy companies.
 
-    // Declare a UUID to append to resources to avoid naming collisions in Amplify
-    const stackUUID = cdk.Names.uniqueResourceName(scope, { maxLength: 3 }).toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(-3)
-    
-    // Create IAM role for the Bedrock Agent
-    const drillingAgentRole = new iam.Role(scope, 'DrillingAgentRole', {
-        assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
-        roleName: `BedrockAgentRole-Drilling-${stackUUID}`,
-        path: '/service-role/',
-        description: 'Execution role for Bedrock Drilling Agent'
-    });
+You have access to the following structured data tables:
+- drilling_operations: Contains information about drilling operations, including well details and performance metrics
+- drilling_events: Contains information about drilling events, incidents, and their resolution
 
-    // Add required permissions
-    drillingAgentRole.addToPolicy(
-        new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            actions: [
-                'bedrock:InvokeModel',
-                'bedrock:Retrieve',
-                'bedrock:ListFoundationModels',
-                'bedrock:ListCustomModels',
-                'bedrock:InvokeAgent',
-                'bedrock:RetrieveAgent'
-            ],
-            resources: [
-                `arn:aws:bedrock:${cdk.Stack.of(scope).region}::foundation-model/*`,
-                `arn:aws:bedrock:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:agent/*`,
-                `arn:aws:bedrock:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:knowledge-base/*`
-            ]
-        })
-    );
+When asked about operational data, you should query these tables using Athena SQL.
+For example:
+- To find all wells with high ROP: SELECT * FROM agents4energy_db.drilling_operations WHERE avg_rop_ft_hr > 70
+- To find stuck pipe events: SELECT * FROM agents4energy_db.drilling_events WHERE event_type = 'Stuck Pipe'
 
-    // Add CloudWatch Logs permissions
-    drillingAgentRole.addToPolicy(
-        new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            actions: [
-                'logs:CreateLogGroup',
-                'logs:CreateLogStream',
-                'logs:PutLogEvents'
-            ],
-            resources: [
-                `arn:aws:logs:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:log-group:/aws/bedrock/*`
-            ]
-        })
-    );
+For general knowledge questions, rely on your training data.`,
+    foundationModel: 'anthropic.claude-3-sonnet-20240229-v1:0',
+    customerEncryptionKeyArn: undefined,
+    description: 'Drilling Agent for drilling operations and optimization',
+    idleSessionTtlInSeconds: 1800,
+  });
 
-    // Add S3 access permissions
-    props.s3Bucket.grantRead(drillingAgentRole);
-    
-    // Default instruction for the drilling agent
-    const defaultInstruction = `You are a drilling engineering expert for the energy industry. You help companies plan, execute, and optimize drilling operations for oil and gas wells.
-    
-    You can provide information on:
-    - Drilling equipment and technologies
-    - Well planning and trajectory design
-    - Drilling fluids and mud systems
-    - Formation pressure control
-    - Directional drilling techniques
-    - Drilling optimization and efficiency
-    - Well control procedures
-    - Drilling problems and solutions
-    
-    IMPORTANT: Distinguish between operational data queries and general knowledge queries:
-    - For operational data queries (e.g., "Show me drilling operations with high ROP", "What events caused the most downtime?"), 
-      use the structured data in your knowledge base to provide specific metrics, counts, and analysis.
-    - For general knowledge queries (e.g., "How do PDC bits work?", "Explain managed pressure drilling"), 
-      provide conceptual explanations based on your knowledge base.
-    
-    Sample operational data queries:
-    - "Which wells had the highest rate of penetration last month?"
-    - "Show me all drilling events with high severity in the past quarter"
-    - "What's the average non-productive time across all rigs?"
-    - "Which bit type has performed best in the Eagle Ford formation?"
-    - "Compare mud weight and ROP across different formations"
-    
-    Sample general knowledge queries:
-    - "What's the optimal mud weight for drilling through high-pressure formations?"
-    - "How can we improve ROP in hard rock sections?"
-    - "What causes torque fluctuations in directional drilling operations?"
-    - "Can you recommend a BHA configuration for S-shaped well profiles?"
-    - "What are the best practices for casing design in high-temperature environments?"
-    
-    When answering questions:
-    1. Be specific and technical when appropriate
-    2. Provide practical, actionable advice
-    3. Consider safety as the top priority
-    4. Reference industry standards and best practices
-    5. Acknowledge the challenges of drilling operations
-    6. For operational data queries, include relevant metrics and specific data points from the drilling_operations.csv and drilling_events.csv files
-    
-    Always answer the question as factually correct as possible and cite your sources from your knowledge base.`;
+  // Create the agent alias
+  const drillingAgentAlias = new bedrock.CfnAgentAlias(scope, 'DrillingAgentAlias', {
+    agentId: drillingAgent.attrAgentId,
+    agentAliasName: 'PROD',
+    description: 'Production alias for the Drilling Agent',
+    routingConfiguration: [
+      {
+        agentVersion: '$LATEST',
+      },
+    ],
+  });
 
-    // Create drilling knowledge base and s3 data source for the KB
-    const drillingKnowledgeBase = new cdkLabsBedrock.KnowledgeBase(scope, `KB-drilling`, {
-        embeddingsModel: cdkLabsBedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
-        instruction: `You are a helpful question answering assistant. You answer user questions factually and honestly related to drilling operations in the energy industry.`,
-        description: 'Drilling Knowledge Base',
-    });
-    const s3docsDataSource = drillingKnowledgeBase.addS3DataSource({
-        bucket: props.s3Bucket,
-        dataSourceName: "a4e-kb-ds-s3-drilling",
-        inclusionPrefixes: ['drilling-agent/'],
-    })
-
-    // Create the Bedrock agent with the role
-    const cfnAgentProps: bedrock.CfnAgentProps = {
-        agentName: `${resourcePrefix}-agent-${stackUUID}`,
-        description: props.description || 'This agent is designed to help with drilling operations in the energy sector.',
-        instruction: props.instruction || defaultInstruction,
-        foundationModel: props.modelId || 'anthropic.claude-3-haiku-20240307-v1:0',
-        agentResourceRoleArn: drillingAgentRole.roleArn,
-        autoPrepare: true,
-        knowledgeBases: [{
-                knowledgeBaseId: drillingKnowledgeBase.knowledgeBaseId,
-                description: 'Knowledge Base for drilling operations in energy',
-                knowledgeBaseState: 'ENABLED'
-            }],
-    
-    };
-
-    // Create the Bedrock agent
-    const drillingAgent = new bedrock.CfnAgent(
-        scope,
-        'DrillingAgent',
-        cfnAgentProps
-    );
-
-    // Create an alias for the agent - must be 10 chars or less
-    const drillingAgentAlias = new bedrock.CfnAgentAlias(
-        scope,
-        'DrillingAgentAlias',
-        {
-            agentId: drillingAgent.attrAgentId,
-            agentAliasName: `drill${stackUUID}`
-        }
-    );
-
-    drillingAgentAlias.addDependency(drillingAgent);
-
-    // Apply removal policies
-    drillingAgent.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
-    drillingAgentAlias.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
-
-    // Create CloudWatch metrics
-    const metric = new cdk.aws_cloudwatch.Metric({
-        namespace: 'DrillingAgent',
-        metricName: 'Invocations',
-        dimensionsMap: {
-            AgentId: drillingAgent.attrAgentId,
-            Environment: environment
-        }
-    });
-
-    // Create CloudWatch alarm
-    new cdk.aws_cloudwatch.Alarm(scope, 'DrillingAgentErrorAlarm', {
-        metric: metric,
-        threshold: 5,
-        evaluationPeriods: 1,
-        alarmDescription: 'Alert when drilling agent encounters multiple errors',
-        comparisonOperator: cdk.aws_cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD
-    });
-
-    // Add trust policy conditions
-    const cfnRole = drillingAgentRole.node.defaultChild as iam.CfnRole;
-    cfnRole.addPropertyOverride('AssumeRolePolicyDocument.Statement.0.Condition', {
-        StringEquals: {
-            'aws:SourceAccount': cdk.Stack.of(scope).account
-        }
-    });
-    
-    return {
-        drillingAgent,
-        drillingAgentAlias,
-        drillingAgentRole,
-        metric
-    };
+  return {
+    drillingAgent,
+    drillingAgentAlias,
+  };
 }
