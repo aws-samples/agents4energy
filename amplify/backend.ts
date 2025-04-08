@@ -225,16 +225,7 @@ const otherAgentTypes = [
   'decarb'
 ];
 
-otherAgentTypes.forEach(agentType => {
-  const functionName = `${agentType}AgentFunction`;
-  const agentFunction = backend.functions.getFunction(functionName)?.resources.lambda;
-  
-  if (agentFunction) {
-    structuredDataSetup.addPermissionsToAgentFunction(agentFunction);
-    agentFunction.addEnvironment('ATHENA_WORKGROUP_NAME', structuredDataSetup.athenaWorkgroup.name);
-    agentFunction.addEnvironment('DATABASE_NAME', 'agents4energy_db');
-  }
-});
+// We'll handle other agent functions in a future update
 
 const {
   convertPdfToYamlFunction,
