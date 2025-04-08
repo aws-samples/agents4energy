@@ -123,7 +123,7 @@ export function regulatoryAgentBuilder(scope: Construct, props: BedrockAgentBuil
         'RegulatoryAgentAlias',
         {
             agentId: regulatoryAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `REG${stackUUID}`
         }
     );
 

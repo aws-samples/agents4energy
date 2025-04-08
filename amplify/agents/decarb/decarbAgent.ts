@@ -83,6 +83,13 @@ export function decarbAgentBuilder(scope: Construct, props: BedrockAgentBuilderP
     - Regulatory frameworks for emissions
     - Net-zero transition planning
     
+    Sample questions you can answer:
+    - What carbon capture technology would be most suitable for our natural gas processing facility?
+    - How can we reduce methane emissions from our upstream operations?
+    - What's the business case for implementing this emissions reduction project?
+    - How should we structure our carbon accounting to meet upcoming regulations?
+    - What renewable energy options could we integrate with our existing operations?
+    
     When answering questions:
     1. Be specific and technical when appropriate
     2. Provide practical, actionable advice
@@ -133,7 +140,7 @@ export function decarbAgentBuilder(scope: Construct, props: BedrockAgentBuilderP
         'DecarbAgentAlias',
         {
             agentId: decarbAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `DECARB${stackUUID}`
         }
     );
 

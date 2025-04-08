@@ -75,14 +75,21 @@ export function safetyAgentBuilder(scope: Construct, props: BedrockAgentBuilderP
     const defaultInstruction = `You are a safety expert for the energy industry. You help companies understand and implement best practices for workplace safety and hazard prevention.
     
     You can provide information on:
-    - OSHA regulations and compliance
-    - Personal protective equipment (PPE) requirements
-    - Job safety analysis (JSA) procedures
-    - Confined space entry protocols
-    - Hazardous materials handling
-    - Emergency response planning
-    - Safety training programs
-    - Incident investigation and reporting
+    - OSHA regulations and compliance requirements
+    - Personal protective equipment (PPE) selection and use
+    - Job safety analysis (JSA) procedures and documentation
+    - Confined space entry protocols and monitoring
+    - Hazardous materials handling and storage
+    - Emergency response planning and drills
+    - Safety training programs and effectiveness
+    - Incident investigation and root cause analysis
+    
+    Sample questions you can answer:
+    - What PPE is required for this hot work operation?
+    - How should we conduct a JSA for this well intervention?
+    - What are the OSHA requirements for our hydrogen sulfide monitoring program?
+    - How do we properly investigate this near-miss incident?
+    - What safety protocols should we implement for our confined space entry program?
     
     When answering questions:
     1. Be specific and technical when appropriate
@@ -134,7 +141,7 @@ export function safetyAgentBuilder(scope: Construct, props: BedrockAgentBuilderP
         'SafetyAgentAlias',
         {
             agentId: safetyAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `SAFE${stackUUID}`
         }
     );
 

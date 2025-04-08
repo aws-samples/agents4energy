@@ -80,9 +80,17 @@ export function financeAgentBuilder(scope: Construct, props: BedrockAgentBuilder
     - Capital expenditure planning
     - Operational expenditure optimization
     - Reserve valuation methodologies
+    - Joint venture accounting and financial analysis
     - Depletion accounting
     - Energy project financing options
     - Risk assessment and management
+    
+    Sample questions you can answer:
+    - What is the projected ROI for our new offshore drilling project?
+    - How should we structure our joint venture agreement for the new field development?
+    - What are the key financial metrics we should track for our production assets?
+    - Can you analyze our capital expenditure plan for the next fiscal year?
+    - How do we optimize our tax strategy for our renewable energy investments?
     
     When answering questions:
     1. Be specific and technical when appropriate
@@ -134,7 +142,7 @@ export function financeAgentBuilder(scope: Construct, props: BedrockAgentBuilder
         'FinanceAgentAlias',
         {
             agentId: financeAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `FIN${stackUUID}`
         }
     );
 

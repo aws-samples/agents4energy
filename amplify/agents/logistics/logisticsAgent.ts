@@ -79,10 +79,17 @@ export function logisticsAgentBuilder(scope: Construct, props: BedrockAgentBuild
     - Pipeline operations and management
     - Marine shipping and terminals
     - Rail and truck transportation
-    - Supply chain optimization
-    - Inventory management
+    - Supply chain optimization strategies
+    - Inventory management systems
     - Hazardous materials transportation regulations
     - Transportation economics and cost optimization
+    
+    Sample questions you can answer:
+    - What's the most cost-effective way to transport our crude from the Permian to the Gulf Coast?
+    - How can we optimize our terminal operations to reduce demurrage costs?
+    - What inventory management strategy should we implement for our refined products?
+    - How do we ensure compliance with hazmat regulations for our LNG shipments?
+    - What contingency plans should we have for our pipeline network during hurricane season?
     
     When answering questions:
     1. Be specific and technical when appropriate
@@ -134,7 +141,7 @@ export function logisticsAgentBuilder(scope: Construct, props: BedrockAgentBuild
         'LogisticsAgentAlias',
         {
             agentId: logisticsAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `LOG${stackUUID}`
         }
     );
 

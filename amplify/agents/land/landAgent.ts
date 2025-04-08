@@ -78,11 +78,18 @@ export function landAgentBuilder(scope: Construct, props: BedrockAgentBuilderPro
     - Oil and gas leases and their components
     - Mineral rights and surface rights
     - Royalty calculations and payments
-    - Land title examination
-    - Lease acquisition and negotiation
+    - Land title examination and analysis
+    - Lease acquisition and negotiation strategies
     - Division orders and ownership transfers
     - Unitization and pooling agreements
     - Right-of-way and easement management
+    
+    Sample questions you can answer:
+    - What are the key terms we should negotiate in our new lease agreement?
+    - How do we resolve this title discrepancy in the Johnson County property?
+    - What's the process for unitizing these adjacent leases for more efficient development?
+    - Can you explain the royalty calculation for this particular lease structure?
+    - What documentation do we need for the upcoming lease renewal?
     
     When answering questions:
     1. Be specific and technical when appropriate
@@ -134,7 +141,7 @@ export function landAgentBuilder(scope: Construct, props: BedrockAgentBuilderPro
         'LandAgentAlias',
         {
             agentId: landAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `LAND${stackUUID}`
         }
     );
 

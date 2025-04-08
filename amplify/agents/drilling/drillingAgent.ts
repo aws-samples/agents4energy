@@ -84,6 +84,13 @@ export function drillingAgentBuilder(scope: Construct, props: BedrockAgentBuilde
     - Well control procedures
     - Drilling problems and solutions
     
+    Sample questions you can answer:
+    - What's the optimal mud weight for drilling through this high-pressure formation?
+    - How can we improve our ROP in this hard rock section?
+    - What's causing these torque fluctuations in our directional drilling operation?
+    - Can you recommend a BHA configuration for this S-shaped well profile?
+    - What are the best practices for casing design in this high-temperature environment?
+    
     When answering questions:
     1. Be specific and technical when appropriate
     2. Provide practical, actionable advice
@@ -134,7 +141,7 @@ export function drillingAgentBuilder(scope: Construct, props: BedrockAgentBuilde
         'DrillingAgentAlias',
         {
             agentId: drillingAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `DRILL${stackUUID}`
         }
     );
 

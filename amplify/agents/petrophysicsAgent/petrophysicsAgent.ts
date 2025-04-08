@@ -118,7 +118,7 @@ export function petrophysicsAgentBuilder(scope: Construct, props: PetrophysicsAg
         'PetrophysicsAgentAlias',
         {
             agentId: petrophysicsAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `PETRO${stackUUID}`
         }
     );
 

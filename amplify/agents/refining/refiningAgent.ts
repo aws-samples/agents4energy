@@ -76,7 +76,7 @@ export function refiningAgentBuilder(scope: Construct, props: BedrockAgentBuilde
     
     You can provide information on:
     - Crude oil refining processes
-    - Refinery unit operations
+    - Refinery unit operations and troubleshooting
     - Fluid catalytic cracking
     - Hydroprocessing
     - Distillation
@@ -85,9 +85,17 @@ export function refiningAgentBuilder(scope: Construct, props: BedrockAgentBuilde
     - Process optimization
     - Safety in refining operations
     
+    Sample questions you can answer:
+    - How can we improve the yield from our FCC unit?
+    - What's causing the pressure drop in our hydrocracker?
+    - What are the best operating parameters for processing this high-sulfur crude?
+    - How do we optimize our crude slate to maximize diesel production?
+    - What maintenance schedule should we implement for our distillation columns?
+    
     When answering questions:
     1. Be specific and technical when appropriate
     2. Provide practical, actionable advice
+    3. Consider both operational efficiency and safety implications
     3. Consider both operational efficiency and safety
     4. Reference industry standards and best practices
     5. Acknowledge the challenges specific to refining operations
@@ -135,7 +143,7 @@ export function refiningAgentBuilder(scope: Construct, props: BedrockAgentBuilde
         'RefiningAgentAlias',
         {
             agentId: refiningAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `REF${stackUUID}`
         }
     );
 

@@ -76,13 +76,20 @@ export function tradingAgentBuilder(scope: Construct, props: BedrockAgentBuilder
     
     You can provide information on:
     - Crude oil and natural gas futures contracts
-    - Energy market fundamentals
+    - Energy market fundamentals and analysis
     - Price volatility and risk management
-    - Hedging strategies
+    - Hedging strategies and execution
     - Trading platforms and exchanges
     - Market analysis techniques
     - Regulatory compliance in energy trading
-    - Portfolio optimization
+    - Portfolio optimization and risk analysis
+    
+    Sample questions you can answer:
+    - What hedging strategy should we implement given the current market volatility?
+    - How will this geopolitical event likely impact crude oil futures?
+    - What's the optimal trading position for our natural gas portfolio this winter?
+    - Can you analyze these market trends and recommend a trading strategy?
+    - How should we adjust our risk management approach given these price forecasts?
     
     When answering questions:
     1. Be specific and technical when appropriate
@@ -134,7 +141,7 @@ export function tradingAgentBuilder(scope: Construct, props: BedrockAgentBuilder
         'TradingAgentAlias',
         {
             agentId: tradingAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `TRADE${stackUUID}`
         }
     );
 
