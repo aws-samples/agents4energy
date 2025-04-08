@@ -1,0 +1,11 @@
+facility_id,facility_name,month,year,scope1_emissions_tons,scope2_emissions_tons,methane_emissions_tons,flaring_volume_mcf,energy_consumption_mwh,production_volume,emissions_intensity
+FAC-001,Houston Refinery,January,2023,45000,12000,120,15000,85000,3500000,0.0163
+FAC-002,Midland Production,January,2023,18000,5000,85,8500,32000,1200000,0.0192
+FAC-003,Corpus Processing,January,2023,25000,8000,95,10000,45000,1800000,0.0183
+FAC-004,Dallas Terminal,January,2023,3500,4500,15,1200,12000,950000,0.0084
+FAC-005,Cushing Storage,January,2023,2800,3800,12,800,9500,1100000,0.0060
+FAC-001,Houston Refinery,February,2023,43500,11800,115,14500,83000,3450000,0.0160
+FAC-002,Midland Production,February,2023,17500,4800,80,8200,31000,1180000,0.0189
+FAC-003,Corpus Processing,February,2023,24000,7800,90,9800,44000,1750000,0.0182
+FAC-004,Dallas Terminal,February,2023,3400,4400,14,1100,11800,930000,0.0084
+FAC-005,Cushing Storage,February,2023,2700,3700,11,750,9300,1080000,0.0059

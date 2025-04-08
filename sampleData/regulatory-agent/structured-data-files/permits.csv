@@ -1,0 +1,11 @@
+permit_id,facility_name,permit_type,issuing_agency,issue_date,expiration_date,status,renewal_status
+PER-2023-001,Houston Refinery,Air Quality,EPA,2021-06-15,2023-06-14,Active,Renewal In Progress
+PER-2023-002,Dallas Processing Plant,Wastewater Discharge,State DEQ,2022-03-22,2025-03-21,Active,Not Started
+PER-2023-003,Austin Terminal,Hazardous Waste,EPA,2020-08-05,2023-08-04,Active,Renewal In Progress
+PER-2023-004,San Antonio Facility,Stormwater,State DEQ,2022-11-18,2027-11-17,Active,Not Started
+PER-2023-005,Corpus Christi Plant,Air Quality,EPA,2019-04-10,2023-04-09,Expired,Renewal Submitted
+PER-2023-006,Houston Refinery,Underground Storage Tank,State DEQ,2021-09-25,2024-09-24,Active,Not Started
+PER-2023-007,Dallas Processing Plant,Air Quality,EPA,2020-12-08,2023-12-07,Active,Not Started
+PER-2023-008,Austin Terminal,Wastewater Discharge,State DEQ,2022-05-22,2025-05-21,Active,Not Started
+PER-2023-009,San Antonio Facility,Hazardous Waste,EPA,2019-07-12,2022-07-11,Expired,Renewal Rejected
+PER-2023-010,Corpus Christi Plant,Stormwater,State DEQ,2021-10-28,2026-10-27,Active,Not Started

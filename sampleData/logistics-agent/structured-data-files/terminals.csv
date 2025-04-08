@@ -1,0 +1,11 @@
+terminal_id,terminal_name,location,capacity_barrels,current_inventory_barrels,utilization_pct,products,truck_racks,rail_capacity,marine_docks
+TERM-001,Houston North,Houston TX,500000,425000,85,Gasoline|Diesel|Jet Fuel,12,25,0
+TERM-002,Corpus Christi Main,Corpus Christi TX,750000,600000,80,Gasoline|Diesel|Crude Oil,8,15,3
+TERM-003,Midland Central,Midland TX,350000,315000,90,Crude Oil,5,30,0
+TERM-004,Cushing Hub,Cushing OK,1200000,960000,80,Crude Oil,0,40,0
+TERM-005,Chicago Terminal,Chicago IL,400000,280000,70,Gasoline|Diesel,10,20,1
+TERM-006,New York Harbor,New York NY,650000,520000,80,Gasoline|Diesel|Jet Fuel,15,10,4
+TERM-007,Atlanta Distribution,Atlanta GA,300000,240000,80,Gasoline|Diesel|Jet Fuel,14,0,0
+TERM-008,Dallas Terminal,Dallas TX,350000,245000,70,Gasoline|Diesel,12,15,0
+TERM-009,Philadelphia Terminal,Philadelphia PA,450000,360000,80,Gasoline|Diesel|Jet Fuel,10,15,2
+TERM-010,Boston Harbor,Boston MA,380000,266000,70,Gasoline|Diesel|Jet Fuel,8,5,3

@@ -1,0 +1,11 @@
+cost_center_id,quarter,year,category,budget_amount_usd,actual_amount_usd,variance_pct,status
+CC-001,Q1,2023,Drilling,3500000,3680000,5.1,Over Budget
+CC-002,Q1,2023,Completions,2800000,2750000,-1.8,Under Budget
+CC-003,Q1,2023,Facilities,1200000,1350000,12.5,Over Budget
+CC-004,Q1,2023,G&A,950000,920000,-3.2,Under Budget
+CC-005,Q1,2023,Land,750000,780000,4.0,Over Budget
+CC-001,Q2,2023,Drilling,3800000,3920000,3.2,Over Budget
+CC-002,Q2,2023,Completions,3100000,2980000,-3.9,Under Budget
+CC-003,Q2,2023,Facilities,1500000,1620000,8.0,Over Budget
+CC-004,Q2,2023,G&A,980000,990000,1.0,On Budget
+CC-005,Q2,2023,Land,820000,790000,-3.7,Under Budget

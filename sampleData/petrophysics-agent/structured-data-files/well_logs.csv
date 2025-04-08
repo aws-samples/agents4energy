@@ -1,0 +1,11 @@
+log_id,well_id,log_date,log_type,service_company,depth_start_ft,depth_end_ft,porosity_avg,resistivity_avg,gamma_ray_avg,quality_indicator
+LOG-001,WELL-001,2023-01-20,Triple Combo,Schlumberger,8000,12500,0.18,15.2,65.3,High
+LOG-002,WELL-002,2023-02-10,Triple Combo,Halliburton,6500,9800,0.12,22.8,78.5,Medium
+LOG-003,WELL-003,2023-03-05,NMR,Baker Hughes,7200,11200,0.15,18.5,72.1,High
+LOG-004,WELL-004,2023-03-01,Triple Combo,Schlumberger,8500,13100,0.21,12.3,58.7,High
+LOG-005,WELL-005,2023-03-25,Sonic,Weatherford,5800,8500,0.09,28.6,85.2,Medium
+LOG-006,WELL-006,2023-04-05,Triple Combo,Halliburton,7000,10200,0.14,19.8,70.5,High
+LOG-007,WELL-007,2023-04-20,NMR,Baker Hughes,7800,11800,0.17,16.4,68.9,Medium
+LOG-008,WELL-008,2023-04-01,Triple Combo,Schlumberger,8200,12800,0.19,14.5,62.8,High
+LOG-009,WELL-009,2023-05-15,Sonic,Weatherford,6200,8900,0.11,25.3,80.1,Low
+LOG-010,WELL-010,2023-05-20,Triple Combo,Halliburton,7300,10500,0.16,18.2,71.4,High

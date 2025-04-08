@@ -1,0 +1,11 @@
+defect_id,lease_id,defect_type,severity,description,identified_date,status,resolution_date,resolution_description
+DEF-001,LEASE-001,Gap in Chain of Title,High,Missing deed between Jones and Smith in 1985,2022-01-15,Open,,
+DEF-002,LEASE-002,Mineral Reservation,Medium,25% mineral interest reserved in 1972 deed,2022-03-22,Resolved,2022-05-15,Obtained quitclaim from reservation holder
+DEF-003,LEASE-003,Unreleased Mortgage,Low,Old mortgage from 1995 not formally released,2022-08-05,Resolved,2022-09-20,Located release in county records
+DEF-004,LEASE-004,Probate Issue,High,Lessor inherited without proper probate,2022-11-18,Open,,
+DEF-005,LEASE-005,Boundary Dispute,Medium,Conflicting surveys along northern boundary,2022-04-10,In Progress,,
+DEF-006,LEASE-006,Gap in Chain of Title,High,Missing assignment in 1998,2022-09-25,Open,,
+DEF-007,LEASE-007,Mineral Reservation,Low,5% mineral interest reserved in 1965 deed,2022-12-08,Resolved,2023-02-10,Obtained quitclaim from reservation holder
+DEF-008,LEASE-008,Unreleased Mortgage,Medium,Mortgage from 2005 not formally released,2022-05-22,In Progress,,
+DEF-009,LEASE-009,Probate Issue,High,Multiple heirs not included in probate,2022-07-12,Open,,
+DEF-010,LEASE-010,Boundary Dispute,Low,Minor discrepancy in eastern boundary description,2022-10-28,Resolved,2023-01-15,New survey completed and agreed upon

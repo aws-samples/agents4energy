@@ -1,0 +1,11 @@
+trade_id,trader_name,trade_date,product,contract_month,volume,price_usd,counterparty,trade_type,p_and_l
+TRD-001,John Smith,2023-01-05,WTI Crude,Feb-2023,1000,75.25,Morgan Stanley,Buy,12500
+TRD-002,Sarah Johnson,2023-01-08,Natural Gas,Mar-2023,10000,3.85,Goldman Sachs,Sell,8200
+TRD-003,Michael Brown,2023-01-12,Brent Crude,Feb-2023,1500,80.10,BP,Buy,-5250
+TRD-004,John Smith,2023-01-15,WTI Crude,Mar-2023,2000,76.50,Citigroup,Sell,9800
+TRD-005,Sarah Johnson,2023-01-20,Natural Gas,Apr-2023,15000,3.92,Morgan Stanley,Buy,-7500
+TRD-006,Michael Brown,2023-02-03,Brent Crude,Mar-2023,1200,82.30,Goldman Sachs,Sell,14400
+TRD-007,John Smith,2023-02-08,WTI Crude,Apr-2023,1800,78.15,BP,Buy,8100
+TRD-008,Sarah Johnson,2023-02-12,Natural Gas,May-2023,12000,4.05,Citigroup,Sell,-3600
+TRD-009,Michael Brown,2023-02-18,Brent Crude,Apr-2023,2200,83.75,Morgan Stanley,Buy,16500
+TRD-010,John Smith,2023-02-25,WTI Crude,May-2023,1500,79.40,Goldman Sachs,Sell,10500

@@ -1,0 +1,11 @@
+project_id,project_name,facility_id,project_type,start_date,completion_date,status,capital_cost_usd,annual_emissions_reduction_tons,roi_years,carbon_price_assumption_usd
+PROJ-001,Houston Refinery CCS,FAC-001,Carbon Capture,2023-03-01,2024-06-30,In Progress,25000000,120000,8.5,65
+PROJ-002,Midland Methane Detection,FAC-002,Methane Reduction,2023-01-15,2023-06-30,Completed,3500000,15000,4.2,45
+PROJ-003,Corpus Electrification,FAC-003,Electrification,2023-04-01,2024-02-28,In Progress,12000000,35000,7.8,55
+PROJ-004,Dallas Solar Installation,FAC-004,Renewable Energy,2023-02-15,2023-08-31,In Progress,8500000,22000,6.5,50
+PROJ-005,Cushing Energy Efficiency,FAC-005,Energy Efficiency,2023-01-10,2023-04-30,Completed,2800000,9500,3.8,45
+PROJ-006,Houston Flare Reduction,FAC-001,Flaring Reduction,2023-05-01,2023-12-31,Planned,5500000,18000,5.2,50
+PROJ-007,Midland Water Recycling,FAC-002,Water Management,2023-06-01,2024-01-31,Planned,7200000,5000,8.5,55
+PROJ-008,Corpus Hydrogen Pilot,FAC-003,Hydrogen,2023-07-01,2024-09-30,Planned,18000000,42000,9.2,65
+PROJ-009,Dallas EV Fleet,FAC-004,Transportation,2023-03-15,2023-09-30,In Progress,4200000,3500,7.5,50
+PROJ-010,Cushing Waste Heat Recovery,FAC-005,Energy Efficiency,2023-04-15,2023-10-31,In Progress,3800000,11000,4.5,45

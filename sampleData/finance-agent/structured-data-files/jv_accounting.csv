@@ -1,0 +1,11 @@
+transaction_id,date,project_id,partner_id,transaction_type,amount_usd,working_interest_pct,description,status
+JV-2023-001,2023-01-15,PRJ-001,Partner-001,Capital Call,1250000,35.0,Q1 drilling program funding,Completed
+JV-2023-002,2023-01-22,PRJ-002,Partner-002,Capital Call,980000,28.5,Facility expansion funding,Completed
+JV-2023-003,2023-02-05,PRJ-001,Partner-003,Capital Call,875000,25.0,Q1 drilling program funding,Completed
+JV-2023-004,2023-02-18,PRJ-003,Partner-001,Revenue Distribution,1450000,35.0,Q4 2022 production revenue,Completed
+JV-2023-005,2023-03-10,PRJ-002,Partner-004,Capital Call,650000,18.5,Facility expansion funding,Pending
+JV-2023-006,2023-03-25,PRJ-003,Partner-002,Revenue Distribution,1180000,28.5,Q4 2022 production revenue,Completed
+JV-2023-007,2023-04-08,PRJ-001,Partner-001,AFE Adjustment,320000,35.0,Cost overrun for Well-005,Disputed
+JV-2023-008,2023-04-22,PRJ-004,Partner-003,Capital Call,1580000,25.0,New acquisition funding,Completed
+JV-2023-009,2023-05-12,PRJ-003,Partner-003,Revenue Distribution,950000,25.0,Q4 2022 production revenue,Completed
+JV-2023-010,2023-05-28,PRJ-002,Partner-001,AFE Adjustment,-180000,35.0,Cost savings for compression project,Completed

@@ -1,0 +1,11 @@
+lease_id,lessor_name,county,state,acres,effective_date,primary_term_years,expiration_date,royalty_rate,status,hbp_status,pugh_clause,depth_restriction
+LEASE-001,Smith Family Trust,Johnson,Texas,640,2020-01-15,3,2023-01-14,0.25,Active,Not HBP,Yes,Below 10000 ft
+LEASE-002,XYZ Ranch LLC,Reeves,Texas,1280,2021-03-22,5,2026-03-21,0.20,Active,HBP,No,None
+LEASE-003,Johnson Properties,McKenzie,North Dakota,480,2019-08-05,3,2022-08-04,0.18,Expired,Not HBP,Yes,Below 9000 ft
+LEASE-004,Williams Estate,Midland,Texas,960,2022-11-18,5,2027-11-17,0.22,Active,Not HBP,No,None
+LEASE-005,Green Valley Minerals,Eddy,New Mexico,800,2020-04-10,3,2023-04-09,0.25,Active,HBP,Yes,Below 8500 ft
+LEASE-006,Thompson Family,Johnson,Texas,320,2021-09-25,3,2024-09-24,0.20,Active,Not HBP,No,None
+LEASE-007,Black Rock Resources,Reeves,Texas,1600,2020-12-08,5,2025-12-07,0.22,Active,HBP,Yes,Below 11000 ft
+LEASE-008,Western Holdings LLC,McKenzie,North Dakota,560,2022-05-22,3,2025-05-21,0.19,Active,Not HBP,No,None
+LEASE-009,Sunset Minerals,Midland,Texas,720,2019-07-12,3,2022-07-11,0.25,Expired,Not HBP,Yes,Below 9500 ft
+LEASE-010,Eastern Properties,Eddy,New Mexico,1120,2021-10-28,5,2026-10-27,0.21,Active,HBP,No,None

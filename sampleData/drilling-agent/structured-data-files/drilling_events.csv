@@ -1,0 +1,11 @@
+event_id,well_id,event_date,event_type,severity,description,downtime_hours,cost_impact_usd,resolution
+EVENT-001,WELL-001,2023-01-15,Stuck Pipe,High,Differential sticking at 8500 ft,48,120000,Worked pipe free with spotting fluid
+EVENT-002,WELL-002,2023-01-25,Lost Circulation,Medium,Partial losses at 6200 ft,12,35000,LCM pill successfully deployed
+EVENT-003,WELL-003,2023-02-10,BHA Failure,High,Downhole motor failure,36,95000,Pulled out and replaced BHA
+EVENT-004,WELL-001,2023-01-28,Wellbore Instability,Medium,Tight hole conditions while tripping,18,42000,Increased mud weight and reamed
+EVENT-005,WELL-004,2023-02-18,Lost Circulation,Low,Minor losses at 9800 ft,6,15000,LCM pill successfully deployed
+EVENT-006,WELL-005,2023-03-05,Stuck Pipe,High,Pack-off at 7200 ft,72,180000,Jarring operations successful
+EVENT-007,WELL-006,2023-03-20,BHA Failure,Medium,MWD tool failure,24,65000,Pulled out and replaced MWD
+EVENT-008,WELL-007,2023-03-30,Wellbore Instability,High,Severe washout at 9500 ft,54,145000,Set cement plug and sidetrack
+EVENT-009,WELL-008,2023-03-25,Lost Circulation,Medium,Partial losses at 10200 ft,18,48000,LCM pill successfully deployed
+EVENT-010,WELL-009,2023-04-22,BHA Failure,Low,Bit damage,12,30000,Pulled out and replaced bit

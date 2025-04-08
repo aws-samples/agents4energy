@@ -1,0 +1,11 @@
+batch_id,refinery_name,product_type,production_date,volume_barrels,sulfur_ppm,octane_rating,cloud_point_f,api_gravity,status
+BATCH-001,Houston Refinery,Gasoline,2023-01-05,25000,10,91,,58.2,On Spec
+BATCH-002,Houston Refinery,Diesel,2023-01-08,18000,12,,10,36.5,On Spec
+BATCH-003,Houston Refinery,Jet Fuel,2023-01-12,15000,5,,-40,42.8,On Spec
+BATCH-004,Corpus Christi Refinery,Gasoline,2023-01-10,22000,15,87,,57.8,Off Spec
+BATCH-005,Corpus Christi Refinery,Diesel,2023-01-15,20000,8,,5,37.2,On Spec
+BATCH-006,Houston Refinery,Gasoline,2023-02-03,24000,8,92,,58.5,On Spec
+BATCH-007,Houston Refinery,Diesel,2023-02-09,19000,15,,12,36.2,Off Spec
+BATCH-008,Houston Refinery,Jet Fuel,2023-02-14,14000,4,,-42,43.0,On Spec
+BATCH-009,Corpus Christi Refinery,Gasoline,2023-02-08,23000,12,89,,58.0,On Spec
+BATCH-010,Corpus Christi Refinery,Diesel,2023-02-18,21000,10,,8,36.8,On Spec

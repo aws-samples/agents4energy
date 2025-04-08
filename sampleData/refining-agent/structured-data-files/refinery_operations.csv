@@ -1,0 +1,11 @@
+unit_id,refinery_name,unit_type,crude_type,throughput_bpd,operating_temp_f,operating_pressure_psi,energy_consumption_mmbtu_day,yield_pct,start_date,end_date
+UNIT-001,Houston Refinery,CDU,WTI,120000,650,50,4500,98.5,2023-01-01,2023-01-31
+UNIT-002,Houston Refinery,FCC,VGO,65000,950,25,3200,85.2,2023-01-01,2023-01-31
+UNIT-003,Houston Refinery,Hydrotreater,Diesel,45000,700,1500,2100,99.1,2023-01-01,2023-01-31
+UNIT-004,Corpus Christi Refinery,CDU,Maya,95000,660,55,3800,97.8,2023-01-01,2023-01-31
+UNIT-005,Corpus Christi Refinery,Reformer,Naphtha,35000,920,200,1900,92.5,2023-01-01,2023-01-31
+UNIT-001,Houston Refinery,CDU,WTI,118000,655,52,4450,98.2,2023-02-01,2023-02-28
+UNIT-002,Houston Refinery,FCC,VGO,63000,960,26,3150,84.8,2023-02-01,2023-02-28
+UNIT-003,Houston Refinery,Hydrotreater,Diesel,44000,705,1520,2080,98.9,2023-02-01,2023-02-28
+UNIT-004,Corpus Christi Refinery,CDU,Maya,92000,665,56,3750,97.5,2023-02-01,2023-02-28
+UNIT-005,Corpus Christi Refinery,Reformer,Naphtha,34000,925,205,1880,92.1,2023-02-01,2023-02-28

@@ -1,0 +1,11 @@
+shipment_id,origin,destination,product,volume,unit,transport_mode,carrier,departure_date,arrival_date,status,cost_usd
+SHIP-001,Houston,Chicago,Gasoline,10000,Barrels,Pipeline,Colonial Pipeline,2023-01-05,2023-01-10,Delivered,35000
+SHIP-002,Corpus Christi,New York,Diesel,15000,Barrels,Vessel,Kirby Marine,2023-01-08,2023-01-18,Delivered,85000
+SHIP-003,Midland,Cushing,Crude Oil,25000,Barrels,Pipeline,Plains All American,2023-01-12,2023-01-15,Delivered,42000
+SHIP-004,Houston,Atlanta,Jet Fuel,8000,Barrels,Truck,J.B. Hunt,2023-01-15,2023-01-18,Delivered,28000
+SHIP-005,Corpus Christi,Boston,Gasoline,12000,Barrels,Vessel,Kirby Marine,2023-01-20,2023-01-31,Delayed,92000
+SHIP-006,Midland,Houston,Crude Oil,30000,Barrels,Pipeline,Energy Transfer,2023-02-03,2023-02-06,Delivered,48000
+SHIP-007,Houston,Dallas,Diesel,9000,Barrels,Truck,Schneider National,2023-02-08,2023-02-10,Delivered,25000
+SHIP-008,Corpus Christi,Philadelphia,Jet Fuel,14000,Barrels,Vessel,Kirby Marine,2023-02-12,2023-02-23,In Transit,88000
+SHIP-009,Midland,Cushing,Crude Oil,28000,Barrels,Pipeline,Plains All American,2023-02-18,2023-02-21,Delivered,45000
+SHIP-010,Houston,Miami,Gasoline,11000,Barrels,Vessel,Crowley Maritime,2023-02-25,2023-03-05,In Transit,75000
