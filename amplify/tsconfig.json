@@ -8,10 +8,19 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
+    "composite": true,
+    "declaration": true,
     "paths": {
       "$amplify/*": [
         "../.amplify/generated/*"
       ]
     }
-  }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../.amplify/generated/**/*.ts",
+    "../src/utils/types.ts",
+    "../src/utils/amplify-utils.ts"
+  ]
 }

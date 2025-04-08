@@ -4,7 +4,8 @@ import { Message, ToolMessageContentType, messageContentType } from './types'
 
 import { type Schema } from "../../amplify/data/resource";
 
-export const amplifyClient = generateClient<Schema>();
+// Add explicit type annotation to avoid TS2742 error
+export const amplifyClient: ReturnType<typeof generateClient<Schema>> = generateClient<Schema>();
 
 type BedrockAnthropicBodyType = {
     id: string;
