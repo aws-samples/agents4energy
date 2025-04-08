@@ -7,32 +7,32 @@
     },
     "drilling": {
       "agentId": "CAAAAZEZ2K",
-      "agentAliasId": "CAAAAZEZ2K-alias",
+      "agentAliasId": "drilling-agent-alias-lar",
       "knowledgeBaseId": "HQBIOCTWW8"
     },
     "finance": {
       "agentId": "YODQQX7YTV",
-      "agentAliasId": "YODQQX7YTV-alias",
+      "agentAliasId": "finance-agent-alias-lar",
       "knowledgeBaseId": "PA9Z0LEKHF"
     },
     "land": {
       "agentId": "AKZ6KLWZ9W",
-      "agentAliasId": "AKZ6KLWZ9W-alias",
+      "agentAliasId": "land-agent-alias-lar",
       "knowledgeBaseId": "3KBQ2EZPYX"
     },
     "logistics": {
       "agentId": "X2WMS36KFW",
-      "agentAliasId": "X2WMS36KFW-alias",
+      "agentAliasId": "logistics-agent-alias-lar",
       "knowledgeBaseId": "GP2L2LRMQ8"
     },
     "maintenance": {
       "agentId": "ON7FYSQOPS",
-      "agentAliasId": "ON7FYSQOPS-alias",
+      "agentAliasId": "maintenance-agent-alias-lar",
       "knowledgeBaseId": "FPMP6K8BWS"
     },
     "petrophysics": {
       "agentId": "FM0XVGBCEJ",
-      "agentAliasId": "FM0XVGBCEJ-alias",
+      "agentAliasId": "petrophysics-agent-alias-lar",
       "knowledgeBaseId": "HUMLUPQY46"
     },
     "production": {
@@ -42,22 +42,22 @@
     },
     "refining": {
       "agentId": "DXSUZSHLY2",
-      "agentAliasId": "DXSUZSHLY2-alias",
+      "agentAliasId": "refining-agent-alias-lar",
       "knowledgeBaseId": "HDKMHTDIA5"
     },
     "regulatory": {
       "agentId": "HREETCP4NV",
-      "agentAliasId": "HREETCP4NV-alias",
+      "agentAliasId": "regulatory-agent-alias-lar",
       "knowledgeBaseId": "L04E68NMUJ"
     },
     "safety": {
       "agentId": "RCKHBTAXAP",
-      "agentAliasId": "RCKHBTAXAP-alias",
+      "agentAliasId": "safety-agent-alias-lar",
       "knowledgeBaseId": "WJNPNMLRUY"
     },
     "trading": {
       "agentId": "ZZSTWLARZI",
-      "agentAliasId": "ZZSTWLARZI-alias",
+      "agentAliasId": "trading-agent-alias-lar",
       "knowledgeBaseId": "QXSBSOU88X"
     }
   },
