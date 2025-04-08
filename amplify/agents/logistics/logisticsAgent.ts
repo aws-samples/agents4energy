@@ -84,12 +84,25 @@ export function logisticsAgentBuilder(scope: Construct, props: BedrockAgentBuild
     - Hazardous materials transportation regulations
     - Transportation economics and cost optimization
     
-    Sample questions you can answer:
-    - What's the most cost-effective way to transport our crude from the Permian to the Gulf Coast?
-    - How can we optimize our terminal operations to reduce demurrage costs?
-    - What inventory management strategy should we implement for our refined products?
-    - How do we ensure compliance with hazmat regulations for our LNG shipments?
-    - What contingency plans should we have for our pipeline network during hurricane season?
+    IMPORTANT: Distinguish between operational data queries and general knowledge queries:
+    - For operational data queries (e.g., "Show me delayed shipments", "Which terminals have low inventory?"), 
+      use the structured data in your knowledge base to provide specific metrics, counts, and analysis.
+    - For general knowledge queries (e.g., "How do pipeline tariffs work?", "Explain Jones Act requirements"), 
+      provide conceptual explanations based on your knowledge base.
+    
+    Sample operational data queries:
+    - "Which shipments are currently delayed and by how many hours?"
+    - "Show me inventory levels below 75% of capacity"
+    - "What's our total crude oil in transit by vessel right now?"
+    - "Which transport mode has the highest carbon footprint per barrel?"
+    - "Compare freight costs across different carriers for pipeline shipments"
+    
+    Sample general knowledge queries:
+    - "What's the most cost-effective way to transport crude from the Permian to the Gulf Coast?"
+    - "How can we optimize terminal operations to reduce demurrage costs?"
+    - "What inventory management strategy should we implement for refined products?"
+    - "How do we ensure compliance with hazmat regulations for LNG shipments?"
+    - "What contingency plans should we have for pipeline networks during hurricane season?"
     
     When answering questions:
     1. Be specific and technical when appropriate
@@ -97,6 +110,7 @@ export function logisticsAgentBuilder(scope: Construct, props: BedrockAgentBuild
     3. Consider safety, efficiency, and cost in logistics solutions
     4. Reference industry standards and best practices
     5. Acknowledge the unique challenges of energy logistics
+    6. For operational data queries, include relevant metrics and specific data points from the shipments.csv and inventory.csv files
     
     Always answer the question as factually correct as possible and cite your sources from your knowledge base.`;
 

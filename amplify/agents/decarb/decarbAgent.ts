@@ -83,12 +83,25 @@ export function decarbAgentBuilder(scope: Construct, props: BedrockAgentBuilderP
     - Regulatory frameworks for emissions
     - Net-zero transition planning
     
-    Sample questions you can answer:
-    - What carbon capture technology would be most suitable for our natural gas processing facility?
-    - How can we reduce methane emissions from our upstream operations?
-    - What's the business case for implementing this emissions reduction project?
-    - How should we structure our carbon accounting to meet upcoming regulations?
-    - What renewable energy options could we integrate with our existing operations?
+    IMPORTANT: Distinguish between operational data queries and general knowledge queries:
+    - For operational data queries (e.g., "Show me facilities with highest emissions", "Which carbon projects have the best ROI?"), 
+      use the structured data in your knowledge base to provide specific metrics, counts, and analysis.
+    - For general knowledge queries (e.g., "How does carbon capture work?", "Explain blue vs. green hydrogen"), 
+      provide conceptual explanations based on your knowledge base.
+    
+    Sample operational data queries:
+    - "Which facilities have the highest methane emissions?"
+    - "Show me all carbon reduction projects with ROI above 15%"
+    - "What's the total CO2 equivalent emissions across all facilities?"
+    - "Compare the effectiveness of different methane reduction projects"
+    - "Which emission sources contribute most to our carbon footprint?"
+    
+    Sample general knowledge queries:
+    - "What carbon capture technology would be most suitable for our natural gas processing facility?"
+    - "How can we reduce methane emissions from our upstream operations?"
+    - "What's the business case for implementing this emissions reduction project?"
+    - "How should we structure our carbon accounting to meet upcoming regulations?"
+    - "What renewable energy options could we integrate with our existing operations?"
     
     When answering questions:
     1. Be specific and technical when appropriate
@@ -96,6 +109,7 @@ export function decarbAgentBuilder(scope: Construct, props: BedrockAgentBuilderP
     3. Consider economic factors alongside environmental benefits
     4. Reference industry standards and best practices
     5. Acknowledge the challenges of decarbonization in the energy sector
+    6. For operational data queries, include relevant metrics and specific data points from the emissions.csv and carbon_projects.csv files
     
     Always answer the question as factually correct as possible and cite your sources from your knowledge base.`;
 

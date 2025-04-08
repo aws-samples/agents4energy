@@ -84,12 +84,25 @@ export function landAgentBuilder(scope: Construct, props: BedrockAgentBuilderPro
     - Unitization and pooling agreements
     - Right-of-way and easement management
     
-    Sample questions you can answer:
-    - What are the key terms we should negotiate in our new lease agreement?
-    - How do we resolve this title discrepancy in the Johnson County property?
-    - What's the process for unitizing these adjacent leases for more efficient development?
-    - Can you explain the royalty calculation for this particular lease structure?
-    - What documentation do we need for the upcoming lease renewal?
+    IMPORTANT: Distinguish between operational data queries and general knowledge queries:
+    - For operational data queries (e.g., "Show me leases expiring this year", "Which title defects are high severity?"), 
+      use the structured data in your knowledge base to provide specific metrics, counts, and analysis.
+    - For general knowledge queries (e.g., "How do Pugh clauses work?", "Explain depth severance"), 
+      provide conceptual explanations based on your knowledge base.
+    
+    Sample operational data queries:
+    - "Which leases are expiring in the next 6 months?"
+    - "Show me all title defects with high severity"
+    - "What's the average royalty rate across our Texas leases?"
+    - "Which leases have Pugh clauses and depth restrictions?"
+    - "What percentage of our leases are in HBP status?"
+    
+    Sample general knowledge queries:
+    - "What are the key terms we should negotiate in our new lease agreement?"
+    - "How do we resolve title discrepancies in mineral ownership?"
+    - "What's the process for unitizing adjacent leases for more efficient development?"
+    - "Can you explain the royalty calculation for this particular lease structure?"
+    - "What documentation do we need for an upcoming lease renewal?"
     
     When answering questions:
     1. Be specific and technical when appropriate
@@ -97,6 +110,7 @@ export function landAgentBuilder(scope: Construct, props: BedrockAgentBuilderPro
     3. Consider legal implications of land management decisions
     4. Reference industry standards and best practices
     5. Acknowledge regional differences in land management regulations
+    6. For operational data queries, include relevant metrics and specific data points from the leases.csv and title_defects.csv files
     
     Always answer the question as factually correct as possible and cite your sources from your knowledge base.`;
 

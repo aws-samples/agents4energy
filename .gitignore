@@ -51,3 +51,6 @@ test/**/*.js
 .amplify
 amplify_outputs*
 amplifyconfiguration*
+
+# project specific
+next-steps.md
