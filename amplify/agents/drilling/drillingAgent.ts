@@ -141,7 +141,7 @@ export function drillingAgentBuilder(scope: Construct, props: BedrockAgentBuilde
         'DrillingAgentAlias',
         {
             agentId: drillingAgent.attrAgentId,
-            agentAliasName: `DRILL${stackUUID}`
+            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
         }
     );
 

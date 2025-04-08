@@ -141,7 +141,7 @@ export function landAgentBuilder(scope: Construct, props: BedrockAgentBuilderPro
         'LandAgentAlias',
         {
             agentId: landAgent.attrAgentId,
-            agentAliasName: `LAND${stackUUID}`
+            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
         }
     );
 

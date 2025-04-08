@@ -142,7 +142,7 @@ export function financeAgentBuilder(scope: Construct, props: BedrockAgentBuilder
         'FinanceAgentAlias',
         {
             agentId: financeAgent.attrAgentId,
-            agentAliasName: `FIN${stackUUID}`
+            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
         }
     );
 

@@ -140,7 +140,7 @@ export function decarbAgentBuilder(scope: Construct, props: BedrockAgentBuilderP
         'DecarbAgentAlias',
         {
             agentId: decarbAgent.attrAgentId,
-            agentAliasName: `DECARB${stackUUID}`
+            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
         }
     );
 

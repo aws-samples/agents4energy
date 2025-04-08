@@ -141,7 +141,7 @@ export function logisticsAgentBuilder(scope: Construct, props: BedrockAgentBuild
         'LogisticsAgentAlias',
         {
             agentId: logisticsAgent.attrAgentId,
-            agentAliasName: `LOG${stackUUID}`
+            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
         }
     );
 
