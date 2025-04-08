@@ -134,13 +134,13 @@ export function decarbAgentBuilder(scope: Construct, props: BedrockAgentBuilderP
         cfnAgentProps
     );
 
-    // Create an alias for the agent
+    // Create an alias for the agent - must be 10 chars or less
     const decarbAgentAlias = new bedrock.CfnAgentAlias(
         scope,
         'DecarbAgentAlias',
         {
             agentId: decarbAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `decarb${stackUUID}`
         }
     );
 

@@ -1,6 +1,5 @@
 // import { BedrockAgent } from "@aws-sdk/client-bedrock-agent"
 import outputs from '@/../amplify_outputs.json';
-import agentConfig from '@/../agent-config.json';
 
 type BaseAgent = {
     name: string
@@ -19,23 +18,13 @@ export type LangGraphAgent = BaseAgent & {
     invokeFieldName: string
 }
 
-// Helper function to safely get agent IDs
+// Helper function to safely get agent IDs directly from amplify outputs
 const getAgentId = (agentKey: string) => {
     try {
-        // First try to get from agent config
-        if (agentKey in agentConfig.agents) {
-            const agent = agentConfig.agents[agentKey as keyof typeof agentConfig.agents];
-            if (agent && 'agentId' in agent) {
-                return agent.agentId;
-            }
-        }
-        
-        // Then try to get from outputs
         const customKey = `${agentKey}AgentId`;
         if (outputs.custom && customKey in outputs.custom) {
             return outputs.custom[customKey as keyof typeof outputs.custom] as string;
         }
-        
         return '';
     } catch (e) {
         console.warn(`Failed to get agentId for ${agentKey}:`, e);
@@ -43,23 +32,13 @@ const getAgentId = (agentKey: string) => {
     }
 };
 
-// Helper function to safely get agent alias IDs
+// Helper function to safely get agent alias IDs directly from amplify outputs
 const getAgentAliasId = (agentKey: string) => {
     try {
-        // First try to get from agent config
-        if (agentKey in agentConfig.agents) {
-            const agent = agentConfig.agents[agentKey as keyof typeof agentConfig.agents];
-            if (agent && 'agentAliasId' in agent) {
-                return agent.agentAliasId;
-            }
-        }
-        
-        // Then try to get from outputs
         const customKey = `${agentKey}AgentAliasId`;
         if (outputs.custom && customKey in outputs.custom) {
             return outputs.custom[customKey as keyof typeof outputs.custom] as string;
         }
-        
         return '';
     } catch (e) {
         console.warn(`Failed to get agentAliasId for ${agentKey}:`, e);

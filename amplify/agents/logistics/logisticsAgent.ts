@@ -135,13 +135,13 @@ export function logisticsAgentBuilder(scope: Construct, props: BedrockAgentBuild
         cfnAgentProps
     );
 
-    // Create an alias for the agent
+    // Create an alias for the agent - must be 10 chars or less
     const logisticsAgentAlias = new bedrock.CfnAgentAlias(
         scope,
         'LogisticsAgentAlias',
         {
             agentId: logisticsAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `log${stackUUID}`
         }
     );
 

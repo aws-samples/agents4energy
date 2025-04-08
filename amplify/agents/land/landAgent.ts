@@ -135,13 +135,13 @@ export function landAgentBuilder(scope: Construct, props: BedrockAgentBuilderPro
         cfnAgentProps
     );
 
-    // Create an alias for the agent
+    // Create an alias for the agent - must be 10 chars or less
     const landAgentAlias = new bedrock.CfnAgentAlias(
         scope,
         'LandAgentAlias',
         {
             agentId: landAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `land${stackUUID}`
         }
     );
 

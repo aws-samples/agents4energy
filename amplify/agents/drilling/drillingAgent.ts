@@ -135,13 +135,13 @@ export function drillingAgentBuilder(scope: Construct, props: BedrockAgentBuilde
         cfnAgentProps
     );
 
-    // Create an alias for the agent
+    // Create an alias for the agent - must be 10 chars or less
     const drillingAgentAlias = new bedrock.CfnAgentAlias(
         scope,
         'DrillingAgentAlias',
         {
             agentId: drillingAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `drill${stackUUID}`
         }
     );
 

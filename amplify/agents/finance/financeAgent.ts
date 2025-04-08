@@ -136,13 +136,13 @@ export function financeAgentBuilder(scope: Construct, props: BedrockAgentBuilder
         cfnAgentProps
     );
 
-    // Create an alias for the agent
+    // Create an alias for the agent - must be 10 chars or less
     const financeAgentAlias = new bedrock.CfnAgentAlias(
         scope,
         'FinanceAgentAlias',
         {
             agentId: financeAgent.attrAgentId,
-            agentAliasName: `${resourcePrefix}-agent-alias-${stackUUID}`
+            agentAliasName: `fin${stackUUID}`
         }
     );
 

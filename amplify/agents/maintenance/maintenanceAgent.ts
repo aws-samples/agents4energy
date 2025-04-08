@@ -368,7 +368,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
     //Add an agent alias to make the agent callable
     const maintenanceAgentAlias = new bedrock.CfnAgentAlias(scope, 'maintenance-agent-alias', {
         agentId: agentMaint.attrAgentId,
-        agentAliasName: `maintenance-agent-alias-${stackUUID}`
+        agentAliasName: `maint${stackUUID}`
     });
 
     return {
