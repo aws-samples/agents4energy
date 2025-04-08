@@ -6,7 +6,6 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as athena from 'aws-cdk-lib/aws-athena';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
-import { IFunction } from '@aws-amplify/backend-function';
 
 export interface StructuredDataSetupProps {
   bucket: s3.IBucket;
