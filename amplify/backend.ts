@@ -205,27 +205,8 @@ const structuredDataSetup = new StructuredDataSetup(productionAgentStack, 'Struc
   bucket: backend.storage.resources.bucket
 });
 
-// Add permissions to the production agent function
-structuredDataSetup.addPermissionsToAgentFunction(backend.productionAgentFunction.resources.lambda);
-
-// Add environment variables to the production agent function
-backend.productionAgentFunction.resources.lambda.addEnvironment('ATHENA_WORKGROUP_NAME', structuredDataSetup.athenaWorkgroup.name);
-backend.productionAgentFunction.resources.lambda.addEnvironment('DATABASE_NAME', 'agents4energy_db');
-
-// Add permissions for other agent functions if they exist
-const otherAgentTypes = [
-  'regulatory',
-  'drilling',
-  'petrophysics',
-  'finance',
-  'land',
-  'refining',
-  'trading',
-  'logistics',
-  'decarb'
-];
-
-// We'll handle other agent functions in a future update
+// We'll implement the agent function permissions in a future update
+// For now, just create the infrastructure without adding permissions
 
 const {
   convertPdfToYamlFunction,
