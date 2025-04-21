@@ -1,0 +1,2 @@
+This is a test commit file.
+Created to test if the AWS Amplify is able to see the repo. 
