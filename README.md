@@ -1,4 +1,7 @@
 # Agents4Energy 
+
+Getting started deploying generative AI agents for the first time? Begin by deploying [this agents4energy sample agent repository](https://github.com/aws-samples/sample-agents4energy-agent-template-alpha).
+
 Agents4Energy (A4E) is an easily configurable and deployable, set of open-source agentic workflows to help customers in Energy industry accelerate their workloads on AWS. A4E enables industry professionals to use generative AI assistants for a range of common energy industry use cases such as reservoir characterization, well workover assessment, field data analysis, supply chain optimization, and asset integrity management.
 
 ![A4E Constructs](assets/images/A4E-Open-Source-Architecture.png)
