@@ -84,6 +84,17 @@ export const addLlmAgentPolicies = (props: {
         }),
     )
 
+    // Add SSM permissions
+    props.role.addToPrincipalPolicy(new cdk.aws_iam.PolicyStatement({
+        actions: [
+            "ssm:GetParameter",
+            "ssm:GetParameters",
+        ],
+        resources: [
+            `arn:aws:ssm:${props.rootStack.region}:${props.rootStack.account}:parameter/*`
+        ],
+    }))
+
     props.role.addToPrincipalPolicy(new cdk.aws_iam.PolicyStatement({
         actions: [
             "s3:GetBucketLocation",

@@ -14,6 +14,7 @@ import { RetryPolicy } from "@langchain/langgraph"
 
 import { AmplifyClientWrapper, getLangChainMessageTextContent, stringifyLimitStringLength } from '../utils/amplifyUtils'
 import { publishResponseStreamChunk, updateChatSession } from '../graphql/mutations'
+import { RateLimiter } from '../../../src/utils/rateLimiter';
 
 import { Calculator } from "@langchain/community/tools/calculator";
 
@@ -29,6 +30,7 @@ const PlanStepSchema = z.object({
     toolCalls: z.array(z.any()).optional(),
     result: z.string().optional()
 });
+
 
 type PlanStep = z.infer<typeof PlanStepSchema>;
 
@@ -85,7 +87,6 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
     // console.log('Amplify env: ', env)
     // console.log('process.env: ', process.env)
 
-
     if (!(event.arguments.chatSessionId)) throw new Error("Event does not contain chatSessionId");
     if (!event.identity) throw new Error("Event does not contain identity");
     if (!('sub' in event.identity)) throw new Error("Event does not contain user");
@@ -130,6 +131,7 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             plan: chatSession?.planSteps?.map(step => JSON.parse(step || "") as PlanStep),
             pastSteps: chatSession?.pastSteps?.map(step => JSON.parse(step || "") as PlanStep),
         }
+
 
         // Select the model to use for the executor agent
         const agentModel = new ChatBedrockConverse({
@@ -179,21 +181,21 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
 
         const replannerPrompt = ChatPromptTemplate.fromTemplate(
-            `For the given objective, come up with a simple step by step plan. 
+            `For the given objective, come up with a simple step by step plan.
             This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps.
             The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
             Favor assigning the role of ai to human if an available tool may be able to resolve the step.
-            
+
             Your objective was this:
             {objective}
-            
+
             Your original plan (if any) was this:
             {plan}
-            
+
             You have currently done the follow steps:
             {pastSteps}
-            
-            Update your plan accordingly.  
+
+            Update your plan accordingly.
             Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.`.replace(/^\s+/gm, ''),
         );
 
@@ -205,13 +207,13 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
         const responderPrompt = ChatPromptTemplate.fromTemplate(
             `Respond to the user in markdown format based on the origional objective and completed steps.
-            
+
             Your objective was this:
             {input}
 
             The next steps (if any) are this:
             {plan}
-            
+
             You have currently done the follow steps:
             {pastSteps}
             `.replace(/^\s+/gm, ''),
@@ -263,13 +265,14 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             // ${state.input}
             // </objective>
 
+            const rateLimiter = await RateLimiter.getInstance();
             const inputs = {
                 messages: [new HumanMessage(`
                     The following steps have been completed
                     <previousSteps>
                     ${stringify(state.pastSteps)}
                     </previousSteps>
-                    
+
                     Now execute this task.
                     <task>
                     ${stringify(task)}
@@ -277,13 +280,14 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
 
                     To make plots or tables, use the queryGQL tool.
                     When creating a table, never use the HTML format.
-                    
+
                     Tool messages can contain visualizations, query results and tables.
                     If the tool message says it contains information which completes the task, return a summary to the user.
-                    
+
                     Once you have a result for this task, respond with that result.
                     `)],
             };
+            await rateLimiter.waitForRateLimit();
             const { messages } = await agentExecutor.invoke(inputs, config);
             const resultText = getLangChainMessageTextContent(messages.slice(-1)[0]) || ""
             console.log("Execute Step Complete. Result Text:\n", resultText)
@@ -340,6 +344,8 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
                 let newPlan: { steps: PlanStep[] }
                 for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
                     try {
+                        const rateLimiter = await RateLimiter.getInstance();
+                        await rateLimiter.waitForRateLimit();
                         newPlan = await replanner
                             .withConfig({
                                 callbacks: [customHandler],
@@ -447,6 +453,8 @@ export const handler: Schema["invokePlanAndExecuteAgent"]["functionHandler"] = a
             state: typeof PlanExecuteState.State,
             config: RunnableConfig,
         ): Promise<Partial<typeof PlanExecuteState.State>> {
+            const rateLimiter = await RateLimiter.getInstance();
+            await rateLimiter.waitForRateLimit();
             const response = await responder
                 .withConfig({
                     callbacks: [customHandler],
