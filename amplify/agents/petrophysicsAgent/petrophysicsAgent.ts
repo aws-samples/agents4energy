@@ -95,7 +95,7 @@ export function petrophysicsAgentBuilder(scope: Construct, props: PetrophysicsAg
         agentName: `${resourcePrefix}-agent-${stackUUID}`,
         description: props.description || 'This agent is designed to help with petrophysical analysis.',
         instruction: props.instruction || defaultInstruction,
-        foundationModel: props.modelId || 'anthropic.claude-3-haiku-20240307-v1:0',
+        foundationModel: props.modelId || 'anthropic.claude-3-5-sonnet-20240620-v1:0',
         agentResourceRoleArn: petrophysicsAgentRole.roleArn,
         autoPrepare: true,
         knowledgeBases: [{
