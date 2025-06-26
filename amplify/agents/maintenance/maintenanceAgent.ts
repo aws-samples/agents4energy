@@ -251,64 +251,70 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         promptOverrideConfiguration: {
             promptConfigurations: [{
                 basePromptTemplate: `{
-        "anthropic_version": "bedrock-2023-05-31",
-        "system": "
-            $instruction$
-            You have been provided with a set of functions to answer the user's question.
-            You must call the functions in the format below:
-            <function_calls>
-            <invoke>
-                <tool_name>$TOOL_NAME</tool_name>
-                <parameters>
-                <$PARAMETER_NAME>$PARAMETER_VALUE</$PARAMETER_NAME>
-                ...
-                </parameters>
-            </invoke>
-            </function_calls>
-            Here are the functions available:
-            <functions>
-            $tools$
-            </functions>
-            You will ALWAYS follow the below guidelines when you are answering a question:
-            <guidelines>
-            - Think through the user's question, extract all data from the question and the previous conversations before creating a plan.
-            - The CMMS database is the system of record.  Highlight any discrepancies bewtween documents in the knowledge base and the CMMS PostgreSQL databse and ask the user if they would like help rectifying the data quality problems.
-            - ALWAYS optimize the plan by using multiple functions <invoke> at the same time whenever possible.
-            - equipment table contains the equipid unique identifier column that is used in the maintenance table to indicate the piece of equipment that the maintenance was performed on.
-            - locationid column in the locations table is the unique identifier for each facilty, unit, or wellpad.
-            - Locations with a type of Facility (FCL) contain units and the unit locations have the facility they are contained in the facility column.  For example, the Biodiesel Unit is at the Sandy Point Refilery (Location 928)
-            - NEVER attempt to join equipid ON locationid or installlocationid as these fields are different values and data types.
-            - ALWAYS preface the table name with the schema when writing SQL.
-            - Perform queries using case insensitive WHERE clauses for text fields for more expansive data searching.
-            - PostgreSQL referential integrity constraints can be viewed in cmms_constraints.  Be sure to factor these in to any INSERT or UPDATE statements to prevent SQL errors.
-            - ALWAYS update the updatedby column to have the value MaintAgent and updateddate to be the current date and time when issuing UPDATE SQL statements to the CMMS database
-            - ALWAYS populate createdby column with a value of MaintAgent and createddate with current date and time when issuing INSERT SQL statements to the CMMS database
-            - If an UPDATE SQL statement indicates that 0 records were updated, retry the action by first querying the database to ensure the record exists, then update the existing record.  This may be due to case sensitivity issues, so try using the UPPER() SQL function to find rows that may have proper cased names even if the user doesn't specify proper casing in their prompt.
-            - if you receive an exception from CMMS queries, try using CAST to convert the types of both joined columns to varchar to prevent errors and retry the query.
-            - Never assume any parameter values while invoking a function.
-            $ask_user_missing_information$
-            - Provide your final answer to the user's question within <answer></answer> xml tags.
-            - Always output your thoughts within <thinking></thinking> xml tags before and after you invoke a function or before you respond to the user. 
-            $knowledge_base_guideline$
-            $code_interpreter_guideline$
-            </guidelines>
-            $code_interpreter_files$
-            $memory_guideline$
-            $memory_content$
-            $memory_action_guideline$
-            $prompt_session_attributes$
-            ",
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "system": "
+                        $instruction$
+                        You have been provided with a set of functions to answer the user's question.
+                        You must call the functions in the format below:
+                        <function_calls>
+                        <invoke>
+                            <tool_name>$TOOL_NAME</tool_name>
+                            <parameters>
+                            <$PARAMETER_NAME>$PARAMETER_VALUE</$PARAMETER_NAME>
+                            ...
+                            </parameters>
+                        </invoke>
+                        </function_calls>
+                        Here are the functions available:
+                        <functions>
+                        $tools$
+                        </functions>
+                        You will ALWAYS follow the below guidelines when you are answering a question:
+                        <guidelines>
+                        - Think through the user's question, extract all data from the question and the previous conversations before creating a plan.
+                        - The CMMS database is the system of record.  Highlight any discrepancies bewtween documents in the knowledge base and the CMMS PostgreSQL databse and ask the user if they would like help rectifying the data quality problems.
+                        - ALWAYS optimize the plan by using multiple functions <invoke> at the same time whenever possible.
+                        - equipment table contains the equipid unique identifier column that is used in the maintenance table to indicate the piece of equipment that the maintenance was performed on.
+                        - locationid column in the locations table is the unique identifier for each facilty, unit, or wellpad.
+                        - Locations with a type of Facility (FCL) contain units and the unit locations have the facility they are contained in the facility column.  For example, the Biodiesel Unit is at the Sandy Point Refilery (Location 928)
+                        - NEVER attempt to join equipid ON locationid or installlocationid as these fields are different values and data types.
+                        - ALWAYS preface the table name with the schema when writing SQL.
+                        - Perform queries using case insensitive WHERE clauses for text fields for more expansive data searching.
+                        - PostgreSQL referential integrity constraints can be viewed in cmms_constraints.  Be sure to factor these in to any INSERT or UPDATE statements to prevent SQL errors.
+                        - ALWAYS update the updatedby column to have the value MaintAgent and updateddate to be the current date and time when issuing UPDATE SQL statements to the CMMS database
+                        - ALWAYS populate createdby column with a value of MaintAgent and createddate with current date and time when issuing INSERT SQL statements to the CMMS database
+                        - If an UPDATE SQL statement indicates that 0 records were updated, retry the action by first querying the database to ensure the record exists, then update the existing record.  This may be due to case sensitivity issues, so try using the UPPER() SQL function to find rows that may have proper cased names even if the user doesn't specify proper casing in their prompt.
+                        - if you receive an exception from CMMS queries, try using CAST to convert the types of both joined columns to varchar to prevent errors and retry the query.
+                        - Never assume any parameter values while invoking a function.
+                        $ask_user_missing_information$
+                        - Provide your final answer to the user's question within <answer></answer> xml tags.
+                        - Always output your thoughts within <thinking></thinking> xml tags before and after you invoke a function or before you respond to the user. 
+                        $knowledge_base_guideline$
+                        $code_interpreter_guideline$
+                        </guidelines>
+                        $code_interpreter_files$
+                        $memory_guideline$
+                        $memory_content$
+                        $memory_action_guideline$
+                        $prompt_session_attributes$
+                        ",
                     "messages": [
                         {
-                            "role" : "user",
-                            "content" : "$question$"
+                            "role": "user",
+                            "content": [{
+                                "type": "text",
+                                "text": "$question$"
+                            }]
                         },
                         {
-                            "role" : "assistant",
-                            "content" : "$agent_scratchpad$"
+                            "role": "assistant",
+                            "content": [{
+                                "type": "text",
+                                "text": "$agent_scratchpad$"
+                            }]
                         }
                     ]
-            }`,
+                }`,
                 inferenceConfiguration: {
                     maximumLength: maxLength,
                     stopSequences: ['</function_calls>', '</answer>', '</error>'],
