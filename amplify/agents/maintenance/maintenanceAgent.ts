@@ -1,7 +1,6 @@
 // Agents4Energy - Maintenance Agent
 import { Construct } from "constructs";
 import * as cdk from 'aws-cdk-lib';
-import { Stack, Fn, Aws, Token } from 'aws-cdk-lib';
 import {
     aws_bedrock as bedrock,
     aws_iam as iam,
@@ -251,7 +250,7 @@ export function maintenanceAgentBuilder(scope: Construct, props: AgentProps) {
         promptOverrideConfiguration: {
             promptConfigurations: [{
                 basePromptTemplate: `{
-                    "anthropic_version": "bedrock-2023-05-31",
+                    "anthropic_version": "bedrock-2024-06-20",
                     "system": "
                         $instruction$
                         You have been provided with a set of functions to answer the user's question.
