@@ -8,7 +8,7 @@ import {
   Toggle
 } from "@cloudscape-design/components";
 import { applyMode, Mode } from "@cloudscape-design/global-styles";
-import logoSmallTopNavigation from '@/a4e-logo.png';
+import logoSmallTopNavigation from '@/Logo_full.png';
 
 const TopNavBar = () => {
   // const { signOut, authStatus } = useAuthenticator(context => [context.user, context.authStatus]);
@@ -29,7 +29,7 @@ const TopNavBar = () => {
       <TopNavigation
         identity={{
           href: "/",
-          title: "Agents4Energy - Sample",
+          title: "Agents4Energy",
           logo: {
             src: logoSmallTopNavigation.src,
             alt: "A4E"

@@ -1,7 +1,5 @@
 import os
-import json
 import boto3
-from datetime import datetime
 
 rds_client = boto3.client('rds-data')
 database_name = os.environ.get('database_name')
@@ -20,7 +18,7 @@ def get_tables_information(t: list[str]):
     tables_information = execute_statement(sql)
     return tables_information
 
-def execute_statement(sql):
+def execute_statement(sql: str):
     print(">>>>> EXECUTE_SQL_STATEMENT: Attempting to run SQL: " + sql)
     response = rds_client.execute_statement(
         secretArn=db_credentials_secrets_arn,
@@ -28,11 +26,12 @@ def execute_statement(sql):
         resourceArn=db_resource_arn,
         sql=sql
         )
+    print(f">>>>> EXECUTE_SQL_STATEMENT: SQL executed with response:\n{response}")
     return response
 
 
 # MAIN LAMBDA FUNCTION ENTRY POINT
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context):
     agent = event['agent']
     actionGroup = event['actionGroup']
     function = event['function']
@@ -63,14 +62,19 @@ def lambda_handler(event, context):
     
     # Business data queries
     else:
+        sql = None
         for param in parameters:
             if param["name"] == 'sql_statement':
                 sql = param["value"]
                 # Remove newline characters
                 sql = sql.replace("\n", " ")
                 print(f"Running agent provided SQL: {sql}")
-                results = execute_statement(sql)
-                responseBody = {"TEXT": {"body": f"<results>{results}</results>"}}
+                try:
+                    results = execute_statement(sql)
+                    responseBody = {"TEXT": {"body": f"<results>{results}</results>"}}
+                except Exception as e:
+                    print(f"Database error: {e}")
+                    responseBody = {"TEXT": {"body": f"<results>Database error: {e}</results>"}}
         if not sql:
             raise Exception("Missing SQL statement")
         

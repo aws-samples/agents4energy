@@ -42,9 +42,11 @@ export function petrophysicsAgentBuilder(scope: Construct, props: PetrophysicsAg
                 'bedrock:RetrieveAgent'
             ],
             resources: [
+                `arn:aws:bedrock:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:inference-profile/*`,
                 `arn:aws:bedrock:${cdk.Stack.of(scope).region}::foundation-model/*`,
                 `arn:aws:bedrock:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:agent/*`,
-                `arn:aws:bedrock:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:knowledge-base/*`
+                `arn:aws:bedrock:${cdk.Stack.of(scope).region}:${cdk.Stack.of(scope).account}:knowledge-base/*`,
+                `arn:aws:bedrock:us-*::foundation-model/*`,
             ]
         })
     );
@@ -95,7 +97,7 @@ export function petrophysicsAgentBuilder(scope: Construct, props: PetrophysicsAg
         agentName: `${resourcePrefix}-agent-${stackUUID}`,
         description: props.description || 'This agent is designed to help with petrophysical analysis.',
         instruction: props.instruction || defaultInstruction,
-        foundationModel: props.modelId || 'anthropic.claude-3-haiku-20240307-v1:0',
+        foundationModel: props.modelId || 'anthropic.claude-3-5-sonnet-20240620-v1:0',
         agentResourceRoleArn: petrophysicsAgentRole.roleArn,
         autoPrepare: true,
         knowledgeBases: [{
@@ -142,6 +144,5 @@ export function petrophysicsAgentBuilder(scope: Construct, props: PetrophysicsAg
         petrophysicsAgent,
         petrophysicsAgentAlias,
         metric
-
     }
 }

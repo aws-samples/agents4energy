@@ -6,7 +6,7 @@ import Grid from "@cloudscape-design/components/grid";
 import Container from "@cloudscape-design/components/container";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Button from "@cloudscape-design/components/button";
-import HeroImg from '@/hero-img.png'; 
+import HeroImg from '@/hero.png'; 
 
 
 export default function Home() {
@@ -34,7 +34,7 @@ export default function Home() {
         <Box padding={{ vertical: "xxxl" }}>
           <Grid
             gridDefinition={[
-              { colspan: { default: 12, s: 8 } }
+              { colspan: { default: 12, s: 7 } }
             ]}
           >
             <Container>
@@ -45,7 +45,7 @@ export default function Home() {
                   variant="h1"
                   padding="n"
                 >
-                  Agents4Energy - Sample
+                  Agents4Energy
                 </Box>
                 <Box
                   fontSize="display-l"
@@ -66,9 +66,6 @@ export default function Home() {
                 >
                   <Button variant="primary" href='/chat'>
                     Start a Chat
-                  </Button>
-                  <Button href='/press-release'>
-                    Read the Press Release / FAQ
                   </Button>
                 </SpaceBetween>
               </Box>
