@@ -11,7 +11,7 @@ function CustomAuthenticator() {
 
   useEffect(() => {
     if (user) {
-      redirect('/');
+      redirect('/landing');
     }
   }, [user]);
   return <Authenticator/>;

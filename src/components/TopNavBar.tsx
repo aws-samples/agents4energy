@@ -1,6 +1,7 @@
 "use client"
 import React from 'react';
 import { useState, useEffect } from "react";
+import { redirect } from 'next/navigation';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useUserAttributes } from '@/components/UserAttributesProvider';
 import {
@@ -41,8 +42,10 @@ const TopNavBar = () => {
             text: userAttributes?.email || "Customer Name",
             // description: userAttributes?.email || "email@example.com",
             iconName: "user-profile" as const,
-            onItemClick: (item: { detail: { id: string } }) => {
-              if (item.detail.id === 'signout') signOut()
+            onItemClick: async (item: { detail: { id: string } }) => {
+              if (item.detail.id === 'signout') {
+                await signOut();
+              }
             },
             items: [
               { id: "signout", text: "Sign out"}
