@@ -1,4 +1,4 @@
-DO \$\$
+DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1
@@ -14,4 +14,4 @@ BEGIN
         ON DELETE NO ACTION
         NOT VALID;
     END IF;
-END \$\$;
+END $$;
