@@ -63,7 +63,7 @@
     "@aws-sdk/client-textract": "^3.716.0",
     "@aws-sdk/credential-provider-node": "^3.670.0",
     "@cdklabs/generative-ai-cdk-constructs": "^0.1.289",
-    "@langchain/community": "^0.3.17",
+    "@langchain/community": "^1.1.14",
     "@tailwindcss/typography": "^0.5.15",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^20",
