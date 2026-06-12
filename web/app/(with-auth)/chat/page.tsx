@@ -99,11 +99,7 @@ const Chat = function Page() {
         </div>
       )}
 
-      <PromptInput onSubmit={({ text }) => {
-        console.log('Sending Message', text)
-        sendMessage({ text })
-      }
-      }>
+      <PromptInput onSubmit={({ text }) => sendMessage({ text })}>
         <PromptInputTextarea
           placeholder="Type a message…"
           disabled={isStreaming}
