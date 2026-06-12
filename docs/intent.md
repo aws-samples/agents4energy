@@ -1,5 +1,9 @@
 
+Please add AWS Amplify Gen2 to this project.
 
+Then use the agenctore cli (or hopefully cdk command) to add an agent chat to the nextjs website in this project. Use the Cognito userpool from the amplify app for authentication. Try to use all of the other defaults from the agentcore-cli. Make sure the agent is typescript based. Use the VercelAI agentic framework.
+
+Context:
 
 https://github.com/aws/agentcore-cli/releases/tag/v0.14.0
 

@@ -2,25 +2,30 @@
   "name": "agentcore-cli-agent",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@aws/agentcore",
+      "@parcel/watcher",
+      "core-js",
+      "esbuild",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "@typescript/vfs": "^1.6.4"
+    }
   },
-  "dependencies": {
-    "next": "16.2.7",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+  "scripts": {
+    "build": "pnpm --filter agentcore-cdk-app build && (cd web && npx ampx sandbox --once) && node scripts/configure-agentcore-auth.js && (cd agent/app/Default && npm install) && pnpm --filter agent run deploy && node scripts/extract-deployment-info.js && pnpm --filter web build",
+    "predeploy": "bash scripts/set-aws-targets.sh",
+    "deploy": "pnpm run build",
+    "destroy": "pnpm --filter agent run destroy && (cd web && npx ampx delete --force)",
+    "clean": "pnpm --filter web exec rm -rf .next && pnpm --filter agentcore-cdk-app run clean && find . -name 'node_modules' -type d -prune -exec rm -rf {} + && rm -rf node_modules"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.7",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@aws-sdk/client-cognito-identity-provider": "^3.1065.0"
   }
 }

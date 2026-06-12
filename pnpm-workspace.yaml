@@ -1,0 +1,4 @@
+packages:
+  - web
+  - agent
+  - agent/agentcore/cdk

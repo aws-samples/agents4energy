@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
+  "name": "agent",
+  "version": 1,
+  "managedBy": "CDK",
+  "tags": {
+    "agentcore:created-by": "agentcore-cli",
+    "agentcore:project-name": "agent"
+  },
+  "runtimes": [
+    {
+      "name": "Default",
+      "build": "CodeZip",
+      "entrypoint": "main.js",
+      "codeLocation": "app/Default/",
+      "runtimeVersion": "NODE_22",
+      "networkMode": "PUBLIC",
+      "protocol": "HTTP",
+      "authorizerType": "CUSTOM_JWT",
+      "authorizerConfiguration": {
+        "customJwtAuthorizer": {
+          "discoveryUrl": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_qG5061DTr/.well-known/openid-configuration",
+          "allowedClients": ["2hugv1ugrni8jts323q1ldiopt"]
+        }
+      }
+    }
+  ],
+  "memories": [
+    {
+      "name": "MyMemory",
+      "eventExpiryDuration": 365,
+      "strategies": []
+    }
+  ],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": [],
+  "configBundles": [
+    {
+      "name": "DefaultConfig",
+      "type": "ConfigurationBundle",
+      "description": "Configuration for Default — managed by agentcore CLI",
+      "components": {
+        "{{runtime:Default}}": {
+          "configuration": {
+            "systemPrompt": "You are a helpful assistant. Use tools when appropriate.",
+            "toolDescriptions": {
+              "add_numbers": "Return the sum of two numbers"
+            }
+          }
+        }
+      },
+      "branchName": "mainline",
+      "commitMessage": "Initial configuration"
+    }
+  ],
+  "abTests": [],
+  "httpGateways": [],
+  "harnesses": [],
+  "datasets": []
+}

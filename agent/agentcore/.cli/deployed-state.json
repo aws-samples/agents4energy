@@ -1,0 +1,30 @@
+{
+  "targets": {
+    "default": {
+      "resources": {
+        "runtimes": {
+          "Default": {
+            "runtimeId": "agent_Default-vLMqqgFM3R",
+            "runtimeArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:runtime/agent_Default-vLMqqgFM3R",
+            "roleArn": "arn:aws:iam::796988593450:role/AgentCore-agent-default-ApplicationAgentDefaultRunt-moo2uUspU3YC"
+          }
+        },
+        "memories": {
+          "MyMemory": {
+            "memoryId": "agent_MyMemory-wm48Ld4owY",
+            "memoryArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:memory/agent_MyMemory-wm48Ld4owY"
+          }
+        },
+        "configBundles": {
+          "DefaultConfig": {
+            "bundleId": "agentDefaultConfig-RsU83B3j1e",
+            "bundleArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:configuration-bundle/agentDefaultConfig-RsU83B3j1e",
+            "versionId": "93f9cf60-0076-4543-b1dd-ccbf1b5fcbdd"
+          }
+        },
+        "stackName": "AgentCore-agent-default",
+        "deployHash": "4d050aa256c4620e"
+      }
+    }
+  }
+}
