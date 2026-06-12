@@ -1,7 +1,13 @@
 'use client';
-
+import { useState } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { AgentCoreTransport } from '@/lib/agentcore-transport';
+import { DefaultChatTransport } from 'ai';
+import {
+  AGENT_RUNTIME_ARN,
+  getAgentCoreUrl,
+  getAccessToken,
+  extractPrompt,
+} from '@/lib/agentcore-transport';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useMemo } from 'react';
 import {
@@ -24,13 +30,23 @@ import {
 } from '@/components/ai-elements/prompt-input';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 
-function ChatView() {
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get('sessionId') ?? undefined;
+const Chat = function Page() {
+  const transport = useMemo(() => new DefaultChatTransport({
+    api: getAgentCoreUrl(AGENT_RUNTIME_ARN),
+    async prepareSendMessagesRequest({ messages }) {
+      const token = await getAccessToken();
+      return {
+        body: { prompt: extractPrompt(messages) },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'text/event-stream',
+        },
+      };
+    },
+  }), []);
 
-  const transport = useMemo(() => new AgentCoreTransport(), []);
   const { messages, sendMessage, status, stop, error } = useChat({
-    id: sessionId,
+    // id: sessionId,
     transport,
     onError: (err) => console.error('[useChat] error:', err),
   });
@@ -38,14 +54,9 @@ function ChatView() {
   const isStreaming = status === 'submitted' || status === 'streaming';
 
   return (
-    <div className="flex flex-col h-full max-w-2xl mx-auto w-full px-4 py-6 gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">AgentCore Chat</h1>
-      </div>
-
+    <>
       <Conversation className="flex-1">
         <ConversationContent>
-          {JSON.stringify(messages, null, 2)}
           {messages.length === 0 && (
             <ConversationEmptyState
               title="No messages yet"
@@ -88,7 +99,11 @@ function ChatView() {
         </div>
       )}
 
-      <PromptInput onSubmit={({ text }) => sendMessage({ text })}>
+      <PromptInput onSubmit={({ text }) => {
+        console.log('Sending Message', text)
+        sendMessage({ text })
+      }
+      }>
         <PromptInputTextarea
           placeholder="Type a message…"
           disabled={isStreaming}
@@ -99,73 +114,9 @@ function ChatView() {
           <PromptInputSubmit status={status} onStop={stop} />
         </PromptInputFooter>
       </PromptInput>
-    </div>
-  );
-}
 
-// export default function ChatPage() {
-//   return (
-//     <Suspense>
-//       <ChatView />
-//     </Suspense>
-//   );
-// }
-
-// 'use client';
-
-// import { useChat } from '@ai-sdk/react';
-// import { DefaultChatTransport } from 'ai';
-import { useState } from 'react';
-
-export default function Page() {
-  const transport = useMemo(() => new AgentCoreTransport(), []);
-  const { messages, sendMessage, status, stop } = useChat({
-    // transport: new DefaultChatTransport({
-    //   api: '/api/chat',
-    // }),
-    transport
-  });
-  const [input, setInput] = useState('');
-
-  return (
-    <>
-      {messages.map(message => (
-        <div key={message.id}>
-          {message.role === 'user' ? 'User: ' : 'AI: '}
-          {message.parts.map((part, index) =>
-            part.type === 'text' ? <span key={index}>{part.text}</span> : null,
-          )}
-        </div>
-      ))}
-
-      {(status === 'submitted' || status === 'streaming') && (
-        <div>
-          {status === 'submitted' && <p> Spinner </p>}
-          <button type="button" onClick={() => stop()}>
-            Stop
-          </button>
-        </div>
-      )}
-
-      <form
-        onSubmit={e => {
-          e.preventDefault();
-          if (input.trim()) {
-            sendMessage({ text: input });
-            setInput('');
-          }
-        }}
-      >
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          disabled={status !== 'ready'}
-          placeholder="Say something..."
-        />
-        <button type="submit" disabled={status !== 'ready'}>
-          Submit
-        </button>
-      </form>
     </>
   );
 }
+
+export default Chat
