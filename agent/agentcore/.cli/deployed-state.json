@@ -15,6 +15,15 @@
             "memoryArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:memory/agent_MyMemory-wm48Ld4owY"
           }
         },
+        "mcp": {
+          "gateways": {
+            "my-gateway": {
+              "gatewayId": "agent-my-gateway-ngfdqzkrio",
+              "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:gateway/agent-my-gateway-ngfdqzkrio",
+              "gatewayUrl": "https://agent-my-gateway-ngfdqzkrio.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp"
+            }
+          }
+        },
         "configBundles": {
           "DefaultConfig": {
             "bundleId": "agentDefaultConfig-RsU83B3j1e",
@@ -23,7 +32,7 @@
           }
         },
         "stackName": "AgentCore-agent-default",
-        "deployHash": "4d050aa256c4620e"
+        "deployHash": "644d27a2b632e977"
       }
     }
   }

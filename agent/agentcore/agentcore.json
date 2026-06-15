@@ -24,7 +24,13 @@
             "2hugv1ugrni8jts323q1ldiopt"
           ]
         }
-      }
+      },
+      "envVars": [
+        {
+          "name": "APPSYNC_ENDPOINT",
+          "value": "https://7iz4bqmxdndijama5c37ne6mgq.appsync-api.us-east-1.amazonaws.com/graphql"
+        }
+      ]
     }
   ],
   "memories": [
@@ -37,7 +43,24 @@
   "credentials": [],
   "evaluators": [],
   "onlineEvalConfigs": [],
-  "agentCoreGateways": [],
+  "agentCoreGateways": [
+    {
+      "name": "my-gateway",
+      "description": "Gateway for my-gateway",
+      "targets": [],
+      "authorizerType": "CUSTOM_JWT",
+      "authorizerConfiguration": {
+        "customJwtAuthorizer": {
+          "discoveryUrl": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_qG5061DTr/.well-known/openid-configuration",
+          "allowedClients": [
+            "2hugv1ugrni8jts323q1ldiopt"
+          ]
+        }
+      },
+      "enableSemanticSearch": true,
+      "exceptionLevel": "DEBUG"
+    }
+  ],
   "policyEngines": [],
   "configBundles": [
     {
