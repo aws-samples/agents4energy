@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@agentcore/shared-types": "workspace:*",
     "@ai-sdk/react": "^3.0.201",
     "@aws-amplify/ui-react": "^6.15.4",
     "@aws-sdk/client-bedrock-agentcore": "^3.1065.0",

@@ -6,10 +6,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Invoking the agent
 
-Use `scripts/invoke.js` to call the deployed AgentCore runtime from the command line:
+Use `scripts/invoke.ts` to call the deployed AgentCore runtime from the command line:
 
 ```
-node scripts/invoke.js "Your prompt here"
+npx tsx scripts/invoke.ts "Your prompt here"
 ```
 
 - Reads test credentials from `scripts/.env.local` (`TEST_USER_EMAIL` / `TEST_USER_PASSWORD`)

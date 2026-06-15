@@ -2,3 +2,5 @@ packages:
   - web
   - agent
   - agent/agentcore/cdk
+  - agent/app/Default
+  - packages/shared-types

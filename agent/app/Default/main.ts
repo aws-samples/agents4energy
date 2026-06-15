@@ -1,26 +1,18 @@
 import { BedrockAgentCoreApp } from 'bedrock-agentcore/runtime';
-import { streamText, createUIMessageStream, UIMessage, convertToModelMessages, stepCountIs } from 'ai';
+import { streamText, createUIMessageStream, convertToModelMessages, stepCountIs } from 'ai';
 import { loadModel } from './model/load.js';
+import type { AgentPayload } from '@agentcore/shared-types';
 
 const SYSTEM_PROMPT = `You are a helpful assistant.`;
-
-type Payload = { prompt: string };
 
 const app = new BedrockAgentCoreApp({
   invocationHandler: {
     async *process(payload, _context) {
       console.log('[invocation] payload:', JSON.stringify(payload, null, 2));
-      const { prompt } = payload as Payload;
+      const { messages: existingMessages } = payload as AgentPayload;
       const model = await loadModel();
 
-      const existingMessages: UIMessage[] = [
-        {
-          id: 'user-1',
-          role: 'user',
-          parts: [{ type: 'text', text: prompt }],
-        },
-      ];
-
+      // Invoke the LLM with a streaming response
       const stream = createUIMessageStream({
         async execute({ writer }) {
           const result = streamText({
@@ -34,6 +26,7 @@ const app = new BedrockAgentCoreApp({
         originalMessages: existingMessages,
       });
 
+      // Send the stream to the front end
       const reader = stream.getReader();
       try {
         while (true) {

@@ -25,7 +25,13 @@
     "destroy": "pnpm --filter agent run destroy && (cd web && npx ampx delete --force)",
     "clean": "pnpm --filter web exec rm -rf .next && pnpm --filter agentcore-cdk-app run clean && find . -name 'node_modules' -type d -prune -exec rm -rf {} + && rm -rf node_modules"
   },
+  "dependencies": {
+    "@agentcore/shared-types": "workspace:*"
+  },
   "devDependencies": {
-    "@aws-sdk/client-cognito-identity-provider": "^3.1065.0"
+    "@aws-sdk/client-cognito-identity-provider": "^3.1065.0",
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
   }
 }

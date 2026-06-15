@@ -421,7 +421,7 @@ export const PromptInputActionAddAttachments = ({
   const attachments = usePromptInputAttachments();
 
   const handleSelect = useCallback(
-    (e: Event) => {
+    (e: React.SyntheticEvent) => {
       e.preventDefault();
       attachments.openFileDialog();
     },

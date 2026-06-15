@@ -10,6 +10,7 @@
     "dev": "tsx watch main.ts"
   },
   "dependencies": {
+    "@agentcore/shared-types": "workspace:*",
     "@ai-sdk/amazon-bedrock": "^4.0.0",
     "@aws-sdk/credential-providers": "^3.0.0",
     "@fastify/sse": "^0.4.0",

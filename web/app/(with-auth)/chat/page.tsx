@@ -6,7 +6,6 @@ import {
   AGENT_RUNTIME_ARN,
   getAgentCoreUrl,
   getAccessToken,
-  extractPrompt,
 } from '@/lib/agentcore-transport';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useMemo } from 'react';
@@ -36,7 +35,7 @@ const Chat = function Page() {
     async prepareSendMessagesRequest({ messages }) {
       const token = await getAccessToken();
       return {
-        body: { prompt: extractPrompt(messages) },
+        body: { messages },
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'text/event-stream',
