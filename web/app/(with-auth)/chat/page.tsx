@@ -2,7 +2,9 @@
 import { useChat } from '@ai-sdk/react';
 import { HarnessChatTransport } from '@/lib/agentcore-transport';
 import { useChatSession } from './use-chat-session';
+import { useInitialMessages } from './use-initial-messages';
 import { useMemo } from 'react';
+import type { UIMessage } from 'ai';
 import {
   Conversation,
   ConversationContent,
@@ -23,9 +25,13 @@ import {
 } from '@/components/ai-elements/prompt-input';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 
-const Chat = function Page() {
-  const { ready, sessionIdRef } = useChatSession();
-
+function ChatView({
+  sessionIdRef,
+  initialMessages,
+}: {
+  sessionIdRef: React.RefObject<string | null>;
+  initialMessages: UIMessage[];
+}) {
   const transport = useMemo(
     () => new HarnessChatTransport({ getSessionId: () => sessionIdRef.current }),
     [sessionIdRef],
@@ -33,10 +39,9 @@ const Chat = function Page() {
 
   const { messages, sendMessage, status, stop, error } = useChat({
     transport,
+    messages: initialMessages,
     onError: (err) => console.error('[useChat] error:', err),
   });
-
-  if (!ready) return null;
 
   const isStreaming = status === 'submitted' || status === 'streaming';
 
@@ -97,9 +102,22 @@ const Chat = function Page() {
           <PromptInputSubmit status={status} onStop={stop} />
         </PromptInputFooter>
       </PromptInput>
-
     </>
   );
 }
 
-export default Chat
+const Chat = function Page() {
+  const { ready, sessionId, sessionIdRef } = useChatSession();
+  const initialMessagesState = useInitialMessages(ready ? sessionId : null);
+
+  if (!ready || initialMessagesState.status === 'loading') return null;
+
+  return (
+    <ChatView
+      sessionIdRef={sessionIdRef}
+      initialMessages={initialMessagesState.messages}
+    />
+  );
+}
+
+export default Chat;

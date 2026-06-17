@@ -11,7 +11,6 @@ export const chatSchema = a.schema({
     // Slug of the Agent this session is scoped to. Drives model + system prompt + gateway tools.
     agentId: a.string(),
     messages: a.hasMany("ChatMessage", "chatSessionId"),
-    mapLayers: a.hasMany("MapLayer", "chatSessionId"),
     mapBounds: a.json(), // Optional: store last view bounds as [west, south, east, north]
     lineageSummary: a.json(), // Optional: consolidated list of datasets accessed during the session
   })

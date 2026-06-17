@@ -27,10 +27,15 @@ for (const [name, h] of Object.entries(resources.harnesses ?? {})) {
   harnesses[name] = { harnessArn: h.harnessArn };
 }
 
+const memories = {};
+for (const [name, m] of Object.entries(resources.memories ?? {})) {
+  memories[name] = { memoryId: m.memoryId, memoryArn: m.memoryArn };
+}
+
 const firstHarnessArn = Object.values(resources.harnesses ?? {})[0]?.harnessArn ?? '';
 const region = firstHarnessArn.split(':')[3] ?? 'us-east-1';
 
-const info = { target: targetName, region, harnesses };
+const info = { target: targetName, region, harnesses, memories };
 
 writeFileSync(outputPath, JSON.stringify(info, null, 2) + '\n');
 console.log(`extract-deployment-info: wrote ${outputPath}`);
