@@ -1,0 +1,16 @@
+{
+  "targets": {
+    "default": {
+      "resources": {
+        "memories": {
+          "MyHarnessMemory": {
+            "memoryId": "default_MyHarnessMemory-zz6wfiFFUs",
+            "memoryArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:memory/default_MyHarnessMemory-zz6wfiFFUs"
+          }
+        },
+        "stackName": "AgentCore-default-default",
+        "deployHash": "e0a00a240b3c63c8"
+      }
+    }
+  }
+}
