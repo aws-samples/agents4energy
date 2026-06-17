@@ -1,14 +1,8 @@
 'use client';
-import { useState } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
-import {
-  AGENT_RUNTIME_ARN,
-  getAgentCoreUrl,
-  getAccessToken,
-} from '@/lib/agentcore-transport';
-import { useSearchParams } from 'next/navigation';
-import { Suspense, useMemo } from 'react';
+import { HarnessChatTransport } from '@/lib/agentcore-transport';
+import { useChatSession } from './use-chat-session';
+import { useMemo } from 'react';
 import {
   Conversation,
   ConversationContent,
@@ -30,25 +24,19 @@ import {
 import { Shimmer } from '@/components/ai-elements/shimmer';
 
 const Chat = function Page() {
-  const transport = useMemo(() => new DefaultChatTransport({
-    api: getAgentCoreUrl(AGENT_RUNTIME_ARN),
-    async prepareSendMessagesRequest({ messages }) {
-      const token = await getAccessToken();
-      return {
-        body: { messages },
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'text/event-stream',
-        },
-      };
-    },
-  }), []);
+  const { ready, sessionIdRef } = useChatSession();
+
+  const transport = useMemo(
+    () => new HarnessChatTransport({ getSessionId: () => sessionIdRef.current }),
+    [sessionIdRef],
+  );
 
   const { messages, sendMessage, status, stop, error } = useChat({
-    // id: sessionId,
     transport,
     onError: (err) => console.error('[useChat] error:', err),
   });
+
+  if (!ready) return null;
 
   const isStreaming = status === 'submitted' || status === 'streaming';
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env tsx
-// Invoke the deployed AgentCore agent from the command line.
+// Invoke the deployed AgentCore harness from the command line.
 //
 // Usage:
-//   node scripts/invoke.ts "Hello, how are you?"
+//   npx tsx scripts/invoke.ts "Your prompt here"
 //
 // Auth credentials are read from scripts/.env.local (TEST_USER_EMAIL / TEST_USER_PASSWORD).
-// Runtime ARN is read from web/deployment-info.json.
+// Harness ARN is read from web/deployment-info.json.
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
 import { CognitoIdentityProviderClient, InitiateAuthCommand } from '@aws-sdk/client-cognito-identity-provider';
-import type { AgentPayload } from '@agentcore/shared-types';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -20,7 +20,10 @@ const env = Object.fromEntries(
   readFileSync(envPath, 'utf8')
     .split('\n')
     .filter((l) => l.includes('='))
-    .map((l) => l.split('=').map((s) => s.trim())),
+    .map((l) => {
+      const idx = l.indexOf('=');
+      return [l.slice(0, idx).trim(), l.slice(idx + 1).trim()];
+    }),
 );
 
 const email = env.TEST_USER_EMAIL;
@@ -32,17 +35,21 @@ if (!email || !password) {
 
 // Load Cognito config
 const amplifyOutputs = JSON.parse(readFileSync(resolve(root, 'web/amplify_outputs.json'), 'utf8'));
-const { user_pool_client_id: clientId, aws_region: region } = amplifyOutputs.auth;
+const { user_pool_client_id: clientId, aws_region: authRegion } = amplifyOutputs.auth;
 
-// Load runtime ARN
+// Load harness ARN
 const deploymentInfo = JSON.parse(readFileSync(resolve(root, 'web/deployment-info.json'), 'utf8'));
-const runtimeArn: string = deploymentInfo.runtimes.Default.runtimeArn;
-const runtimeRegion = runtimeArn.split(':')[3];
-const encodedArn = encodeURIComponent(runtimeArn);
-const url = `https://bedrock-agentcore.${runtimeRegion}.amazonaws.com/runtimes/${encodedArn}/invocations?qualifier=DEFAULT`;
+const harnessArn: string = deploymentInfo.harnesses?.MyHarness?.harnessArn;
+if (!harnessArn) {
+  console.error('No harness ARN in web/deployment-info.json — run node scripts/extract-deployment-info.js after deploying');
+  process.exit(1);
+}
+const region = harnessArn.split(':')[3];
+const encodedArn = encodeURIComponent(harnessArn);
+const url = `https://bedrock-agentcore.${region}.amazonaws.com/harnesses/invoke?harnessArn=${encodedArn}`;
 
 // Authenticate
-const cognito = new CognitoIdentityProviderClient({ region });
+const cognito = new CognitoIdentityProviderClient({ region: authRegion });
 const authResult = await cognito.send(
   new InitiateAuthCommand({
     AuthFlow: 'USER_PASSWORD_AUTH',
@@ -56,23 +63,21 @@ if (!accessToken) {
   process.exit(1);
 }
 
-// Build payload from CLI args
+// Build message from CLI args
 const text = process.argv.slice(2).join(' ') || 'Hello!';
 console.log(`Prompt: ${text}\n`);
 
-const body: AgentPayload = {
-  messages: [{ id: 'user-1', role: 'user', parts: [{ type: 'text', text }] }],
-};
-
-// Invoke
+// Invoke harness
 const response = await fetch(url, {
   method: 'POST',
   headers: {
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
-    Accept: 'text/event-stream',
   },
-  body: JSON.stringify(body),
+  body: JSON.stringify({
+    runtimeSessionId: randomUUID(),
+    messages: [{ role: 'user', content: [{ text }] }],
+  }),
 });
 
 if (!response.ok) {
@@ -80,23 +85,48 @@ if (!response.ok) {
   process.exit(1);
 }
 
-// Stream and print
-const decoder = new TextDecoder();
-let buffer = '';
-for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
-  buffer += decoder.decode(chunk, { stream: true });
-  const lines = buffer.split('\n');
-  buffer = lines.pop() ?? '';
-  for (const line of lines) {
-    if (!line.startsWith('data:')) continue;
-    const raw = line.slice(5).trim();
-    if (!raw || raw === '[DONE]') continue;
-    try {
-      const event = JSON.parse(raw);
-      if (event.type === 'text-delta') process.stdout.write(event.delta);
-    } catch {
-      process.stdout.write(raw);
+// Decode AWS binary event stream
+function u32(buf: Buffer, offset: number): number {
+  return buf.readUInt32BE(offset);
+}
+function u16(buf: Buffer, offset: number): number {
+  return buf.readUInt16BE(offset);
+}
+
+let raw = Buffer.alloc(0);
+for await (const chunk of response.body as AsyncIterable<Buffer>) {
+  raw = Buffer.concat([raw, chunk]);
+
+  while (raw.length >= 12) {
+    const totalLen = u32(raw, 0);
+    if (raw.length < totalLen) break;
+
+    const headersLen = u32(raw, 4);
+    let pos = 12;
+    const headersEnd = pos + headersLen;
+    const headers: Record<string, string> = {};
+
+    while (pos < headersEnd) {
+      const nameLen = raw[pos++];
+      const name = raw.subarray(pos, pos + nameLen).toString('utf8');
+      pos += nameLen;
+      pos++; // value type byte
+      const valLen = u16(raw, pos);
+      pos += 2;
+      headers[name] = raw.subarray(pos, pos + valLen).toString('utf8');
+      pos += valLen;
     }
+
+    const payloadBytes = raw.subarray(12 + headersLen, totalLen - 4);
+    let payload: any = null;
+    try { payload = JSON.parse(payloadBytes.toString('utf8')); } catch { /* empty */ }
+
+    if (headers[':event-type'] === 'contentBlockDelta') {
+      const delta = payload?.delta?.text as string | undefined;
+      if (delta) process.stdout.write(delta);
+    }
+
+    raw = raw.subarray(totalLen);
   }
 }
 process.stdout.write('\n');
