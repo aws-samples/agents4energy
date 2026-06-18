@@ -60,6 +60,15 @@ function ChatView({
             agentId: selectedAgent?.id ?? null,
             systemPromptText: selectedAgent?.systemPromptText ?? null,
             modelId: selectedAgent?.modelId ?? null,
+            mcpServers: selectedAgent?.mcpServers.map((s) => ({
+              name: s.name,
+              url: s.url,
+              headers: Object.fromEntries(
+                (s.headers ?? [])
+                  .filter((h): h is { key: string; value: string } => !!h.key && !!h.value)
+                  .map((h) => [h.key, h.value]),
+              ),
+            })),
           };
         },
       }),
@@ -131,7 +140,7 @@ function ChatView({
             {agents.length > 0 && (
               <PromptInputSelect
                 value={agentId ?? ''}
-                onValueChange={(val) => onAgentChange(val || null)}
+                onValueChange={(val: unknown) => onAgentChange(val === '' ? null : String(val))}
               >
                 <PromptInputSelectTrigger>
                   <PromptInputSelectValue placeholder="Default agent" />

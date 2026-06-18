@@ -13,11 +13,20 @@ export async function getAccessToken(): Promise<string> {
   return token;
 }
 
+export interface McpServerConfig {
+  name: string;
+  url: string;
+  // Extra headers to forward when calling this MCP server (e.g. Authorization: Bearer <token>).
+  headers?: Record<string, string>;
+}
+
 export interface AgentConfig {
   agentId?: string | null;
   systemPromptText?: string | null;
   // Bedrock model ID, e.g. "anthropic.claude-sonnet-4-5". When set, overrides harness default.
   modelId?: string | null;
+  // MCP servers injected as remote_mcp tools for this invocation.
+  mcpServers?: McpServerConfig[];
 }
 
 export class HarnessChatTransport implements ChatTransport<UIMessage> {
@@ -78,6 +87,18 @@ export class HarnessChatTransport implements ChatTransport<UIMessage> {
             }
             if (agentConfig.modelId) {
               invokeBody.model = { bedrock: { modelId: agentConfig.modelId } };
+            }
+            if (agentConfig.mcpServers?.length) {
+              invokeBody.tools = agentConfig.mcpServers.map((s) => ({
+                type: 'remote_mcp',
+                name: s.name,
+                config: {
+                  remoteMcp: {
+                    url: s.url,
+                    ...(s.headers && Object.keys(s.headers).length ? { headers: s.headers } : {}),
+                  },
+                },
+              }));
             }
 
             const response = await fetch(url, {

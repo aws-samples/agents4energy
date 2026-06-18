@@ -2,6 +2,7 @@ import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { listSessionMessages } from './functions/list-session-messages/resource';
+import { registerMcpTarget } from './functions/register-mcp-target/resource';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
 
@@ -12,6 +13,7 @@ const backend = defineBackend({
   auth,
   data,
   listSessionMessages,
+  registerMcpTarget,
 });
 
 
@@ -55,6 +57,29 @@ listSessionMessagesLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['bedrock-agentcore:ListEvents'],
     resources: [AGENTCORE_MEMORY_ARN],
+  }),
+);
+
+// ============================================================================
+// REGISTER-MCP-TARGET Lambda — CreateGatewayTarget on the default gateway
+// ============================================================================
+
+const GATEWAY_ID = 'default-default-gateway-5qwnlmsqe3';
+const GATEWAY_REGION = 'us-east-1';
+const GATEWAY_ARN = `arn:aws:bedrock-agentcore:${GATEWAY_REGION}:796988593450:gateway/${GATEWAY_ID}`;
+
+backend.registerMcpTarget.addEnvironment('GATEWAY_ID', GATEWAY_ID);
+backend.registerMcpTarget.addEnvironment('GATEWAY_REGION', GATEWAY_REGION);
+
+const registerMcpTargetLambda = backend.registerMcpTarget.resources.lambda as LambdaFunction;
+registerMcpTargetLambda.addToRolePolicy(
+  new PolicyStatement({
+    // CreateGatewayTarget internally calls SynchronizeGatewayTargets to refresh the gateway.
+    actions: [
+      'bedrock-agentcore:CreateGatewayTarget',
+      'bedrock-agentcore:SynchronizeGatewayTargets',
+    ],
+    resources: ['*'],
   }),
 );
 

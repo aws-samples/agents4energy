@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Reads agent/default/agentcore/.cli/deployed-state.json after `agentcore deploy`
-// and writes web/deployment-info.json so the static frontend can import ARNs
-// at build time without hardcoding them.
+// and CloudFormation stack outputs for gateway ARN/endpoint,
+// then writes web/deployment-info.json so the frontend can import ARNs at build time.
 import { readFileSync, writeFileSync } from 'fs';
+import { execSync } from 'child_process';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -33,10 +34,30 @@ for (const [name, m] of Object.entries(resources.memories ?? {})) {
 }
 
 const firstHarnessArn = Object.values(resources.harnesses ?? {})[0]?.harnessArn ?? '';
-const region = firstHarnessArn.split(':')[3] ?? 'us-east-1';
+const region = firstHarnessArn.split(':')[3] || 'us-east-1';
 
-const info = { target: targetName, region, harnesses, memories };
+// Read gateway outputs from CloudFormation via AWS CLI (avoids SDK dependency in plain Node)
+let gateway = null;
+if (resources.stackName) {
+  try {
+    const raw = execSync(
+      `aws cloudformation describe-stacks --stack-name ${resources.stackName} --region ${region} --query "Stacks[0].Outputs" --output json`,
+      { encoding: 'utf8' }
+    );
+    const outputs = JSON.parse(raw) ?? [];
+    const get = (key) => outputs.find(o => o.OutputKey === key)?.OutputValue;
+    const gatewayArn = get('UserMcpGatewayArn');
+    const gatewayId = get('UserMcpGatewayId');
+    const gatewayEndpoint = get('UserMcpGatewayEndpoint');
+    if (gatewayArn) {
+      gateway = { gatewayArn, gatewayId, gatewayEndpoint };
+    }
+  } catch (err) {
+    console.warn('extract-deployment-info: could not read CFN outputs:', err.message);
+  }
+}
 
+const info = { target: targetName, region, harnesses, memories, ...(gateway ? { gateway } : {}) };
 writeFileSync(outputPath, JSON.stringify(info, null, 2) + '\n');
 console.log(`extract-deployment-info: wrote ${outputPath}`);
 console.log(JSON.stringify(info, null, 2));

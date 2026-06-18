@@ -9,6 +9,7 @@ import {
 } from '@aws/agentcore-cdk';
 import { CfnOutput, Stack, type StackProps } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
 
 export interface HarnessConfig {
@@ -109,8 +110,9 @@ export class AgentCoreStack extends Stack {
     this.application = new AgentCoreApplication(this, 'Application', appProps as any);
 
     // Create AgentCoreMcp if there are gateways configured
+    let mcp: AgentCoreMcp | undefined;
     if (mcpSpec?.agentCoreGateways && mcpSpec.agentCoreGateways.length > 0) {
-      new AgentCoreMcp(this, 'Mcp', {
+      mcp = new AgentCoreMcp(this, 'Mcp', {
         projectName: spec.name,
         mcpSpec,
         agentCoreApplication: this.application,
@@ -240,5 +242,74 @@ export class AgentCoreStack extends Stack {
       description: 'Name of the CloudFormation Stack',
       value: this.stackName,
     });
+
+    // Attach a REQUEST interceptor Lambda to any L3-deployed gateway named "default-gateway".
+    // The interceptor promotes x-mcp-auth-token → Authorization so users can forward
+    // 3rd-party bearer tokens to arbitrary MCP server targets without pre-registering
+    // a credential provider per OAuth source.
+    // Targets are added at runtime via CreateGatewayTarget (up to 100 per gateway).
+    if (mcp) {
+      const cfnGateway = mcp.gateways.get('default-gateway');
+      if (cfnGateway) {
+        // Interceptor Lambda: reads inbound x-mcp-auth-token and returns it as Authorization.
+        // passRequestHeaders: true is required so the Lambda receives the original headers.
+        const interceptorFn = new lambda.Function(this, 'UserMcpInterceptor', {
+          runtime: lambda.Runtime.PYTHON_3_12,
+          handler: 'index.handler',
+          code: lambda.Code.fromInline(`
+def handler(event, context):
+    request = event.get("mcp", {}).get("gatewayRequest", {})
+    headers = event.get("requestHeaders", {})
+    mcp_token = headers.get("x-mcp-auth-token")
+    transformed = dict(request)
+    if mcp_token:
+        if "headers" not in transformed:
+            transformed["headers"] = {}
+        transformed["headers"]["Authorization"] = f"Bearer {mcp_token}"
+    return {
+        "interceptorOutputVersion": "1.0",
+        "mcp": {"transformedGatewayRequest": transformed},
+    }
+`),
+          description: 'Promotes x-mcp-auth-token header to Authorization for MCP server targets',
+        });
+
+        // Grant the gateway role permission to invoke the interceptor Lambda.
+        // The gateway role is the CfnGateway's roleArn — we can't call grantInvoke on it
+        // without an IRole object, so we use a resource-based policy on the Lambda instead.
+        interceptorFn.addPermission('AllowGatewayInvoke', {
+          principal: new iam.ServicePrincipal('bedrock-agentcore.amazonaws.com'),
+          action: 'lambda:InvokeFunction',
+        });
+
+        cfnGateway.interceptorConfigurations = [{
+          interceptionPoints: ['REQUEST'],
+          interceptor: {
+            lambda: { arn: interceptorFn.functionArn },
+          },
+          inputConfiguration: {
+            passRequestHeaders: true,
+          },
+        }];
+
+        new CfnOutput(this, 'UserMcpGatewayArn', {
+          description: 'ARN of the default-gateway (user MCP gateway)',
+          value: cfnGateway.attrGatewayArn,
+          exportName: `${this.stackName}-UserMcpGateway-Arn`,
+        });
+
+        new CfnOutput(this, 'UserMcpGatewayId', {
+          description: 'ID of the default-gateway (user MCP gateway)',
+          value: cfnGateway.attrGatewayIdentifier,
+          exportName: `${this.stackName}-UserMcpGateway-Id`,
+        });
+
+        new CfnOutput(this, 'UserMcpGatewayEndpoint', {
+          description: 'Endpoint URL of the default-gateway (user MCP gateway)',
+          value: cfnGateway.attrGatewayUrl,
+          exportName: `${this.stackName}-UserMcpGateway-Endpoint`,
+        });
+      }
+    }
   }
 }

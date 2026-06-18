@@ -46,7 +46,24 @@
   "credentials": [],
   "evaluators": [],
   "onlineEvalConfigs": [],
-  "agentCoreGateways": [],
+  "agentCoreGateways": [
+    {
+      "name": "default-gateway",
+      "description": "Gateway for default-gateway",
+      "targets": [],
+      "authorizerType": "CUSTOM_JWT",
+      "authorizerConfiguration": {
+        "customJwtAuthorizer": {
+          "discoveryUrl": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_qG5061DTr/.well-known/openid-configuration",
+          "allowedClients": [
+            "2hugv1ugrni8jts323q1ldiopt"
+          ]
+        }
+      },
+      "enableSemanticSearch": true,
+      "exceptionLevel": "DEBUG"
+    }
+  ],
   "policyEngines": [],
   "configBundles": [],
   "abTests": [],

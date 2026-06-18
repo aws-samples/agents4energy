@@ -8,8 +8,17 @@
             "memoryArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:memory/default_MyHarnessMemory-zz6wfiFFUs"
           }
         },
+        "mcp": {
+          "gateways": {
+            "default-gateway": {
+              "gatewayId": "default-default-gateway-5qwnlmsqe3",
+              "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:gateway/default-default-gateway-5qwnlmsqe3",
+              "gatewayUrl": "https://default-default-gateway-5qwnlmsqe3.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp"
+            }
+          }
+        },
         "stackName": "AgentCore-default-default",
-        "deployHash": "e0a00a240b3c63c8"
+        "deployHash": "883504c2703ccb79"
       }
     }
   }
