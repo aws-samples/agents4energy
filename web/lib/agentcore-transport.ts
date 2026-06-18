@@ -13,11 +13,23 @@ export async function getAccessToken(): Promise<string> {
   return token;
 }
 
+export interface AgentConfig {
+  agentId?: string | null;
+  systemPromptText?: string | null;
+  // Bedrock model ID, e.g. "anthropic.claude-sonnet-4-5". When set, overrides harness default.
+  modelId?: string | null;
+}
+
 export class HarnessChatTransport implements ChatTransport<UIMessage> {
   private getSessionId: () => string | null;
+  private getAgentConfig: () => AgentConfig;
 
-  constructor(opts: { getSessionId: () => string | null }) {
+  constructor(opts: {
+    getSessionId: () => string | null;
+    getAgentConfig?: () => AgentConfig;
+  }) {
     this.getSessionId = opts.getSessionId;
+    this.getAgentConfig = opts.getAgentConfig ?? (() => ({}));
   }
 
   sendMessages({
@@ -31,12 +43,14 @@ export class HarnessChatTransport implements ChatTransport<UIMessage> {
     messageId: string | undefined;
   }): Promise<ReadableStream<UIMessageChunk>> {
     const getSessionId = this.getSessionId;
+    const getAgentConfig = this.getAgentConfig;
 
     return Promise.resolve(
       new ReadableStream<UIMessageChunk>({
         async start(controller) {
           try {
             const token = await getAccessToken();
+            const agentConfig = getAgentConfig();
 
             const harnessMessages = messages.flatMap((m) => {
               if (m.role !== 'user' && m.role !== 'assistant') return [];
@@ -52,16 +66,27 @@ export class HarnessChatTransport implements ChatTransport<UIMessage> {
             const encodedArn = encodeURIComponent(HARNESS_ARN);
             const url = `https://bedrock-agentcore.${DEPLOYMENT_REGION}.amazonaws.com/harnesses/invoke?harnessArn=${encodedArn}`;
 
+            const invokeBody: Record<string, unknown> = {
+              runtimeSessionId: sessionId,
+              messages: harnessMessages,
+            };
+
+            // Use the InvokeHarness API's first-class override fields so the harness
+            // handles system prompt and model selection properly (no message injection).
+            if (agentConfig.systemPromptText) {
+              invokeBody.systemPrompt = [{ text: agentConfig.systemPromptText }];
+            }
+            if (agentConfig.modelId) {
+              invokeBody.model = { bedrock: { modelId: agentConfig.modelId } };
+            }
+
             const response = await fetch(url, {
               method: 'POST',
               headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({
-                runtimeSessionId: sessionId,
-                messages: harnessMessages,
-              }),
+              body: JSON.stringify(invokeBody),
               signal: abortSignal,
             });
 

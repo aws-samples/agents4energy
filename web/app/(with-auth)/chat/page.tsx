@@ -3,7 +3,8 @@ import { useChat } from '@ai-sdk/react';
 import { HarnessChatTransport } from '@/lib/agentcore-transport';
 import { useChatSession } from './use-chat-session';
 import { useInitialMessages } from './use-initial-messages';
-import { useMemo } from 'react';
+import { useAgents } from './use-agents';
+import { useMemo, useRef } from 'react';
 import type { UIMessage } from 'ai';
 import {
   Conversation,
@@ -22,18 +23,46 @@ import {
   PromptInputFooter,
   PromptInputTools,
   PromptInputSubmit,
+  PromptInputSelect,
+  PromptInputSelectTrigger,
+  PromptInputSelectValue,
+  PromptInputSelectContent,
+  PromptInputSelectItem,
 } from '@/components/ai-elements/prompt-input';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import type { AgentOption } from './use-agents';
 
 function ChatView({
   sessionIdRef,
   initialMessages,
+  selectedAgent,
+  agents,
+  agentId,
+  onAgentChange,
 }: {
   sessionIdRef: React.RefObject<string | null>;
   initialMessages: UIMessage[];
+  selectedAgent: AgentOption | undefined;
+  agents: AgentOption[];
+  agentId: string | null;
+  onAgentChange: (id: string | null) => void;
 }) {
+  const agentConfigRef = useRef({ selectedAgent });
+  agentConfigRef.current = { selectedAgent };
+
   const transport = useMemo(
-    () => new HarnessChatTransport({ getSessionId: () => sessionIdRef.current }),
+    () =>
+      new HarnessChatTransport({
+        getSessionId: () => sessionIdRef.current,
+        getAgentConfig: () => {
+          const { selectedAgent } = agentConfigRef.current;
+          return {
+            agentId: selectedAgent?.id ?? null,
+            systemPromptText: selectedAgent?.systemPromptText ?? null,
+            modelId: selectedAgent?.modelId ?? null,
+          };
+        },
+      }),
     [sessionIdRef],
   );
 
@@ -52,7 +81,7 @@ function ChatView({
           {messages.length === 0 && (
             <ConversationEmptyState
               title="No messages yet"
-              description="Start a conversation to get started"
+              description={selectedAgent ? `Chatting with ${selectedAgent.name}` : 'Start a conversation to get started'}
             />
           )}
           {messages.map((message) => {
@@ -98,7 +127,26 @@ function ChatView({
           autoFocus
         />
         <PromptInputFooter>
-          <PromptInputTools />
+          <PromptInputTools>
+            {agents.length > 0 && (
+              <PromptInputSelect
+                value={agentId ?? ''}
+                onValueChange={(val) => onAgentChange(val || null)}
+              >
+                <PromptInputSelectTrigger>
+                  <PromptInputSelectValue placeholder="Default agent" />
+                </PromptInputSelectTrigger>
+                <PromptInputSelectContent>
+                  <PromptInputSelectItem value="">Default agent</PromptInputSelectItem>
+                  {agents.map((a) => (
+                    <PromptInputSelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </PromptInputSelectItem>
+                  ))}
+                </PromptInputSelectContent>
+              </PromptInputSelect>
+            )}
+          </PromptInputTools>
           <PromptInputSubmit status={status} onStop={stop} />
         </PromptInputFooter>
       </PromptInput>
@@ -107,8 +155,12 @@ function ChatView({
 }
 
 const Chat = function Page() {
-  const { ready, sessionId, sessionIdRef } = useChatSession();
+  const { ready, sessionId, sessionIdRef, agentId, setAgentId } = useChatSession();
   const initialMessagesState = useInitialMessages(ready ? sessionId : null);
+  const agentsState = useAgents();
+
+  const agents = agentsState.status === 'ready' ? agentsState.agents : [];
+  const selectedAgent = agents.find((a) => a.id === agentId);
 
   if (!ready || initialMessagesState.status === 'loading') return null;
 
@@ -116,6 +168,10 @@ const Chat = function Page() {
     <ChatView
       sessionIdRef={sessionIdRef}
       initialMessages={initialMessagesState.messages}
+      selectedAgent={selectedAgent}
+      agents={agents}
+      agentId={agentId}
+      onAgentChange={setAgentId}
     />
   );
 }

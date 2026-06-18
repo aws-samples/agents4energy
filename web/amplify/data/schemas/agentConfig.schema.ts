@@ -20,6 +20,8 @@ export const agentConfigSchema = a.schema({
     // URL-safe routing slug, e.g. "ops-agent". Callers pass this as agentId.
     slug: a.string().required(),
     description: a.string(),
+    // Inline system prompt text. Takes precedence over systemPromptS3Key when both are set.
+    systemPromptText: a.string(),
     // S3 key for the system prompt file, e.g. "agents/ops-agent/system-prompt.md"
     // When set, overrides the DynamoDB Settings.system_prompt fallback.
     systemPromptS3Key: a.string(),
