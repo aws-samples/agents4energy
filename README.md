@@ -14,7 +14,16 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [https://localhost:3000](https://localhost:3000) with your browser to see the result.
+
+The dev server uses HTTPS with a self-signed certificate. On first run, trust it to avoid browser security warnings:
+
+```bash
+# Run once from the web/ directory (macOS)
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain certificates/rootCA.pem
+```
+
+Then restart Chrome.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

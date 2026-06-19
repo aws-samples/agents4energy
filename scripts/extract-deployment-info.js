@@ -23,18 +23,49 @@ const targets = deployedState?.targets ?? {};
 const targetName = Object.keys(targets)[0];
 const resources = targets[targetName]?.resources ?? {};
 
-const harnesses = {};
-for (const [name, h] of Object.entries(resources.harnesses ?? {})) {
-  harnesses[name] = { harnessArn: h.harnessArn };
-}
-
 const memories = {};
 for (const [name, m] of Object.entries(resources.memories ?? {})) {
   memories[name] = { memoryId: m.memoryId, memoryArn: m.memoryArn };
 }
 
-const firstHarnessArn = Object.values(resources.harnesses ?? {})[0]?.harnessArn ?? '';
-const region = firstHarnessArn.split(':')[3] || 'us-east-1';
+// Derive region from the stack name or fall back to the first memory ARN.
+const firstMemoryArn = Object.values(memories)[0]?.memoryArn ?? '';
+const region = firstMemoryArn.split(':')[3] || 'us-east-1';
+
+// Resolve harness ARNs from the Harness control-plane API.
+// The Harness API endpoint is bedrock-agentcore-control.{region}.amazonaws.com/harnesses
+// (uses SigV4 with service name "bedrock-agentcore", not "bedrock-agentcore-control").
+// Naming convention: <target>_<HarnessName>-<suffix>  e.g. default_MyHarness-PXjJuBIMNs
+const harnesses = {};
+let harnessListRaw;
+try {
+  // aws-curl-style request via Python botocore for SigV4 signing
+  harnessListRaw = execSync(
+    `python3 -c "
+import boto3, json, urllib.request, urllib.error
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+creds = boto3.Session().get_credentials().get_frozen_credentials()
+req = AWSRequest(method='GET', url='https://bedrock-agentcore-control.${region}.amazonaws.com/harnesses')
+SigV4Auth(creds, 'bedrock-agentcore', '${region}').add_auth(req)
+r = urllib.request.Request(req.url, headers=dict(req.headers), method='GET')
+with urllib.request.urlopen(r) as resp:
+    print(resp.read().decode())
+"`,
+    { encoding: 'utf8' }
+  );
+} catch (err) {
+  console.warn('extract-deployment-info: could not list harnesses:', err.message);
+}
+if (harnessListRaw) {
+  const harnessPrefix = `${targetName}_`;
+  for (const h of JSON.parse(harnessListRaw)?.harnesses ?? []) {
+    if (h.harnessName.startsWith(harnessPrefix)) {
+      const logicalName = h.harnessName.slice(harnessPrefix.length);
+      harnesses[logicalName] = { harnessArn: h.arn };
+    }
+  }
+}
 
 // Read gateway outputs from CloudFormation via AWS CLI (avoids SDK dependency in plain Node)
 let gateway = null;

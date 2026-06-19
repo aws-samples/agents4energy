@@ -5,6 +5,74 @@ import { App, type Environment } from 'aws-cdk-lib';
 import * as path from 'path';
 import * as fs from 'fs';
 
+interface AmplifyOutputs {
+  data?: { url?: string };
+  custom?: Record<string, string>;
+}
+
+function readSeedDataConfig(configRoot: string): {
+  settingsTableName: string;
+  agentTableName: string;
+  mcpServerTableName: string;
+  agentMcpServerTableName: string;
+} | undefined {
+  // Walk up from agentcore/ to find the web/amplify_outputs.json peer directory.
+  // Typical layout: <repo>/agent/default/agentcore/ and <repo>/web/
+  const repoRoot = path.resolve(configRoot, '..', '..', '..');
+  const amplifyOutputsPath = path.join(repoRoot, 'web', 'amplify_outputs.json');
+  if (!fs.existsSync(amplifyOutputsPath)) return undefined;
+
+  let outputs: AmplifyOutputs;
+  try {
+    outputs = JSON.parse(fs.readFileSync(amplifyOutputsPath, 'utf8'));
+  } catch {
+    return undefined;
+  }
+
+  const graphqlUrl = outputs?.data?.url;
+  if (!graphqlUrl) return undefined;
+
+  // Extract AppSync API ID from: https://{customDomain}.appsync-api.{region}.amazonaws.com/graphql
+  // The AppSync API ID is the tag value on the API, not the custom domain prefix.
+  // We need it to construct the DynamoDB table names (format: <Model>-<apiId>-NONE).
+  // The API ID is embedded in the CloudFormation stack resources — read it from the ARN
+  // by calling AppSync. However, to avoid a runtime AWS call at synth time, we use the
+  // AppSync API's tags. The simpler approach: read the amplify_outputs model_introspection
+  // which lists models, and use the API's own stack resource suffix from the Amplify sandbox
+  // stack name. Since Amplify sandbox writes the GRAPHQL URL using the custom endpoint but
+  // the table names use the real API ID, we need to resolve this correlation.
+  //
+  // The table names follow pattern: <Model>-<amplifyApiId>-NONE
+  // amplifyApiId != the custom domain prefix; it's the internal API resource ID.
+  // We derive it by reading the AppSync API tags stored in amplify_outputs.json itself —
+  // specifically, the model_introspection doesn't include it, but we can infer the API ID
+  // from the stack name stored in tags. As a fallback, store it in a sidecar file.
+  const sidecarPath = path.join(repoRoot, 'web', 'amplify-table-suffix.txt');
+  if (!fs.existsSync(sidecarPath)) return undefined;
+
+  const apiId = fs.readFileSync(sidecarPath, 'utf8').trim();
+  if (!apiId) return undefined;
+
+  return {
+    settingsTableName: `Settings-${apiId}-NONE`,
+    agentTableName: `Agent-${apiId}-NONE`,
+    mcpServerTableName: `McpServer-${apiId}-NONE`,
+    agentMcpServerTableName: `AgentMcpServer-${apiId}-NONE`,
+  };
+}
+
+function readInvokeAgentLambdaArn(configRoot: string): string | undefined {
+  const repoRoot = path.resolve(configRoot, '..', '..', '..');
+  const amplifyOutputsPath = path.join(repoRoot, 'web', 'amplify_outputs.json');
+  if (!fs.existsSync(amplifyOutputsPath)) return undefined;
+  try {
+    const outputs: AmplifyOutputs = JSON.parse(fs.readFileSync(amplifyOutputsPath, 'utf8'));
+    return outputs.custom?.invoke_agent_lambda_arn;
+  } catch {
+    return undefined;
+  }
+}
+
 function toEnvironment(target: AwsDeploymentTarget): Environment {
   return {
     account: target.account,
@@ -98,6 +166,8 @@ async function main() {
     }
   }
 
+  const invokeAgentLambdaArn = readInvokeAgentLambdaArn(configRoot);
+
   const app = new App();
 
   for (const target of targets) {
@@ -158,6 +228,8 @@ async function main() {
       credentials,
       harnesses: harnessConfigs.length > 0 ? harnessConfigs : undefined,
       paymentSpec,
+      seedData: readSeedDataConfig(configRoot),
+      invokeAgentLambdaArn,
       env,
       description: `AgentCore stack for ${spec.name} deployed to ${target.name} (${target.region})`,
       tags: {

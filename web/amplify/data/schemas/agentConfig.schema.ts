@@ -1,5 +1,6 @@
 import { a } from '@aws-amplify/backend';
 import { registerMcpTarget } from '../../functions/register-mcp-target/resource';
+import { listMcpTools } from '../../functions/list-mcp-tools/resource';
 
 /**
  * Agent Configuration Schema
@@ -58,10 +59,31 @@ export const agentConfigSchema = a.schema({
     // ID of the registered gateway target for this MCP server (set after CreateGatewayTarget).
     // Null until the user registers the server with the gateway.
     gatewayTargetId: a.string(),
+    // OAuth2 client ID for servers that require PKCE auth.
+    // When set, the UI shows an "Authenticate" button that runs the PKCE flow and
+    // saves the resulting token in McpServerCredential (owner-scoped, per-user).
+    oauthClientId: a.string(),
     enabled: a.boolean().required().default(true),
     agents: a.hasMany('AgentMcpServer', 'mcpServerId'),
+    credentials: a.hasMany('McpServerCredential', 'mcpServerId'),
   }).authorization((allow) => [
     allow.authenticated().to(['read', 'create', 'update', 'delete']),
+    allow.owner(),
+  ]),
+
+  // Per-user OAuth2 token for an MCP server that requires PKCE auth.
+  // owner-only: DynamoDB owner field ensures each user sees only their own tokens.
+  // invokeAgent Lambda read access is granted via the wrapper in resource.ts.
+  McpServerCredential: a.model({
+    mcpServerId: a.id().required(),
+    mcpServer: a.belongsTo('McpServer', 'mcpServerId'),
+    accessToken: a.string().required(),
+    tokenType: a.string(),
+    // ISO-8601 timestamp so the UI can warn when the token is approaching expiry.
+    expiresAt: a.string(),
+    // Refresh token for silent renewal (if the authorization server issued one).
+    refreshToken: a.string(),
+  }).authorization((allow) => [
     allow.owner(),
   ]),
 
@@ -77,6 +99,36 @@ export const agentConfigSchema = a.schema({
     allow.authenticated().to(['read']),
     allow.owner(),
   ]),
+
+  // A single MCP tool descriptor returned by listMcpTools.
+  McpTool: a.customType({
+    name: a.string().required(),
+    description: a.string(),
+    // JSON-encoded JSON Schema for the tool's input parameters.
+    inputSchema: a.string(),
+  }),
+
+  // Result type for listMcpTools — tools array plus an optional error message.
+  // error is non-null when the Lambda could reach the server but it returned an
+  // error (e.g. auth failure), giving the frontend something actionable to show.
+  ListMcpToolsResult: a.customType({
+    tools: a.ref('McpTool').array().required(),
+    error: a.string(),
+  }),
+
+  // Query: probes the given MCP server with the same url + headers the harness
+  // injects as a remote_mcp tool, then returns the tool listing.
+  // If this query succeeds, the agent's remote_mcp invocation will too.
+  listMcpTools: a
+    .query()
+    .arguments({
+      url: a.string().required(),
+      // Pass the McpServer's headers array so the Lambda uses identical auth.
+      headers: a.ref('McpServerHeaderEntry').array(),
+    })
+    .returns(a.ref('ListMcpToolsResult'))
+    .handler(a.handler.function(listMcpTools))
+    .authorization((allow) => [allow.authenticated()]),
 
   // Return type for the registerMcpTarget mutation
   RegisterMcpTargetResult: a.customType({

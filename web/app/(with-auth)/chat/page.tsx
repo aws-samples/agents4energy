@@ -4,7 +4,7 @@ import { HarnessChatTransport } from '@/lib/agentcore-transport';
 import { useChatSession } from './use-chat-session';
 import { useInitialMessages } from './use-initial-messages';
 import { useAgents } from './use-agents';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState, useCallback } from 'react';
 import type { UIMessage } from 'ai';
 import {
   Conversation,
@@ -25,12 +25,153 @@ import {
   PromptInputSubmit,
   PromptInputSelect,
   PromptInputSelectTrigger,
-  PromptInputSelectValue,
   PromptInputSelectContent,
   PromptInputSelectItem,
 } from '@/components/ai-elements/prompt-input';
 import { Shimmer } from '@/components/ai-elements/shimmer';
-import type { AgentOption } from './use-agents';
+import type { AgentOption, McpServerInfo } from './use-agents';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { WrenchIcon, Loader2Icon } from 'lucide-react';
+import { generateClient } from 'aws-amplify/data';
+import type { Schema } from '@/amplify/data/resource';
+
+const amplifyClient = generateClient<Schema>({ authMode: 'userPool' });
+
+type McpTool = {
+  name: string;
+  description?: string | null;
+  inputSchema?: string | null;
+};
+
+type ServerToolsResult = {
+  server: McpServerInfo;
+  tools: McpTool[];
+  error?: string | null;
+};
+
+function AgentToolsDialog({
+  agent,
+  open,
+  onOpenChange,
+}: {
+  agent: AgentOption;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [results, setResults] = useState<ServerToolsResult[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchTools = useCallback(async () => {
+    setLoading(true);
+    setResults(null);
+    const settled = await Promise.all(
+      agent.mcpServers.map(async (server): Promise<ServerToolsResult> => {
+        try {
+          const res = await amplifyClient.queries.listMcpTools({
+            url: server.url,
+            headers: (server.headers ?? [])
+              .filter((h): h is { key: string; value: string } => !!h.key && !!h.value)
+              .map((h) => ({ key: h.key, value: h.value })),
+          });
+          if (res.errors?.length) {
+            return { server, tools: [], error: res.errors.map((e) => e.message).join('; ') };
+          }
+          return {
+            server,
+            tools: (res.data?.tools ?? []).filter((t): t is McpTool => t != null),
+            error: res.data?.error,
+          };
+        } catch (err) {
+          return { server, tools: [], error: String(err) };
+        }
+      }),
+    );
+    setResults(settled);
+    setLoading(false);
+  }, [agent]);
+
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      onOpenChange(next);
+      if (next) fetchTools();
+    },
+    [onOpenChange, fetchTools],
+  );
+
+  const totalTools = results?.reduce((n, r) => n + r.tools.length, 0) ?? 0;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Tools — {agent.name}</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto space-y-4 py-1">
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 justify-center">
+              <Loader2Icon className="size-4 animate-spin" />
+              Loading tools…
+            </div>
+          )}
+
+          {results && results.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No MCP servers configured for this agent.
+            </p>
+          )}
+
+          {results?.map((r) => (
+            <div key={r.server.id}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {r.server.name}
+                </span>
+                <span className="text-xs text-muted-foreground">({r.server.url})</span>
+              </div>
+
+              {r.error && (
+                <p className="text-xs text-destructive bg-destructive/10 rounded-md px-3 py-2 mb-2">
+                  {r.error}
+                </p>
+              )}
+
+              {r.tools.length === 0 && !r.error && (
+                <p className="text-xs text-muted-foreground pl-1">No tools returned.</p>
+              )}
+
+              <ul className="space-y-1.5">
+                {r.tools.map((tool) => (
+                  <li key={tool.name} className="rounded-lg border bg-muted/30 px-3 py-2">
+                    <div className="text-sm font-medium font-mono">{tool.name}</div>
+                    {tool.description && (
+                      <div className="text-xs text-muted-foreground mt-0.5">{tool.description}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        {results && (
+          <DialogFooter showCloseButton>
+            <span className="text-xs text-muted-foreground mr-auto self-center">
+              {totalTools} tool{totalTools !== 1 ? 's' : ''} across {results.length} server{results.length !== 1 ? 's' : ''}
+            </span>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function ChatView({
   sessionIdRef,
@@ -49,6 +190,7 @@ function ChatView({
 }) {
   const agentConfigRef = useRef({ selectedAgent });
   agentConfigRef.current = { selectedAgent };
+  const [toolsDialogOpen, setToolsDialogOpen] = useState(false);
 
   const transport = useMemo(
     () =>
@@ -100,7 +242,7 @@ function ChatView({
               .join('');
 
             return (
-              <Message key={message.id} from={message.role}>
+              <Message key={message.id} from={message.role} data-testid={`message-${message.role}`}>
                 <MessageContent>
                   {message.role === 'assistant' ? (
                     <MessageResponse isAnimating={isStreaming}>{text}</MessageResponse>
@@ -136,16 +278,17 @@ function ChatView({
           autoFocus
         />
         <PromptInputFooter>
-          <PromptInputTools>
+          <PromptInputTools />
+          <div className="flex items-center gap-1">
             {agents.length > 0 && (
               <PromptInputSelect
                 value={agentId ?? ''}
                 onValueChange={(val: unknown) => onAgentChange(val === '' ? null : String(val))}
               >
                 <PromptInputSelectTrigger>
-                  <PromptInputSelectValue placeholder="Default agent" />
+                  {selectedAgent?.name ?? 'Default agent'}
                 </PromptInputSelectTrigger>
-                <PromptInputSelectContent>
+                <PromptInputSelectContent align="end">
                   <PromptInputSelectItem value="">Default agent</PromptInputSelectItem>
                   {agents.map((a) => (
                     <PromptInputSelectItem key={a.id} value={a.id}>
@@ -155,8 +298,26 @@ function ChatView({
                 </PromptInputSelectContent>
               </PromptInputSelect>
             )}
-          </PromptInputTools>
-          <PromptInputSubmit status={status} onStop={stop} />
+            {selectedAgent && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  title="View agent tools"
+                  onClick={() => setToolsDialogOpen(true)}
+                >
+                  <WrenchIcon />
+                  <span className="sr-only">View agent tools</span>
+                </Button>
+                <AgentToolsDialog
+                  agent={selectedAgent}
+                  open={toolsDialogOpen}
+                  onOpenChange={setToolsDialogOpen}
+                />
+              </>
+            )}
+            <PromptInputSubmit status={status} onStop={stop} />
+          </div>
         </PromptInputFooter>
       </PromptInput>
     </>

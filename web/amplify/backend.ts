@@ -3,7 +3,9 @@ import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { listSessionMessages } from './functions/list-session-messages/resource';
 import { registerMcpTarget } from './functions/register-mcp-target/resource';
-import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
+import { listMcpTools } from './functions/list-mcp-tools/resource';
+import { invokeAgent } from './functions/invoke-agent/resource';
+import { PolicyStatement, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
 
 /**
@@ -14,6 +16,8 @@ const backend = defineBackend({
   data,
   listSessionMessages,
   registerMcpTarget,
+  listMcpTools,
+  invokeAgent,
 });
 
 
@@ -83,6 +87,31 @@ registerMcpTargetLambda.addToRolePolicy(
   }),
 );
 
+// ============================================================================
+// INVOKE-AGENT Lambda — sub-agent dispatcher via AgentCore harness
+// ============================================================================
+
+const HARNESS_ARN = 'arn:aws:bedrock-agentcore:us-east-1:796988593450:harness/default_MyHarness-PXjJuBIMNs';
+
+backend.invokeAgent.addEnvironment('HARNESS_ARN', HARNESS_ARN);
+
+const invokeAgentLambda = backend.invokeAgent.resources.lambda as LambdaFunction;
+
+// Allow this Lambda to invoke the harness using SigV4 IAM credentials.
+invokeAgentLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['bedrock-agentcore:InvokeAgentRuntime'],
+    resources: [HARNESS_ARN],
+  }),
+);
+
+// Allow the AgentCore gateway service to invoke this Lambda as a gateway target.
+invokeAgentLambda.addPermission('AllowGatewayInvoke', {
+  principal: new ServicePrincipal('bedrock-agentcore.amazonaws.com'),
+  action: 'lambda:InvokeFunction',
+  sourceArn: GATEWAY_ARN,
+});
+
 // Export IAM role ARNs into amplify_outputs.json under `custom` so other
 // projects in this monorepo can consume them without calling AWS APIs at
 // build/synth time. Add any other cross-project outputs here using the
@@ -93,5 +122,7 @@ backend.addOutput({
       backend.auth.resources.authenticatedUserIamRole.roleArn,
     auth_unauthenticated_role_arn:
       backend.auth.resources.unauthenticatedUserIamRole.roleArn,
+    // Exported for the AgentCore CDK stack to register as a gateway target.
+    invoke_agent_lambda_arn: invokeAgentLambda.functionArn,
   },
 });

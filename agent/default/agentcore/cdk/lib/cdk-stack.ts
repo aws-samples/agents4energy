@@ -7,10 +7,10 @@ import {
   type AgentCoreMcpSpec,
   type CustomJWTAuthorizerConfig,
 } from '@aws/agentcore-cdk';
-import { CfnOutput, Stack, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, CfnResource, Stack, type StackProps } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
+import { SeedDataConstruct } from './seed-data-construct';
 
 export interface HarnessConfig {
   name: string;
@@ -64,6 +64,22 @@ export interface AgentCoreStackProps extends StackProps {
    * Payment specifications with resolved credential provider ARNs.
    */
   paymentSpec?: PaymentSpec[];
+  /**
+   * Amplify DynamoDB table names for seed data. When provided, seeds default Agent,
+   * McpServer, and AgentMcpServer records pointing at the default-gateway.
+   */
+  seedData?: {
+    settingsTableName: string;
+    agentTableName: string;
+    mcpServerTableName: string;
+    agentMcpServerTableName: string;
+  };
+  /**
+   * ARN of the Amplify-managed invoke-agent Lambda. When provided, registers it as
+   * a gateway target exposing the invoke_agent tool for sub-agent delegation.
+   * Exported from web/amplify_outputs.json under custom.invoke_agent_lambda_arn.
+   */
+  invokeAgentLambdaArn?: string;
 }
 
 function toCdkId(name: string): string {
@@ -99,7 +115,7 @@ export class AgentCoreStack extends Stack {
   constructor(scope: Construct, id: string, props: AgentCoreStackProps) {
     super(scope, id, props);
 
-    const { spec, mcpSpec, credentials, harnesses, paymentSpec } = props;
+    const { spec, mcpSpec, credentials, harnesses, paymentSpec, seedData, invokeAgentLambdaArn } = props;
 
     // Create AgentCoreApplication with all agents and harness roles
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -251,47 +267,6 @@ export class AgentCoreStack extends Stack {
     if (mcp) {
       const cfnGateway = mcp.gateways.get('default-gateway');
       if (cfnGateway) {
-        // Interceptor Lambda: reads inbound x-mcp-auth-token and returns it as Authorization.
-        // passRequestHeaders: true is required so the Lambda receives the original headers.
-        const interceptorFn = new lambda.Function(this, 'UserMcpInterceptor', {
-          runtime: lambda.Runtime.PYTHON_3_12,
-          handler: 'index.handler',
-          code: lambda.Code.fromInline(`
-def handler(event, context):
-    request = event.get("mcp", {}).get("gatewayRequest", {})
-    headers = event.get("requestHeaders", {})
-    mcp_token = headers.get("x-mcp-auth-token")
-    transformed = dict(request)
-    if mcp_token:
-        if "headers" not in transformed:
-            transformed["headers"] = {}
-        transformed["headers"]["Authorization"] = f"Bearer {mcp_token}"
-    return {
-        "interceptorOutputVersion": "1.0",
-        "mcp": {"transformedGatewayRequest": transformed},
-    }
-`),
-          description: 'Promotes x-mcp-auth-token header to Authorization for MCP server targets',
-        });
-
-        // Grant the gateway role permission to invoke the interceptor Lambda.
-        // The gateway role is the CfnGateway's roleArn — we can't call grantInvoke on it
-        // without an IRole object, so we use a resource-based policy on the Lambda instead.
-        interceptorFn.addPermission('AllowGatewayInvoke', {
-          principal: new iam.ServicePrincipal('bedrock-agentcore.amazonaws.com'),
-          action: 'lambda:InvokeFunction',
-        });
-
-        cfnGateway.interceptorConfigurations = [{
-          interceptionPoints: ['REQUEST'],
-          interceptor: {
-            lambda: { arn: interceptorFn.functionArn },
-          },
-          inputConfiguration: {
-            passRequestHeaders: true,
-          },
-        }];
-
         new CfnOutput(this, 'UserMcpGatewayArn', {
           description: 'ARN of the default-gateway (user MCP gateway)',
           value: cfnGateway.attrGatewayArn,
@@ -309,6 +284,64 @@ def handler(event, context):
           value: cfnGateway.attrGatewayUrl,
           exportName: `${this.stackName}-UserMcpGateway-Endpoint`,
         });
+
+        if (seedData) {
+          new SeedDataConstruct(this, 'SeedData', {
+            settingsTableName: seedData.settingsTableName,
+            agentTableName: seedData.agentTableName,
+            mcpServerTableName: seedData.mcpServerTableName,
+            agentMcpServerTableName: seedData.agentMcpServerTableName,
+            dispatcherGatewayUrl: cfnGateway.attrGatewayUrl,
+          });
+        }
+
+        // Register the Amplify-managed invoke-agent Lambda as a gateway target.
+        // This exposes a single `invoke_agent` tool that dispatches to any agent by slug.
+        // The Lambda ARN is exported from the Amplify stack into amplify_outputs.json.
+        if (invokeAgentLambdaArn) {
+          const invokeAgentTarget = new CfnResource(this, 'InvokeAgentTarget', {
+            type: 'AWS::BedrockAgentCore::GatewayTarget',
+            properties: {
+              GatewayIdentifier: cfnGateway.ref,
+              Name: 'invoke-agent',
+              Description: 'Dispatches to any configured agent by slug via the harness invoke API',
+              TargetConfiguration: {
+                Mcp: {
+                  Lambda: {
+                    LambdaArn: invokeAgentLambdaArn,
+                    ToolSchema: {
+                      InlinePayload: [
+                        {
+                          Name: 'invoke_agent',
+                          Description: "Invoke any configured sub-agent by slug. Returns the sub-agent's complete response.",
+                          InputSchema: {
+                            Type: 'object',
+                            Properties: {
+                              agentSlug: {
+                                Type: 'string',
+                                Description: 'The slug of the agent to invoke (e.g. "research-agent")',
+                              },
+                              prompt: {
+                                Type: 'string',
+                                Description: 'The task or question to send to the sub-agent',
+                              },
+                              sessionId: {
+                                Type: 'string',
+                                Description: 'Optional session ID for conversation continuity',
+                              },
+                            },
+                            Required: ['agentSlug', 'prompt'],
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          });
+          invokeAgentTarget.addDependency(cfnGateway);
+        }
       }
     }
   }
