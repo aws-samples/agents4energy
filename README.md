@@ -1,45 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AgentCore CLI Agent
 
-## Getting Started
+A Next.js + AWS Amplify Gen 2 application for deploying and chatting with AI agents backed by [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/).
 
-First, run the development server:
+## Getting started
+
+See [CLAUDE.md](CLAUDE.md) for the full command reference, monorepo layout, and architecture overview.
+
+### Frontend dev server
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd web && pnpm dev
 ```
 
-Open [https://localhost:3000](https://localhost:3000) with your browser to see the result.
-
-The dev server uses HTTPS with a self-signed certificate. On first run, trust it to avoid browser security warnings:
+The dev server runs on HTTPS at `https://localhost:3000`. Trust the certificate once on macOS:
 
 ```bash
-# Run once from the web/ directory (macOS)
+# Run once from web/
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain certificates/rootCA.pem
 ```
 
-Then restart Chrome.
+### Deploy
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm deploy   # Amplify sandbox + AgentCore + Next.js export
+pnpm destroy  # Tear down all infrastructure
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Invoke the agent from the CLI
 
-## Learn More
+```bash
+npx tsx scripts/invoke.ts "Your prompt here"
+```
 
-To learn more about Next.js, take a look at the following resources:
+Reads credentials from `scripts/.env.local` (`TEST_USER_EMAIL` / `TEST_USER_PASSWORD`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Docs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Document | What it covers |
+|----------|----------------|
+| [docs/agentic-architecture.md](docs/agentic-architecture.md) | Full data flow diagram and architecture overview |
+| [docs/github-integration.md](docs/github-integration.md) | Invoking agents via GitHub @mentions and issue assignment |
+| [docs/mcp-server-integration.md](docs/mcp-server-integration.md) | Connecting external MCP servers to an agent |
+| [docs/e2e-testing.md](docs/e2e-testing.md) | Playwright E2E test conventions |
 
-## Deploy on Vercel
+## GitHub integration
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Agents can be invoked by @mentioning them in GitHub issue and PR comments. The integration uses GitHub Actions with OIDC federation — no stored AWS credentials needed.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [docs/github-integration.md](docs/github-integration.md) for setup instructions, including the required one-time AWS account step:
+
+```bash
+# One-time per AWS account — already done for account 796988593450
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com
+```

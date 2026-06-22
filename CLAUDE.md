@@ -4,6 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## Guidance
+
+### Docuemntation
+Be sure to keep the documentation in the `./docs` folder fresh. After you make a change, make sure the relevant docs are still correct, and create a new doc if it's something either a developer or user would want to know about.
+
+
+### Internet Search
+To access internal Amazon information, use the Amazon-quick-mcp mcp server. This can include information about how offerings are structured, advice on positioning AWS services, competitive analysis, and more.
+
+For internet research — technical comparisons, product deep-dives, best practices, or any factual question that benefits from up-to-date sources — use the `mcp__amazon-quick-mcp__chat` tool (Amazon Quick's "My Assistant" agent). It performs web searches and returns cited results. Prefer it over answering from training data whenever the question involves current AWS features, pricing, or third-party tooling. Pass `newConversation: true` to start a fresh thread for each independent research question.
+
+
+
 ## Commands
 
 All commands run from the repo root unless noted.

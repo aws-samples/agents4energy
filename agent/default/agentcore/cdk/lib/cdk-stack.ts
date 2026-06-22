@@ -305,6 +305,11 @@ export class AgentCoreStack extends Stack {
               GatewayIdentifier: cfnGateway.ref,
               Name: 'invoke-agent',
               Description: 'Dispatches to any configured agent by slug via the harness invoke API',
+              CredentialProviderConfigurations: [
+                {
+                  CredentialProviderType: 'GATEWAY_IAM_ROLE',
+                },
+              ],
               TargetConfiguration: {
                 Mcp: {
                   Lambda: {
