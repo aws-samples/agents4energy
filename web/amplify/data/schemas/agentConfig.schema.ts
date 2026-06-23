@@ -1,6 +1,7 @@
 import { a } from '@aws-amplify/backend';
 import { registerMcpTarget } from '../../functions/register-mcp-target/resource';
 import { listMcpTools } from '../../functions/list-mcp-tools/resource';
+import { invokeAgent } from '../../functions/invoke-agent/resource';
 
 /**
  * Agent Configuration Schema
@@ -36,7 +37,7 @@ export const agentConfigSchema = a.schema({
     // Agents that can call this agent as a sub-agent (callee side)
     calledByAgents: a.hasMany('AgentSubAgent', 'subAgentId'),
   }).authorization((allow) => [
-    allow.authenticated().to(['read']),
+    allow.authenticated().to(['read', 'create', 'update', 'delete']),
     allow.owner(),
   ]),
 
@@ -96,7 +97,7 @@ export const agentConfigSchema = a.schema({
     // Subset of tool names this agent can use. Empty / null means all tools enabled.
     enabledTools: a.string().array(),
   }).authorization((allow) => [
-    allow.authenticated().to(['read']),
+    allow.authenticated().to(['read', 'create', 'update', 'delete']),
     allow.owner(),
   ]),
 
@@ -148,6 +149,26 @@ export const agentConfigSchema = a.schema({
     .handler(a.handler.function(registerMcpTarget))
     .authorization((allow) => [allow.authenticated()]),
 
+  // Result type for invokeAgent mutation
+  InvokeAgentResult: a.customType({
+    response: a.string().required(),
+    sessionId: a.string().required(),
+  }),
+
+  // Mutation: invoke a named agent synchronously and return its full response.
+  // Authorized for both Cognito users and API key holders so GitHub Actions
+  // can call it without needing AWS IAM credentials.
+  invokeAgent: a
+    .mutation()
+    .arguments({
+      agentSlug: a.string().required(),
+      prompt: a.string().required(),
+      sessionId: a.string(),
+    })
+    .returns(a.ref('InvokeAgentResult'))
+    .handler(a.handler.function(invokeAgent))
+    .authorization((allow) => [allow.authenticated(), allow.publicApiKey()]),
+
   // Self-join: which agents a given agent can call as sub-agents
   AgentSubAgent: a.model({
     agentId: a.id().required(),       // the caller agent
@@ -155,7 +176,7 @@ export const agentConfigSchema = a.schema({
     agent: a.belongsTo('Agent', 'agentId'),
     subAgent: a.belongsTo('Agent', 'subAgentId'),
   }).authorization((allow) => [
-    allow.authenticated().to(['read']),
+    allow.authenticated().to(['read', 'create', 'update', 'delete']),
     allow.owner(),
   ]),
 });

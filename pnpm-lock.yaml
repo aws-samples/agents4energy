@@ -18,9 +18,6 @@ importers:
       '@aws-sdk/client-cognito-identity-provider':
         specifier: ^3.1065.0
         version: 3.1065.0
-      '@aws-sdk/client-lambda':
-        specifier: ^3.1065.0
-        version: 3.1065.0
       '@octokit/rest':
         specifier: ^21.1.1
         version: 21.1.1
@@ -162,6 +159,9 @@ importers:
         specifier: ^1.8.3
         version: 1.8.3(@aws-cdk/cli-plugin-contract@2.182.2)(@aws-sdk/types@3.973.13)(@types/node@20.19.42)(aws-cdk-lib@2.258.1(constructs@10.6.0))(constructs@10.6.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       '@aws-sdk/client-cognito-identity-provider':
+        specifier: ^3.1065.0
+        version: 3.1065.0
+      '@aws-sdk/client-ssm':
         specifier: ^3.1065.0
         version: 3.1065.0
       '@playwright/test':

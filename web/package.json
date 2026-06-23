@@ -42,6 +42,7 @@
     "@aws-amplify/backend": "^1.23.0",
     "@aws-amplify/backend-cli": "^1.8.3",
     "@aws-sdk/client-cognito-identity-provider": "^3.1065.0",
+    "@aws-sdk/client-ssm": "^3.1065.0",
     "@playwright/test": "^1.61.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

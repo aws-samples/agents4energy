@@ -9,13 +9,14 @@
  *
  * What it does:
  *   1. Lists your GitHub repos and lets you pick one (or use --repo flag)
- *   2. Reads IAM role ARN, AppSync endpoint, and Lambda ARN from deployment outputs
- *   3. Sets APPSYNC_ENDPOINT, AWS_AGENT_ROLE_ARN, and INVOKE_AGENT_LAMBDA_ARN as Actions variables
+ *   2. Reads AppSync endpoint from deployment outputs; fetches the API key via AWS CLI
+ *   3. Sets APPSYNC_ENDPOINT and APPSYNC_API_KEY as Actions secrets on the target repo
  *   4. Pushes .github/workflows/agent-mention.yml and scripts/github-agent-invoke.ts
  *      as a commit into the target repo (local files for this repo, GitHub API for external repos)
  *
  * Prerequisites:
  *   gh CLI authenticated (`gh auth login`)
+ *   AWS CLI configured with credentials for the deployment account
  *   `pnpm deploy` completed (web/amplify_outputs.json must exist)
  */
 
@@ -28,6 +29,10 @@ import * as readline from 'readline';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function run(cmd: string): string {
+  return execSync(cmd, { encoding: 'utf8' }).trim();
+}
 
 function gh(...args: string[]): string {
   const result = spawnSync('gh', args, { encoding: 'utf8' });
@@ -55,20 +60,16 @@ function checkGhAuth() {
 function pushFileToRepo(repo: string, path: string, content: string, message: string) {
   const encoded = Buffer.from(content).toString('base64');
 
-  // Check if file already exists so we can pass its sha for an update
   let sha: string | undefined;
   try {
     const existing = ghJson<{ sha?: string }>('api', `repos/${repo}/contents/${path}`);
     sha = existing.sha;
   } catch { /* file doesn't exist yet */ }
 
-  const body: Record<string, string> = { message, content: encoded };
-  if (sha) body.sha = sha;
-
   gh('api', `repos/${repo}/contents/${path}`,
     '-X', 'PUT',
-    '-f', `message=${body.message}`,
-    '-f', `content=${body.content}`,
+    '-f', `message=${message}`,
+    '-f', `content=${encoded}`,
     ...(sha ? ['-f', `sha=${sha}`] : []),
   );
 }
@@ -82,12 +83,6 @@ if (!existsSync(amplifyOutputsPath)) {
 }
 const amplifyOutputs = JSON.parse(readFileSync(amplifyOutputsPath, 'utf8'));
 
-const roleArn: string | undefined = amplifyOutputs.custom?.github_actions_agent_role_arn;
-if (!roleArn) {
-  console.error('Error: github_actions_agent_role_arn not found in amplify_outputs.json. Re-deploy the Amplify backend.');
-  process.exit(1);
-}
-
 const appSyncEndpoint: string | undefined = amplifyOutputs.data?.url;
 if (!appSyncEndpoint) {
   console.error('Error: AppSync endpoint (data.url) not found in amplify_outputs.json.');
@@ -96,9 +91,27 @@ if (!appSyncEndpoint) {
 
 const awsRegion: string = amplifyOutputs.data?.aws_region ?? 'us-east-1';
 
-const lambdaArn: string | undefined = amplifyOutputs.custom?.invoke_agent_lambda_arn;
-if (!lambdaArn) {
-  console.error('Error: invoke_agent_lambda_arn not found in amplify_outputs.json. Re-deploy the Amplify backend.');
+// Resolve the real AppSync apiId by matching the endpoint URL across all APIs.
+// (The DNS prefix in the URL is NOT the apiId.)
+console.log('Fetching AppSync API key…');
+let appSyncApiKey: string;
+try {
+  const apisJson = run(`aws appsync list-graphql-apis --region ${awsRegion}`);
+  const apis: Array<{ apiId: string; uris?: Record<string, string> }> = JSON.parse(apisJson).graphqlApis ?? [];
+  const match = apis.find(api =>
+    Object.values(api.uris ?? {}).some(u => u.includes(appSyncEndpoint.split('/graphql')[0])),
+  );
+  if (!match) throw new Error(`No AppSync API found with endpoint ${appSyncEndpoint}`);
+
+  const keysJson = run(`aws appsync list-api-keys --api-id ${match.apiId} --region ${awsRegion}`);
+  const keys: Array<{ id: string; expires: number }> = JSON.parse(keysJson).apiKeys ?? [];
+  if (keys.length === 0) throw new Error('No API keys found — the API key authorization mode may not be enabled yet. Re-deploy the Amplify backend.');
+  const key = keys.sort((a, b) => b.expires - a.expires)[0];
+  appSyncApiKey = key.id;
+  console.log(`  ✓ API key: ${appSyncApiKey} (expires ${new Date(key.expires * 1000).toLocaleDateString()})`);
+} catch (err) {
+  console.error(`Error fetching API key: ${err}`);
+  console.error('Make sure your AWS CLI is configured for the deployment account.');
   process.exit(1);
 }
 
@@ -111,7 +124,6 @@ checkGhAuth();
 const repoFlagIdx = process.argv.indexOf('--repo');
 let selectedRepo: string = repoFlagIdx !== -1 ? process.argv[repoFlagIdx + 1] : '';
 
-// Normalise full URLs to owner/name
 selectedRepo = selectedRepo
   .replace(/^https?:\/\/github\.com\//, '')
   .replace(/\.git$/, '');
@@ -151,15 +163,14 @@ if (!selectedRepo) {
 
 console.log(`\nConfiguring: ${selectedRepo}\n`);
 
-// ─── Set Actions variables ────────────────────────────────────────────────────
+// ─── Set Actions variables and secrets ────────────────────────────────────────
 
-console.log('Setting GitHub Actions variables…');
+console.log('Setting GitHub Actions config…');
 gh('variable', 'set', 'APPSYNC_ENDPOINT', '--repo', selectedRepo, '--body', appSyncEndpoint);
-console.log(`  ✓ APPSYNC_ENDPOINT          = ${appSyncEndpoint}`);
-gh('variable', 'set', 'AWS_AGENT_ROLE_ARN', '--repo', selectedRepo, '--body', roleArn);
-console.log(`  ✓ AWS_AGENT_ROLE_ARN        = ${roleArn}`);
-gh('variable', 'set', 'INVOKE_AGENT_LAMBDA_ARN', '--repo', selectedRepo, '--body', lambdaArn);
-console.log(`  ✓ INVOKE_AGENT_LAMBDA_ARN   = ${lambdaArn}`);
+console.log(`  ✓ APPSYNC_ENDPOINT (variable) = ${appSyncEndpoint}`);
+// API key is a secret — GitHub will mask it in logs
+gh('secret', 'set', 'APPSYNC_API_KEY', '--repo', selectedRepo, '--body', appSyncApiKey);
+console.log(`  ✓ APPSYNC_API_KEY  (secret)   = ${appSyncApiKey}`);
 
 // ─── Detect if the selected repo is this local repo ──────────────────────────
 
@@ -187,7 +198,6 @@ on:
     types: [assigned]
 
 permissions:
-  id-token: write
   contents: read
   issues: write
   pull-requests: write
@@ -195,17 +205,15 @@ permissions:
 jobs:
   invoke-agent:
     runs-on: ubuntu-latest
-    # Skip bot-generated comments to prevent reply loops
-    if: \${{ github.event.sender.type != 'Bot' }}
+    # Only run when a comment contains @agent-<slug> and was not written by a bot
+    if: |
+      github.event.sender.type != 'Bot' && (
+        github.event_name == 'issues' ||
+        contains(github.event.comment.body, '@agent-')
+      )
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: \${{ vars.AWS_AGENT_ROLE_ARN }}
-          aws-region: ${awsRegion}
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -213,11 +221,12 @@ jobs:
           node-version: '20'
 
       - name: Install script dependencies
-        run: npm install --no-save tsx @aws-sdk/client-lambda @octokit/rest
+        run: npm install --no-save tsx @octokit/rest
 
       - name: Invoke agent and post reply
         env:
-          INVOKE_AGENT_LAMBDA_ARN: \${{ vars.INVOKE_AGENT_LAMBDA_ARN }}
+          APPSYNC_ENDPOINT: \${{ vars.APPSYNC_ENDPOINT }}
+          APPSYNC_API_KEY: \${{ secrets.APPSYNC_API_KEY }}
           AWS_REGION: ${awsRegion}
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: npx tsx scripts/github-agent-invoke.ts
@@ -228,7 +237,6 @@ jobs:
 console.log('\nPushing files to repo…');
 
 if (isThisRepo) {
-  // Write locally so the user can review and commit
   const workflowDir = resolve(root, '.github/workflows');
   mkdirSync(workflowDir, { recursive: true });
   writeFileSync(resolve(workflowDir, 'agent-mention.yml'), workflowContent);
@@ -238,7 +246,6 @@ if (isThisRepo) {
   console.log('    git commit -m "Add GitHub @mention agent workflow"');
   console.log('    git push');
 } else {
-  // Push both files directly to the target repo via the GitHub Contents API
   pushFileToRepo(
     selectedRepo,
     'scripts/github-agent-invoke.ts',
@@ -262,12 +269,10 @@ console.log(`
 ${'─'.repeat(72)}
 Setup complete for ${selectedRepo}
 
-  IAM role ARN:           ${roleArn}
-  invoke-agent Lambda:    ${lambdaArn}
-  AppSync endpoint:       ${appSyncEndpoint}
-  AWS region:             ${awsRegion}
+  AppSync endpoint:  ${appSyncEndpoint}
+  AWS region:        ${awsRegion}
 
-The workflow is active. Create an issue in ${selectedRepo} and
-comment with @<agent-slug> <prompt> to invoke an agent.
+The workflow is active. Comment @agent-<slug> <prompt> on any issue
+in ${selectedRepo} to invoke an agent.
 ${'─'.repeat(72)}
 `);

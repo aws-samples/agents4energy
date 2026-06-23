@@ -5,7 +5,7 @@ import { listSessionMessages } from './functions/list-session-messages/resource'
 import { registerMcpTarget } from './functions/register-mcp-target/resource';
 import { listMcpTools } from './functions/list-mcp-tools/resource';
 import { invokeAgent } from './functions/invoke-agent/resource';
-import { PolicyStatement, ServicePrincipal, Role, Effect, FederatedPrincipal } from 'aws-cdk-lib/aws-iam';
+import { PolicyStatement, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
 
 /**
@@ -92,16 +92,32 @@ registerMcpTargetLambda.addToRolePolicy(
 // ============================================================================
 
 const HARNESS_ARN = 'arn:aws:bedrock-agentcore:us-east-1:796988593450:harness/default_MyHarness-PXjJuBIMNs';
+// Cognito client for the service account that the Lambda uses to obtain a Bearer
+// token accepted by the harness (CUSTOM_JWT auth mode).
+const COGNITO_CLIENT_ID = '2hugv1ugrni8jts323q1ldiopt';
+const SERVICE_ACCOUNT_EMAIL = 'invoke-agent-service@internal.local';
+// Password stored as an SSM SecureString; created manually via aws ssm put-parameter.
+const SERVICE_ACCOUNT_PASSWORD_PARAM = '/agentcore/invoke-agent/service-account-password';
 
 backend.invokeAgent.addEnvironment('HARNESS_ARN', HARNESS_ARN);
+backend.invokeAgent.addEnvironment('COGNITO_CLIENT_ID', COGNITO_CLIENT_ID);
+backend.invokeAgent.addEnvironment('SERVICE_ACCOUNT_EMAIL', SERVICE_ACCOUNT_EMAIL);
+backend.invokeAgent.addEnvironment('SERVICE_ACCOUNT_PASSWORD_PARAM', SERVICE_ACCOUNT_PASSWORD_PARAM);
 
 const invokeAgentLambda = backend.invokeAgent.resources.lambda as LambdaFunction;
 
-// Allow this Lambda to invoke the harness using SigV4 IAM credentials.
+// Allow the Lambda to read the service account password from SSM.
 invokeAgentLambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['bedrock-agentcore:InvokeAgentRuntime'],
-    resources: [HARNESS_ARN],
+    actions: ['ssm:GetParameter'],
+    resources: [`arn:aws:ssm:us-east-1:796988593450:parameter${SERVICE_ACCOUNT_PASSWORD_PARAM}`],
+  }),
+);
+// Allow decryption of the SecureString with the default SSM KMS key.
+invokeAgentLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['kms:Decrypt'],
+    resources: ['arn:aws:kms:us-east-1:796988593450:key/alias/aws/ssm'],
   }),
 );
 
@@ -127,57 +143,3 @@ backend.addOutput({
   },
 });
 
-// ============================================================================
-// GITHUB ACTIONS — IAM role for @mention agent invocation via OIDC
-// ============================================================================
-
-// GitHub owners/orgs whose repos are trusted to assume this role.
-// Access is gated by which repos have the AWS_AGENT_ROLE_ARN variable +
-// AGENT_APP_PRIVATE_KEY secret set (via scripts/setup-github-integration.ts).
-const GITHUB_OWNERS = ['waltmayf', 'energy-digital-operations'];
-
-const githubOidcProvider = `token.actions.githubusercontent.com`;
-
-const githubActionsRole = new Role(backend.stack, 'GitHubActionsAgentRole', {
-  roleName: 'github-actions-agent-invoker',
-  assumedBy: new FederatedPrincipal(
-    `arn:aws:iam::${backend.stack.account}:oidc-provider/${githubOidcProvider}`,
-    {
-      StringEquals: {
-        [`${githubOidcProvider}:aud`]: 'sts.amazonaws.com',
-      },
-      StringLike: {
-        // Trust any ref in any repo under the listed owners.
-        [`${githubOidcProvider}:sub`]: GITHUB_OWNERS.map(o => `repo:${o}/*:*`),
-      },
-    },
-    'sts:AssumeRoleWithWebIdentity',
-  ),
-});
-
-// Allow the role to execute any GraphQL operation on the AppSync API.
-githubActionsRole.addToPolicy(
-  new PolicyStatement({
-    effect: Effect.ALLOW,
-    actions: ['appsync:GraphQL'],
-    resources: [`${backend.data.resources.graphqlApi.arn}/*`],
-  }),
-);
-
-// Allow the role to invoke the invoke-agent Lambda directly (used by
-// scripts/github-agent-invoke.ts while invokeAgentAsync GraphQL mutation
-// is not yet available).
-githubActionsRole.addToPolicy(
-  new PolicyStatement({
-    effect: Effect.ALLOW,
-    actions: ['lambda:InvokeFunction'],
-    resources: [invokeAgentLambda.functionArn],
-  }),
-);
-
-// Export the role ARN so it can be referenced in the GitHub Actions workflow.
-backend.addOutput({
-  custom: {
-    github_actions_agent_role_arn: githubActionsRole.roleArn,
-  },
-});
