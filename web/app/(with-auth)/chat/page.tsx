@@ -39,10 +39,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { WrenchIcon, Loader2Icon } from 'lucide-react';
-import { generateClient } from 'aws-amplify/data';
-import type { Schema } from '@/amplify/data/resource';
-
-const amplifyClient = generateClient<Schema>({ authMode: 'userPool' });
+import { listMcpToolsForServer } from '@/lib/list-mcp-tools';
 
 type McpTool = {
   name: string;
@@ -74,19 +71,17 @@ function AgentToolsDialog({
     const settled = await Promise.all(
       agent.mcpServers.map(async (server): Promise<ServerToolsResult> => {
         try {
-          const res = await amplifyClient.queries.listMcpTools({
-            url: server.url,
-            headers: (server.headers ?? [])
-              .filter((h): h is { key: string; value: string } => !!h.key && !!h.value)
-              .map((h) => ({ key: h.key, value: h.value })),
-          });
-          if (res.errors?.length) {
-            return { server, tools: [], error: res.errors.map((e) => e.message).join('; ') };
-          }
+          const serverWithHeaders = {
+            ...server,
+            headers: (server.headers ?? []).filter(
+              (h): h is { key: string; value: string } => !!h.key && !!h.value,
+            ),
+          };
+          const result = await listMcpToolsForServer(serverWithHeaders);
           return {
             server,
-            tools: (res.data?.tools ?? []).filter((t): t is McpTool => t != null),
-            error: res.data?.error,
+            tools: result.tools.filter((t): t is McpTool => t != null),
+            error: result.error,
           };
         } catch (err) {
           return { server, tools: [], error: String(err) };

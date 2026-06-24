@@ -198,7 +198,7 @@ on:
     types: [assigned]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
@@ -221,14 +221,16 @@ jobs:
           node-version: '20'
 
       - name: Install script dependencies
-        run: npm install --no-save tsx @octokit/rest
+        run: npm install --no-save tsx @octokit/rest @aws-sdk/client-lambda
 
       - name: Invoke agent and post reply
         env:
-          APPSYNC_ENDPOINT: \${{ vars.APPSYNC_ENDPOINT }}
-          APPSYNC_API_KEY: \${{ secrets.APPSYNC_API_KEY }}
+          INVOKE_AGENT_LAMBDA_ARN: \${{ vars.INVOKE_AGENT_LAMBDA_ARN }}
+          AWS_ACCESS_KEY_ID: \${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: \${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${awsRegion}
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GITHUB_BASE_REF: \${{ github.event.repository.default_branch }}
         run: npx tsx scripts/github-agent-invoke.ts
 `;
 

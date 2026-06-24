@@ -30,6 +30,15 @@ export type AgentsState =
 
 export function useAgents(): AgentsState {
   const [state, setState] = useState<AgentsState>({ status: 'loading' });
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Re-fetch when the tab regains focus — credentials may have been added or
+  // revoked on the Agents page while this tab was in the background.
+  useEffect(() => {
+    function onFocus() { setReloadKey((k) => k + 1); }
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +117,7 @@ export function useAgents(): AgentsState {
 
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   return state;
 }

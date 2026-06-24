@@ -19,7 +19,7 @@
     }
   },
   "scripts": {
-    "build": "pnpm --filter agentcore-cdk-app build && (cd web && npx ampx sandbox --once) && node scripts/configure-agentcore-auth.js && (cd agent/default && ../../node_modules/.pnpm/node_modules/.bin/agentcore deploy --target default) && node scripts/extract-deployment-info.js && pnpm --filter web build",
+    "build": "pnpm --filter agentcore-cdk-app build && (cd web && npx ampx sandbox --once) && node scripts/configure-agentcore-auth.js && (cd agent/default && npx @aws/agentcore deploy --target default) && node scripts/extract-deployment-info.js && pnpm --filter web build",
     "predeploy": "bash scripts/set-aws-targets.sh",
     "deploy": "pnpm run build",
     "destroy": "pnpm --filter agent run destroy && (cd web && npx ampx delete --force)",

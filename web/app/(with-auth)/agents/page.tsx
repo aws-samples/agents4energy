@@ -38,6 +38,7 @@ import {
   revokeCredential,
   isExpiredOrExpiringSoon,
 } from '@/lib/mcp-auth';
+import { listMcpToolsForServer } from '@/lib/list-mcp-tools';
 
 const amplifyClient = generateClient<Schema>({ authMode: 'userPool' });
 
@@ -315,23 +316,9 @@ function McpToolsDialog({
 
     (async () => {
       try {
-        const res = await (amplifyClient.graphql({
-          query: /* GraphQL */ `
-            query ListMcpTools($url: String!, $headers: [McpServerHeaderEntryInput]) {
-              listMcpTools(url: $url, headers: $headers) {
-                tools { name description inputSchema }
-                error
-              }
-            }
-          `,
-          variables: {
-            url: server.url,
-            headers: server.headers.length > 0 ? server.headers : undefined,
-          },
-        }) as unknown as Promise<any>);
-        const result = res.data?.listMcpTools;
-        setTools(result?.tools ?? []);
-        setError(result?.error ?? null);
+        const result = await listMcpToolsForServer(server);
+        setTools(result.tools);
+        setError(result.error);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -643,9 +630,22 @@ function McpServerEditPanel({
                 data-testid="input-mcp-oauth-client-id"
               />
               <span className="text-xs font-normal text-muted-foreground mt-0.5 block">
-                When set, users authenticate via PKCE before making MCP calls.
+                When set, users authenticate via a browser popup (OAuth2 PKCE) before making MCP calls.
               </span>
             </label>
+
+            {/* OAuth server requirements — shown when a client ID is entered */}
+            {form.oauthClientId.trim() && (
+              <div className="rounded-lg border border-dashed px-3 py-2.5 space-y-1.5 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground text-xs">MCP server requirements for OAuth</p>
+                <ul className="space-y-1 list-none">
+                  <li className="flex gap-1.5"><span className="shrink-0 text-muted-foreground">1.</span><span>Serve <span className="font-mono">GET /.well-known/oauth-protected-resource</span> — lists the authorization server URL.</span></li>
+                  <li className="flex gap-1.5"><span className="shrink-0 text-muted-foreground">2.</span><span>Authorization server exposes <span className="font-mono">/.well-known/openid-configuration</span> with <span className="font-mono">authorization_endpoint</span> and <span className="font-mono">token_endpoint</span>.</span></li>
+                  <li className="flex gap-1.5"><span className="shrink-0 text-muted-foreground">3.</span><span>App client has <span className="font-mono">https://localhost:3000/oauth/callback</span> registered as a redirect URI.</span></li>
+                  <li className="flex gap-1.5"><span className="shrink-0 text-muted-foreground">4.</span><span>App client supports Authorization Code + PKCE (no client secret needed).</span></li>
+                </ul>
+              </div>
+            )}
           </div>
         </section>
 

@@ -2,6 +2,13 @@
   "targets": {
     "default": {
       "resources": {
+        "runtimes": {
+          "AgUiHandler": {
+            "runtimeId": "default_AgUiHandler-HISztIENHn",
+            "runtimeArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:runtime/default_AgUiHandler-HISztIENHn",
+            "roleArn": "arn:aws:iam::796988593450:role/AgentCore-default-default-ApplicationAgentAgUiHandl-MMwH2RMyxHuo"
+          }
+        },
         "memories": {
           "MyHarnessMemory": {
             "memoryId": "default_MyHarnessMemory-zz6wfiFFUs",
@@ -18,7 +25,7 @@
           }
         },
         "stackName": "AgentCore-default-default",
-        "deployHash": "883504c2703ccb79"
+        "deployHash": "e078250467c2cb02"
       }
     }
   }

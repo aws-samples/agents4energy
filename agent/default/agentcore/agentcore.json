@@ -7,7 +7,21 @@
     "agentcore:created-by": "agentcore-cli",
     "agentcore:project-name": "default"
   },
-  "runtimes": [],
+  "runtimes": [
+    {
+      "name": "AgUiHandler",
+      "build": "Container",
+      "codeLocation": "../handler",
+      "entrypoint": "agent.py",
+      "networkMode": "PUBLIC",
+      "envVars": [
+        {
+          "name": "APPSYNC_HTTP_ENDPOINT",
+          "value": "https://7iz4bqmxdndijama5c37ne6mgq.appsync-api.us-east-1.amazonaws.com/graphql"
+        }
+      ]
+    }
+  ],
   "memories": [
     {
       "name": "MyHarnessMemory",

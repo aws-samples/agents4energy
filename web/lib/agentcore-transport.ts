@@ -1,4 +1,6 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { SignatureV4 } from '@smithy/signature-v4';
+import { Sha256 } from '@aws-crypto/sha256-browser';
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai';
 import { decodeEventStream } from './aws-event-stream';
 import deploymentInfo from '../deployment-info.json';
@@ -6,11 +8,44 @@ import deploymentInfo from '../deployment-info.json';
 export const HARNESS_ARN = (deploymentInfo as any).harnesses?.MyHarness?.harnessArn as string;
 export const DEPLOYMENT_REGION = ((deploymentInfo as any).region as string) ?? 'us-east-1';
 
-export async function getAccessToken(): Promise<string> {
+async function signedFetch(url: string, init: RequestInit & { body: string }): Promise<Response> {
   const session = await fetchAuthSession();
-  const token = session.tokens?.accessToken?.toString();
-  if (!token) throw new Error('No access token — sign in first.');
-  return token;
+  const creds = session.credentials;
+  if (!creds?.accessKeyId || !creds?.secretAccessKey) {
+    throw new Error('No AWS credentials — sign in first.');
+  }
+
+  const parsed = new URL(url);
+  const signer = new SignatureV4({
+    credentials: {
+      accessKeyId: creds.accessKeyId,
+      secretAccessKey: creds.secretAccessKey,
+      sessionToken: creds.sessionToken,
+    },
+    region: DEPLOYMENT_REGION,
+    service: 'bedrock-agentcore',
+    sha256: Sha256,
+  });
+
+  const signed = await signer.sign({
+    method: init.method as string,
+    protocol: parsed.protocol,
+    hostname: parsed.hostname,
+    path: parsed.pathname,
+    query: Object.fromEntries(parsed.searchParams),
+    headers: {
+      host: parsed.hostname,
+      'content-type': 'application/json',
+    },
+    body: init.body,
+  });
+
+  return fetch(url, {
+    method: init.method,
+    headers: signed.headers as Record<string, string>,
+    body: init.body,
+    signal: (init as any).signal,
+  });
 }
 
 export interface McpServerConfig {
@@ -58,7 +93,6 @@ export class HarnessChatTransport implements ChatTransport<UIMessage> {
       new ReadableStream<UIMessageChunk>({
         async start(controller) {
           try {
-            const token = await getAccessToken();
             const agentConfig = getAgentConfig();
 
             const harnessMessages = messages.flatMap((m) => {
@@ -101,12 +135,8 @@ export class HarnessChatTransport implements ChatTransport<UIMessage> {
               }));
             }
 
-            const response = await fetch(url, {
+            const response = await signedFetch(url, {
               method: 'POST',
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
               body: JSON.stringify(invokeBody),
               signal: abortSignal,
             });

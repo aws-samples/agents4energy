@@ -12,7 +12,7 @@ The agent in this project is a **Bedrock AgentCore Harness** — a managed runti
 
 ```
 Browser
-  │  Bearer JWT (Cognito access token)
+  │  SigV4-signed request (Cognito Identity Pool credentials)
   ▼
 bedrock-agentcore.{region}.amazonaws.com/harnesses/invoke
   │
@@ -35,7 +35,7 @@ The harness is configured in [`agent/default/app/MyHarness/harness.json`](../age
 | Model | `openai.gpt-oss-120b` via Bedrock, chat completions API format |
 | Memory | `MyHarnessMemory` (persistent, per-user + per-session) |
 | Built-in tools | `agentcore_browser`, `agentcore_code_interpreter` |
-| Auth | Custom JWT — validates Cognito tokens from this project's User Pool |
+| Auth | AWS_IAM — requests are SigV4-signed using Cognito Identity Pool credentials |
 | Context truncation | Summarization (preserves 10 most-recent messages, summarizes the rest) |
 
 The harness runs as a hosted container on AgentCore infrastructure. Its ARN is stored in `web/deployment-info.json` and imported at build time by the frontend transport layer.
@@ -46,9 +46,9 @@ The harness runs as a hosted container on AgentCore infrastructure. Its ARN is s
 
 ### 1. Authentication
 
-The frontend calls `fetchAuthSession()` from `aws-amplify/auth` to get a Cognito access token (JWT). This token is passed as `Authorization: Bearer <token>` on every harness invoke request.
+The frontend calls `fetchAuthSession()` from `aws-amplify/auth` to get temporary AWS credentials from the Cognito Identity Pool (STS-issued `accessKeyId` / `secretAccessKey` / `sessionToken`). These are used to SigV4-sign every harness invoke request via `@smithy/signature-v4`.
 
-The harness uses OIDC discovery against the Cognito User Pool to validate the token. No AWS SigV4 credentials are involved in the request path — Cognito JWTs are the only auth mechanism.
+The harness uses AWS_IAM auth — it validates the SigV4 signature and authorizes based on the caller's IAM identity. The Cognito Identity Pool maps authenticated Cognito users to the Amplify `authenticatedUserIamRole`.
 
 ### 2. Request construction
 
@@ -179,16 +179,17 @@ ChatView (React)
        │
        ▼
 HarnessChatTransport
-  fetchAuthSession() → Cognito JWT
+  fetchAuthSession() → Identity Pool credentials (STS)
+  SigV4-sign request with @smithy/signature-v4
   build invoke body (messages + systemPrompt + model + tools)
        │
        ▼
 POST /harnesses/invoke?harnessArn=...
-  Authorization: Bearer {jwt}
+  Authorization: AWS4-HMAC-SHA256 ... (SigV4)
        │
        ▼
 AgentCore Harness (MyHarness)
-  1. Validate JWT via Cognito OIDC
+  1. Validate SigV4 signature (AWS_IAM auth)
   2. Load memory context for actorId + sessionId
   3. Build model request (history + system prompt + tools)
        │

@@ -1,0 +1,6 @@
+strands-agents
+fastapi
+uvicorn[standard]
+httpx
+boto3
+botocore

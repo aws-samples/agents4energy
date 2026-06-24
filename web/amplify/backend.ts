@@ -92,32 +92,67 @@ registerMcpTargetLambda.addToRolePolicy(
 // ============================================================================
 
 const HARNESS_ARN = 'arn:aws:bedrock-agentcore:us-east-1:796988593450:harness/default_MyHarness-PXjJuBIMNs';
-// Cognito client for the service account that the Lambda uses to obtain a Bearer
-// token accepted by the harness (CUSTOM_JWT auth mode).
-const COGNITO_CLIENT_ID = '2hugv1ugrni8jts323q1ldiopt';
-const SERVICE_ACCOUNT_EMAIL = 'invoke-agent-service@internal.local';
-// Password stored as an SSM SecureString; created manually via aws ssm put-parameter.
-const SERVICE_ACCOUNT_PASSWORD_PARAM = '/agentcore/invoke-agent/service-account-password';
 
 backend.invokeAgent.addEnvironment('HARNESS_ARN', HARNESS_ARN);
-backend.invokeAgent.addEnvironment('COGNITO_CLIENT_ID', COGNITO_CLIENT_ID);
-backend.invokeAgent.addEnvironment('SERVICE_ACCOUNT_EMAIL', SERVICE_ACCOUNT_EMAIL);
-backend.invokeAgent.addEnvironment('SERVICE_ACCOUNT_PASSWORD_PARAM', SERVICE_ACCOUNT_PASSWORD_PARAM);
 
 const invokeAgentLambda = backend.invokeAgent.resources.lambda as LambdaFunction;
 
-// Allow the Lambda to read the service account password from SSM.
+// Allow the Lambda to invoke the harness using its IAM execution role (AWS_IAM auth mode).
+invokeAgentLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: [
+      'bedrock-agentcore:InvokeAgentRuntime',
+      'bedrock-agentcore:InvokeHarness',
+    ],
+    resources: [HARNESS_ARN],
+  }),
+);
+
+// Grant direct DynamoDB read access so the Lambda can look up agent config without going
+// through AppSync (AppSync owner-auth silently filters out records with null owner).
+// Table names are hardcoded to avoid a CDK circular dependency between the function and
+// data stacks (function stack → data stack tables → data stack → function resolver).
+const AMPLIFY_ENV_SUFFIX = 'w76u5er7b5gvvclhudegwckcse-NONE';
+const ACCOUNT_ID = '796988593450';
+const DDB_REGION = 'us-east-1';
+backend.invokeAgent.addEnvironment('AGENT_TABLE', `Agent-${AMPLIFY_ENV_SUFFIX}`);
+backend.invokeAgent.addEnvironment('MCP_SERVER_TABLE', `McpServer-${AMPLIFY_ENV_SUFFIX}`);
+backend.invokeAgent.addEnvironment('AGENT_MCP_SERVER_TABLE', `AgentMcpServer-${AMPLIFY_ENV_SUFFIX}`);
+invokeAgentLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['dynamodb:Scan', 'dynamodb:Query', 'dynamodb:BatchGetItem', 'dynamodb:GetItem'],
+    resources: [
+      `arn:aws:dynamodb:${DDB_REGION}:${ACCOUNT_ID}:table/Agent-${AMPLIFY_ENV_SUFFIX}`,
+      `arn:aws:dynamodb:${DDB_REGION}:${ACCOUNT_ID}:table/McpServer-${AMPLIFY_ENV_SUFFIX}`,
+      `arn:aws:dynamodb:${DDB_REGION}:${ACCOUNT_ID}:table/AgentMcpServer-${AMPLIFY_ENV_SUFFIX}`,
+      `arn:aws:dynamodb:${DDB_REGION}:${ACCOUNT_ID}:table/AgentMcpServer-${AMPLIFY_ENV_SUFFIX}/index/*`,
+    ],
+  }),
+);
+
+// Service account Cognito credentials for harness Bearer token auth.
+const SVC_SSM_PATH = '/agentcore/invoke-agent-service/password';
+backend.invokeAgent.addEnvironment('COGNITO_USER_POOL_ID', 'us-east-1_qG5061DTr');
+backend.invokeAgent.addEnvironment('COGNITO_CLIENT_ID', '2hugv1ugrni8jts323q1ldiopt');
+backend.invokeAgent.addEnvironment('SERVICE_ACCOUNT_USERNAME', 'invoke-agent-service@internal.local');
+backend.invokeAgent.addEnvironment('SERVICE_ACCOUNT_SSM_PATH', SVC_SSM_PATH);
 invokeAgentLambda.addToRolePolicy(
   new PolicyStatement({
     actions: ['ssm:GetParameter'],
-    resources: [`arn:aws:ssm:us-east-1:796988593450:parameter${SERVICE_ACCOUNT_PASSWORD_PARAM}`],
+    resources: [`arn:aws:ssm:${DDB_REGION}:${ACCOUNT_ID}:parameter${SVC_SSM_PATH}`],
   }),
 );
-// Allow decryption of the SecureString with the default SSM KMS key.
-invokeAgentLambda.addToRolePolicy(
+
+
+// Allow authenticated browser users to SigV4-sign harness invoke requests directly.
+// The Cognito Identity Pool maps signed-in users to this role.
+backend.auth.resources.authenticatedUserIamRole.addToPrincipalPolicy(
   new PolicyStatement({
-    actions: ['kms:Decrypt'],
-    resources: ['arn:aws:kms:us-east-1:796988593450:key/alias/aws/ssm'],
+    actions: [
+      'bedrock-agentcore:InvokeAgentRuntime',
+      'bedrock-agentcore:InvokeHarness',
+    ],
+    resources: [HARNESS_ARN],
   }),
 );
 
@@ -143,3 +178,18 @@ backend.addOutput({
   },
 });
 
+// ============================================================================
+// AG-UI HANDLER — GraphQL API environment variable placeholder
+//
+// The invokeHandler HTTP data source + resolver are created/updated by
+// scripts/extract-deployment-info.js (AWS CLI) after agentcore deploy, so
+// there is no CFn ownership conflict.
+//
+// We set a placeholder AGUI_RUNTIME_ARN on the API now so the env var slot
+// exists. The post-deploy script updates it to the real runtime ARN via
+// PutGraphqlApiEnvironmentVariables.
+// ============================================================================
+const cfnGraphqlApi = backend.data.resources.cfnResources.cfnGraphqlApi;
+cfnGraphqlApi.environmentVariables = {
+  AGUI_RUNTIME_ARN: 'PLACEHOLDER',
+};
