@@ -5,7 +5,7 @@ on:
   issue_comment:
     types: [created]
   issues:
-    types: [assigned]
+    types: [opened, assigned]
 
 permissions:
   contents: write
@@ -15,11 +15,12 @@ permissions:
 jobs:
   invoke-agent:
     runs-on: ubuntu-latest
-    # Only run when a comment contains @agent or @agent-<slug> and was not written by a bot
+    # Only run when @agent is mentioned and the sender is not a bot
     if: |
       github.event.sender.type != 'Bot' && (
-        github.event_name == 'issues' ||
-        contains(github.event.comment.body, '@agent')
+        (github.event_name == 'issues' && github.event.action == 'assigned') ||
+        (github.event_name == 'issues' && github.event.action == 'opened' && contains(github.event.issue.body, '@agent')) ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@agent'))
       )
 
     steps:
@@ -70,4 +71,4 @@ jobs:
           GITHUB_BASE_REF: ${{ github.event.repository.default_branch }}
           STATUS_COMMENT_ID_FILE: /tmp/status_comment_id.txt
         working-directory: scripts
-        run: pnpm exec tsx github-agent-invoke.ts
+        run: ./node_modules/.bin/tsx github-agent-invoke.ts
