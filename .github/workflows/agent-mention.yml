@@ -57,7 +57,7 @@ jobs:
         working-directory: scripts
         run: |
           echo '{"type":"module"}' > package.json
-          npm install @octokit/rest @smithy/signature-v4 @aws-crypto/sha256-js tsx
+          npm install @octokit/rest @smithy/signature-v4 @aws-crypto/sha256-js
 
       - name: Invoke agent and post reply
         env:
@@ -71,4 +71,4 @@ jobs:
           GITHUB_BASE_REF: ${{ github.event.repository.default_branch }}
           STATUS_COMMENT_ID_FILE: /tmp/status_comment_id.txt
         working-directory: scripts
-        run: node_modules/.bin/tsx github-agent-invoke.ts
+        run: node --experimental-strip-types github-agent-invoke.ts
