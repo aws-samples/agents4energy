@@ -77,6 +77,9 @@ jobs:
           STATUS_COMMENT_ID_FILE: /tmp/status_comment_id.txt
         working-directory: scripts
         run: |
-          echo "=== npm root ===" && npm root -g
-          echo "=== node path ===" && node -e "console.log(require.resolve.paths('@aws-sdk/client-lambda'))"
+          echo "=== installed packages ===" && ls node_modules
+          echo "=== smithy/signature-v4 version ===" && cat node_modules/@smithy/signature-v4/package.json | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));console.log(d.version, JSON.stringify(d.dependencies||{}))"
+          echo "=== smithy/core version ===" && cat node_modules/@smithy/core/package.json | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));console.log(d.version, JSON.stringify(d.dependencies||{}))"
+          echo "=== client-lambda in smithy ===" && find node_modules/@smithy -name '*.js' | xargs grep -l 'client-lambda' 2>/dev/null || echo "none"
+          echo "=== client-lambda in exports ===" && find node_modules -name 'package.json' | xargs grep -l 'client-lambda' 2>/dev/null || echo "none"
           node --experimental-strip-types github-agent-invoke.ts
