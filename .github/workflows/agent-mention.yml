@@ -56,7 +56,7 @@ jobs:
           node-version: '24'
 
       - name: Install script dependencies
-        run: pnpm install --frozen-lockfile --filter agent-invoke
+        run: pnpm install --frozen-lockfile
 
       - name: Invoke agent and post reply
         env:
