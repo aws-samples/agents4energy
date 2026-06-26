@@ -76,4 +76,6 @@ jobs:
           echo '{"type":"module"}' > package.json
           npm install --silent "@octokit/rest@21" "@smithy/signature-v4@5" "@aws-crypto/sha256-js@5" tsx
           cp $GITHUB_WORKSPACE/scripts/github-agent-invoke.ts .
+          echo "=== installed ===" && ls node_modules | grep aws
+          echo "=== client-lambda anywhere ===" && find / -name 'package.json' -path '*/client-lambda/*' 2>/dev/null | head -5 || echo "none"
           node_modules/.bin/tsx github-agent-invoke.ts
