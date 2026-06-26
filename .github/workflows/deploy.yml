@@ -105,8 +105,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.ref_name }}" = "main" ]; then
+            # Use the sanitized branch name to match the Amplify branch created by the hosting stack
             pnpm exec ampx pipeline-deploy \
-              --branch "${{ github.ref_name }}" \
+              --branch "$BRANCH" \
               --app-id "$AMPLIFY_APP_ID" \
               --outputs-out-dir .
           else
