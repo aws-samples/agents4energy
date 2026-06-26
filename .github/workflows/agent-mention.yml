@@ -56,10 +56,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install script dependencies
-        working-directory: scripts
-        run: pnpm install --frozen-lockfile
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -75,5 +71,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_BASE_REF: ${{ github.event.repository.default_branch }}
           STATUS_COMMENT_ID_FILE: /tmp/status_comment_id.txt
-        working-directory: scripts
-        run: pnpm exec tsx github-agent-invoke.ts
+        run: |
+          mkdir /tmp/agent-invoke && cd /tmp/agent-invoke
+          echo '{"type":"module"}' > package.json
+          npm install --silent "@octokit/rest@21" "@smithy/signature-v4@5" "@aws-crypto/sha256-js@5" tsx
+          cp $GITHUB_WORKSPACE/scripts/github-agent-invoke.ts .
+          node_modules/.bin/tsx github-agent-invoke.ts
