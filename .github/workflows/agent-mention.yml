@@ -55,7 +55,9 @@ jobs:
 
       - name: Install script dependencies
         working-directory: scripts
-        run: npm install @octokit/rest @smithy/signature-v4 @aws-crypto/sha256-js tsx
+        run: |
+          echo '{"type":"module"}' > package.json
+          npm install @octokit/rest @smithy/signature-v4 @aws-crypto/sha256-js tsx
 
       - name: Invoke agent and post reply
         env:
