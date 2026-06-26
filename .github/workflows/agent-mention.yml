@@ -11,6 +11,7 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  id-token: write
 
 jobs:
   invoke-agent:
@@ -57,24 +58,19 @@ jobs:
         working-directory: scripts
         run: |
           echo '{"type":"module"}' > package.json
-          npm install @octokit/rest @smithy/signature-v4 @aws-crypto/sha256-js
+          npm install "@octokit/rest@^21" @smithy/signature-v4 @aws-crypto/sha256-js
 
-      - name: Debug module resolution
-        working-directory: scripts
-        run: |
-          echo "=== Node version ===" && node --version
-          echo "=== package.json ===" && cat package.json
-          echo "=== node_modules list ===" && ls node_modules | head -20
-          echo "=== client-lambda search ===" && find node_modules -name 'package.json' | xargs grep -l 'client-lambda' 2>/dev/null || echo "none"
-          echo "=== parent node_modules ===" && ls ../node_modules 2>/dev/null | head -5 || echo "no parent node_modules"
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
 
       - name: Invoke agent and post reply
         env:
           INVOKE_AGENT_RUNTIME_ARN: ${{ vars.INVOKE_AGENT_RUNTIME_ARN }}
           APPSYNC_ENDPOINT: ${{ vars.APPSYNC_ENDPOINT }}
           APP_URL: ${{ vars.APP_URL }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: us-east-1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_BASE_REF: ${{ github.event.repository.default_branch }}
