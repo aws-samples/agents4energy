@@ -2,6 +2,7 @@ import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { listSessionMessages } from './functions/list-session-messages/resource';
+import { updateSessionSummary } from './functions/update-session-summary/resource';
 import { registerMcpTarget } from './functions/register-mcp-target/resource';
 import { listMcpTools } from './functions/list-mcp-tools/resource';
 import { invokeAgent } from './functions/invoke-agent/resource';
@@ -15,6 +16,7 @@ const backend = defineBackend({
   auth,
   data,
   listSessionMessages,
+  updateSessionSummary,
   registerMcpTarget,
   listMcpTools,
   invokeAgent,
@@ -59,7 +61,24 @@ backend.listSessionMessages.addEnvironment('AGENTCORE_MEMORY_ID', AGENTCORE_MEMO
 const listSessionMessagesLambda = backend.listSessionMessages.resources.lambda as LambdaFunction;
 listSessionMessagesLambda.addToRolePolicy(
   new PolicyStatement({
-    actions: ['bedrock-agentcore:ListEvents'],
+    actions: [
+      'bedrock-agentcore:ListEvents',
+      'bedrock-agentcore:ListMemoryRecords',
+    ],
+    resources: [AGENTCORE_MEMORY_ARN],
+  }),
+);
+
+// ============================================================================
+// UPDATE-SESSION-SUMMARY Lambda — BatchUpdateMemoryRecords on the memory
+// ============================================================================
+
+backend.updateSessionSummary.addEnvironment('AGENTCORE_MEMORY_ID', AGENTCORE_MEMORY_ID);
+
+const updateSessionSummaryLambda = backend.updateSessionSummary.resources.lambda as LambdaFunction;
+updateSessionSummaryLambda.addToRolePolicy(
+  new PolicyStatement({
+    actions: ['bedrock-agentcore:BatchUpdateMemoryRecords'],
     resources: [AGENTCORE_MEMORY_ARN],
   }),
 );

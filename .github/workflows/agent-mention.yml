@@ -29,7 +29,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # React to the triggering comment with 👀 so the user knows immediately
+          # React to the triggering comment with 👀
           if [ -n "${{ github.event.comment.id }}" ]; then
             curl -s -X POST \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -37,15 +37,6 @@ jobs:
               "https://api.github.com/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
               -d '{"content":"eyes"}'
           fi
-          # Post a status comment so the user knows the agent is starting
-          ISSUE_NUMBER="${{ github.event.issue.number }}"
-          curl -s -X POST \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${ISSUE_NUMBER}/comments" \
-            -d '{"body":"⚙️ Agent triggered — creating chat session…"}' \
-            | jq -r '.id' > /tmp/status_comment_id.txt
-          echo "Status comment ID: $(cat /tmp/status_comment_id.txt)"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -53,33 +44,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_AGENT_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Write memory poll script
-        run: |
-          {
-          echo 'import boto3,os,sys,time'
-          echo 'mid=os.environ["MEMORY_ID"]'
-          echo 'sid=os.environ["SESSION_ID"]'
-          echo 'c=boto3.client("bedrock-agentcore",region_name="us-east-1")'
-          echo 'for a in range(36):'
-          echo '  if a:time.sleep(10)'
-          echo '  sys.stderr.write(f"[poll] attempt {a+1}/36\n")'
-          echo '  try:'
-          echo '    r=c.list_events(memoryId=mid,actorId="default",sessionId=sid,includePayloads=True)'
-          echo '    for e in reversed(r.get("events",[])):'
-          echo '      for p in e.get("payload",[]):'
-          echo '        v=p.get("conversational",{})'
-          echo '        if v.get("role","").upper()=="ASSISTANT":'
-          echo '          t=v.get("content",{}).get("text","")'
-          echo '          if t:print(t);sys.exit(0)'
-          echo '  except Exception as ex:sys.stderr.write(str(ex)+"\n")'
-          echo 'sys.stderr.write("[poll] timed out waiting for ASSISTANT event\n")'
-          } > /tmp/poll_memory.py
-
-      - name: Invoke agent and post reply
+      - name: Invoke agent
         env:
           APPSYNC_ENDPOINT: ${{ vars.APPSYNC_ENDPOINT }}
           APP_URL: ${{ vars.APP_URL }}
-          AGENTCORE_MEMORY_ID: ${{ vars.AGENTCORE_MEMORY_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ISSUE_NUMBER="${{ github.event.issue.number }}"
@@ -95,7 +63,6 @@ jobs:
           SENDER="${{ github.event.sender.login }}"
           REPO="${{ github.repository }}"
           DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-          STATUS_COMMENT_ID=$(cat /tmp/status_comment_id.txt 2>/dev/null || echo "")
 
           # Strip the @agent mention to get the user's actual request
           RAW_TEXT="${COMMENT_BODY:-$ISSUE_BODY}"
@@ -114,13 +81,14 @@ jobs:
           USER REQUEST:
           ${USER_PROMPT}
 
-          If your response involves code changes, create a new branch off ${DEFAULT_BRANCH}, commit the changes, and open a pull request. Reference issue #${ISSUE_NUMBER} in the PR description."
+          When you are done, post a summary of what you did as a comment on issue #${ISSUE_NUMBER} using:
+            gh issue comment ${ISSUE_NUMBER} --repo ${REPO} --body \"...\"
+          If your response involves code changes, create a new branch off ${DEFAULT_BRANCH}, commit the changes, and open a pull request referencing issue #${ISSUE_NUMBER}."
 
-          # Create a ChatSession so the run is viewable in the web UI
+          # Create a ChatSession so the run is visible in the web UI
           SESSION_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
-          SESSION_NAME="GitHub #${ISSUE_NUMBER} — ${ISSUE_TITLE}"
           CREATE_SESSION_BODY=$(jq -n \
-            --arg name "$SESSION_NAME" \
+            --arg name "GitHub #${ISSUE_NUMBER} — ${ISSUE_TITLE}" \
             '{"query":"mutation CreateChatSession($input: CreateChatSessionInput!) { createChatSession(input: $input) { id } }","variables":{"input":{"name":$name}}}')
 
           SESSION_RESP=$(curl -s -X POST "$APPSYNC_ENDPOINT" \
@@ -130,49 +98,33 @@ jobs:
             --aws-sigv4 "aws:amz:us-east-1:appsync" \
             -d "$CREATE_SESSION_BODY")
           CREATED_ID=$(echo "$SESSION_RESP" | jq -r '.data.createChatSession.id // empty')
-          if [ -n "$CREATED_ID" ]; then
-            SESSION_ID="$CREATED_ID"
-            echo "Chat session created: $SESSION_ID"
-          else
-            echo "Warning: could not create chat session: $SESSION_RESP"
+          [ -n "$CREATED_ID" ] && SESSION_ID="$CREATED_ID"
+          echo "Session: $SESSION_ID"
+
+          # Post status comment with live-chat link
+          LIVE_BODY="⚙️ Agent working…"
+          if [ -n "$APP_URL" ]; then
+            LIVE_BODY="⚙️ Agent working… [Watch live](${APP_URL}/chat-handler?sessionId=${SESSION_ID})"
           fi
-
-          # Update the status comment with a live-chat link
-          if [ -n "$APP_URL" ] && [ -n "$STATUS_COMMENT_ID" ]; then
-            LIVE_BODY="🤖 Agent is working… [Watch live](${APP_URL}/chat-handler?sessionId=${SESSION_ID})"
-            curl -s -X PATCH \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/${REPO}/issues/comments/${STATUS_COMMENT_ID}" \
-              -d "$(jq -n --arg b "$LIVE_BODY" '{"body":$b}')"
-          fi
-
-          # Fire invokeHandler — returns immediately, agent runs async in the container
-          INVOKE_BODY=$(jq -n \
-            --arg sessionId "$SESSION_ID" \
-            --arg prompt "$PROMPT" \
-            '{"query":"mutation InvokeHandler($sessionId: String!, $prompt: String!) { invokeHandler(sessionId: $sessionId, prompt: $prompt) { sessionId } }","variables":{"sessionId":$sessionId,"prompt":$prompt}}')
-
-          INVOKE_RESP=$(curl -s -X POST "$APPSYNC_ENDPOINT" \
-            -H "Content-Type: application/json" \
-            -H "X-Amz-Security-Token: $AWS_SESSION_TOKEN" \
-            --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" \
-            --aws-sigv4 "aws:amz:us-east-1:appsync" \
-            -d "$INVOKE_BODY")
-          echo "invokeHandler response: $INVOKE_RESP"
-
-          # Poll AgentCore memory until an ASSISTANT event appears (max 6 min, 10s interval)
-          AGENT_RESPONSE=$(MEMORY_ID="$AGENTCORE_MEMORY_ID" SESSION_ID="$SESSION_ID" python3 /tmp/poll_memory.py)
-
-          if [ -z "$AGENT_RESPONSE" ]; then
-            AGENT_RESPONSE="⚠️ Agent did not respond within the timeout."
-          fi
-
-          echo "Agent response length: ${#AGENT_RESPONSE}"
-
-          # Post the agent's reply as a GitHub comment
           curl -s -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${REPO}/issues/${ISSUE_NUMBER}/comments" \
-            -d "$(jq -n --arg b "$AGENT_RESPONSE" '{"body":$b}')"
+            -d "$(jq -n --arg b "$LIVE_BODY" '{"body":$b}')"
+
+          # Fire invokeHandler — agent runs async, posts its own comment when done
+          INVOKE_BODY=$(jq -n \
+            --arg sessionId "$SESSION_ID" \
+            --arg prompt "$PROMPT" \
+            --arg githubToken "$GITHUB_TOKEN" \
+            --arg githubRepo "$REPO" \
+            --arg githubBranch "$DEFAULT_BRANCH" \
+            '{"query":"mutation InvokeHandler($sessionId: String!, $prompt: String!, $systemPrompt: String) { invokeHandler(sessionId: $sessionId, prompt: $prompt, systemPrompt: $systemPrompt) { sessionId } }","variables":{"sessionId":$sessionId,"prompt":$prompt,"systemPrompt":""}}')
+
+          curl -s -X POST "$APPSYNC_ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -H "X-Amz-Security-Token: $AWS_SESSION_TOKEN" \
+            --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" \
+            --aws-sigv4 "aws:amz:us-east-1:appsync" \
+            -d "$INVOKE_BODY"
+          echo "Agent invoked."

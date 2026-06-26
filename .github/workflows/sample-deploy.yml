@@ -1,0 +1,107 @@
+name: Deploy
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
+  ACM_CERT_ARN: ${{ vars.ACM_CERT_ARN }}
+  HOSTED_ZONE_ID: ${{ vars.HOSTED_ZONE_ID }}
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC auth to AWS
+      contents: read
+      actions: read     # required to download amplify-outputs artifact on feature branches
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4  # reads version from packageManager in package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Slashes invalid in CloudFormation stack names/subdomains; lowercased because
+      # CloudFront CNAMEs must be lowercase.
+      - name: Sanitize branch name
+        run: echo "BRANCH=$(echo '${{ github.ref_name }}' | tr '/' '-' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Deploy per-branch hosting stack
+        run: |
+          # ROLLBACK_COMPLETE stacks cannot be updated — delete and recreate
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "chess-coach-$BRANCH" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+          if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+            echo "Stack is in ROLLBACK_COMPLETE — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "chess-coach-$BRANCH"
+            aws cloudformation wait stack-delete-complete --stack-name "chess-coach-$BRANCH"
+          fi
+
+          aws cloudformation deploy \
+            --stack-name "chess-coach-$BRANCH" \
+            --template-file infra/hosting-branch.yaml \
+            --parameter-overrides \
+              BranchName="$BRANCH" \
+              AcmCertArn="$ACM_CERT_ARN" \
+              HostedZoneId="$HOSTED_ZONE_ID" \
+            --no-fail-on-empty-changeset
+
+      - name: Deploy backend (Amplify Gen2)
+        env:
+          CI: "1"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            pnpm exec ampx pipeline-deploy \
+              --branch "${{ github.ref_name }}" \
+              --app-id "$AMPLIFY_APP_ID"
+          else
+            # Feature branches share main's backend — download its amplify_outputs.json
+            MAIN_RUN=$(gh run list --repo "${{ github.repository }}" \
+              --branch main --workflow deploy.yml --status success --limit 1 \
+              --json databaseId --jq '.[0].databaseId')
+            echo "Reusing amplify_outputs.json from main run $MAIN_RUN"
+            gh run download "$MAIN_RUN" --repo "${{ github.repository }}" \
+              --name amplify-outputs --dir .
+          fi
+
+      - name: Upload amplify_outputs.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: amplify-outputs
+          path: amplify_outputs.json
+
+      - name: Build
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm build
+
+      - name: Deploy to S3 + invalidate CloudFront
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks --stack-name "chess-coach-$BRANCH" \
+            --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text)
+          DIST=$(aws cloudformation describe-stacks --stack-name "chess-coach-$BRANCH" \
+            --query 'Stacks[0].Outputs[?OutputKey==`DistributionId`].OutputValue' --output text)
+
+          aws s3 sync out/ "s3://$BUCKET/" --delete
+          AWS_PAGER="" aws cloudfront create-invalidation \
+            --distribution-id "$DIST" --paths "/*"
+          echo "Deployed: https://chess-$BRANCH.waltmayfield.org/"

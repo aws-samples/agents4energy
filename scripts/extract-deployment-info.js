@@ -187,7 +187,8 @@ if (agUiHandlerRuntime && amplifyOutputs) {
     }
     const invokePolicy = JSON.stringify({
       Version: '2012-10-17',
-      Statement: [{ Effect: 'Allow', Action: ['bedrock-agentcore:InvokeAgentRuntime'], Resource: [runtimeArn] }],
+      Statement: [{ Effect: 'Allow', Action: ['bedrock-agentcore:InvokeAgentRuntime'],
+        Resource: [runtimeArn, `${runtimeArn}/runtime-endpoint/*`] }],
     });
     execSync(
       `aws iam put-role-policy --role-name ${roleName} --policy-name InvokeRuntime --policy-document '${invokePolicy}'`,
@@ -229,15 +230,14 @@ if (agUiHandlerRuntime && amplifyOutputs) {
     }
 
     // 3. Create or update the invokeHandler resolver (script-owned, no CFn conflict).
-    //    Resolver reads ctx.env.AGUI_RUNTIME_ARN (set below) to avoid hardcoding the ARN.
+    //    The encoded ARN is baked in at generation time (encodeURIComponent is not
+    //    available in the AppSync JS runtime).
+    const encodedArn = encodeURIComponent(runtimeArn);
     const resolverCode = `import { util } from '@aws-appsync/utils';
 export function request(ctx) {
-  const runtimeArn = ctx.env.AGUI_RUNTIME_ARN;
-  if (!runtimeArn || runtimeArn === 'PLACEHOLDER') { util.error('AGUI_RUNTIME_ARN not configured', 'ConfigurationError'); }
-  const encodedArn = encodeURIComponent(runtimeArn);
   return {
     method: 'POST',
-    resourcePath: \`/runtimes/\${encodedArn}/invocations?qualifier=DEFAULT\`,
+    resourcePath: '/runtimes/${encodedArn}/invocations?qualifier=DEFAULT',
     params: {
       headers: {
         'Content-Type': 'application/json',
@@ -248,6 +248,7 @@ export function request(ctx) {
         prompt: ctx.args.prompt,
         systemPrompt: ctx.args.systemPrompt,
         modelId: ctx.args.modelId,
+        summary: ctx.args.summary,
       }),
     },
   };
@@ -298,9 +299,12 @@ export function response(ctx) {
       console.warn('extract-deployment-info: could not set AppSync env vars:', err.message);
     }
 
-    // 5. Grant the runtime execution role permission to publish AG-UI events.
+    // 5. Grant the runtime execution role permission to publish AG-UI events,
+    //    invoke Bedrock for summarisation, and read AgentCore memory history.
     if (runtimeRoleArn) {
       const runtimeRoleName = runtimeRoleArn.split('/').pop();
+      const memoryArn = Object.values(memories)[0]?.memoryArn ?? '';
+
       const publishPolicy = JSON.stringify({
         Version: '2012-10-17',
         Statement: [{
@@ -320,26 +324,59 @@ export function response(ctx) {
       } catch (err) {
         console.warn('extract-deployment-info: could not grant runtime role AppSync permission:', err.message);
       }
+
+      // Grant ListEvents on the memory so the container can seed prior conversation
+      // turns into the Strands agent before each run.
+      if (memoryArn) {
+        const memoryReadPolicy = JSON.stringify({
+          Version: '2012-10-17',
+          Statement: [{
+            Effect: 'Allow',
+            Action: ['bedrock-agentcore:ListEvents'],
+            Resource: [memoryArn],
+          }],
+        });
+        try {
+          execSync(
+            `aws iam put-role-policy --role-name ${runtimeRoleName} --policy-name MemoryListEvents --policy-document '${memoryReadPolicy}'`,
+            { encoding: 'utf8' }
+          );
+          console.log(`extract-deployment-info: granted runtime role ${runtimeRoleName} memory ListEvents permission`);
+        } catch (err) {
+          console.warn('extract-deployment-info: could not grant runtime role memory permission:', err.message);
+        }
+      }
     }
 
-    // 4. Keep agentcore.json APPSYNC_HTTP_ENDPOINT in sync so the container
-    //    knows where to publish AG-UI events.
+    // 4. Keep agentcore.json env vars in sync so the container knows where to
+    //    publish AG-UI events and which memory to write conversation turns to.
     const agentcoreJsonPath = resolve(root, 'agent/default/agentcore/agentcore.json');
     try {
       const agentcoreJson = JSON.parse(readFileSync(agentcoreJsonPath, 'utf8'));
       const agUiRuntime = agentcoreJson.runtimes?.find(r => r.name === 'AgUiHandler');
       if (agUiRuntime) {
-        const existing = agUiRuntime.envVars?.find(e => e.name === 'APPSYNC_HTTP_ENDPOINT');
-        if (!existing || existing.value !== appsyncEndpoint) {
-          if (!agUiRuntime.envVars) agUiRuntime.envVars = [];
-          const idx = agUiRuntime.envVars.findIndex(e => e.name === 'APPSYNC_HTTP_ENDPOINT');
+        if (!agUiRuntime.envVars) agUiRuntime.envVars = [];
+        const envUpdates = {
+          APPSYNC_HTTP_ENDPOINT: appsyncEndpoint,
+          AGENTCORE_MEMORY_ID: Object.values(memories)[0]?.memoryId ?? '',
+        };
+        let changed = false;
+        for (const [name, value] of Object.entries(envUpdates)) {
+          if (!value) continue;
+          const idx = agUiRuntime.envVars.findIndex(e => e.name === name);
           if (idx >= 0) {
-            agUiRuntime.envVars[idx].value = appsyncEndpoint;
+            if (agUiRuntime.envVars[idx].value !== value) {
+              agUiRuntime.envVars[idx].value = value;
+              changed = true;
+            }
           } else {
-            agUiRuntime.envVars.push({ name: 'APPSYNC_HTTP_ENDPOINT', value: appsyncEndpoint });
+            agUiRuntime.envVars.push({ name, value });
+            changed = true;
           }
+        }
+        if (changed) {
           writeFileSync(agentcoreJsonPath, JSON.stringify(agentcoreJson, null, 2) + '\n');
-          console.log(`extract-deployment-info: updated agentcore.json APPSYNC_HTTP_ENDPOINT`);
+          console.log(`extract-deployment-info: updated agentcore.json env vars`);
         }
       }
     } catch (err) {
@@ -348,6 +385,31 @@ export function response(ctx) {
   }
 }
 
+// Resolve the AppSync API ID at the outer scope by re-reading the sidecar or API list.
+// appsyncApiId is declared inside the agUiHandlerRuntime block above, so we re-derive it here.
+let outerAppsyncApiId = '';
+if (amplifyOutputs) {
+  const sidecarPath2 = resolve(root, 'web/amplify-table-suffix.txt');
+  try {
+    outerAppsyncApiId = readFileSync(sidecarPath2, 'utf8').trim();
+  } catch {
+    const appsyncUrl = amplifyOutputs?.data?.url ?? '';
+    const appsyncRegion2 = amplifyOutputs?.data?.aws_region ?? region;
+    try {
+      const cfnApiRaw = execSync(`aws appsync list-graphql-apis --region ${appsyncRegion2} --output json`, { encoding: 'utf8' });
+      const apis = JSON.parse(cfnApiRaw)?.graphqlApis ?? [];
+      const match = apis.find(a => a.uris?.GRAPHQL === appsyncUrl);
+      outerAppsyncApiId = match?.apiId ?? '';
+    } catch { /* ignore */ }
+  }
+}
+
+const appsync = amplifyOutputs ? {
+  endpoint: amplifyOutputs?.data?.url ?? '',
+  apiId: outerAppsyncApiId,
+  region: amplifyOutputs?.data?.aws_region ?? region,
+} : undefined;
+
 const info = {
   target: targetName,
   region,
@@ -355,6 +417,7 @@ const info = {
   memories,
   runtimes,
   ...(gateway ? { gateway } : {}),
+  ...(appsync ? { appsync } : {}),
 };
 writeFileSync(outputPath, JSON.stringify(info, null, 2) + '\n');
 console.log(`extract-deployment-info: wrote ${outputPath}`);

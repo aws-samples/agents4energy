@@ -1,0 +1,150 @@
+# Prerequisites: run `pnpm setup:deploy-role` once to create the IAM OIDC
+# provider + deploy role and write AWS_ROLE_ARN / AWS_REGION to this repo.
+name: Deploy
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  NEXT_TELEMETRY_DISABLED: 1
+  ACT: ''  # overridden to 'true' by act for local runs; used to skip OIDC steps
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC auth to AWS
+      contents: read
+      actions: read     # required to download amplify-outputs artifact on feature branches
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4  # reads version from packageManager in package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install AWS CLI (act only — real runners have it pre-installed)
+        run: |
+          if [ -n "$ACT" ] && ! command -v aws &>/dev/null; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            /tmp/aws/install
+            aws --version
+          fi
+
+      - name: Configure AWS credentials
+        # In act runs (ACT=true) credentials are already in the environment — skip
+        # the action which would make a network call to STS that fails in Docker.
+        if: ${{ !env.ACT }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Slashes are invalid in CloudFormation stack names; lowercased for consistency
+      - name: Sanitize branch name
+        run: echo "BRANCH=$(echo '${{ github.ref_name }}' | tr '/' '-' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build CDK app
+        run: pnpm --filter agentcore-cdk-app build
+
+      # ── Phase 1: Hosting infrastructure ──────────────────────────────────────
+      # Deploy first so the Amplify app ID is available for pipeline-deploy below.
+
+      - name: Deploy hosting stack (S3 + CloudFront + Amplify app)
+        working-directory: agent/default/agentcore/cdk
+        run: |
+          STACK_NAME="agentcore-cli-hosting-$BRANCH"
+
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null) || STATUS="DOES_NOT_EXIST"
+          echo "Stack status: $STATUS"
+
+          if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+            echo "Stack is in ROLLBACK_COMPLETE — deleting before redeploy"
+            aws cloudformation delete-stack --stack-name "$STACK_NAME"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
+          fi
+
+          ./node_modules/.bin/cdk deploy "$STACK_NAME" \
+            --require-approval never \
+            --outputs-file hosting-outputs.json \
+            --context stackName="$STACK_NAME"
+
+          # Flatten the nested stack key so downstream steps can use plain keys
+          node -e "
+            const raw = require('./hosting-outputs.json');
+            const key = Object.keys(raw)[0];
+            require('fs').writeFileSync('hosting-outputs.json', JSON.stringify(raw[key], null, 2));
+          "
+
+      - name: Export hosting outputs
+        working-directory: agent/default/agentcore/cdk
+        run: |
+          echo "AMPLIFY_APP_ID=$(node -p "require('./hosting-outputs.json').AmplifyAppId")" >> "$GITHUB_ENV"
+          echo "BUCKET=$(node -p "require('./hosting-outputs.json').BucketName")" >> "$GITHUB_ENV"
+          echo "DIST_ID=$(node -p "require('./hosting-outputs.json').DistributionId")" >> "$GITHUB_ENV"
+          echo "DOMAIN=$(node -p "require('./hosting-outputs.json').Domain")" >> "$GITHUB_ENV"
+
+      # ── Phase 2: Full app deploy ──────────────────────────────────────────────
+
+      - name: Deploy Amplify backend
+        working-directory: web
+        env:
+          CI: '1'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            pnpm exec ampx pipeline-deploy \
+              --branch "${{ github.ref_name }}" \
+              --app-id "$AMPLIFY_APP_ID" \
+              --outputs-out-dir .
+          else
+            # Feature branches share main's backend — download its amplify_outputs.json
+            MAIN_RUN=$(gh run list --repo "${{ github.repository }}" \
+              --branch main --workflow deploy.yml --status success --limit 1 \
+              --json databaseId --jq '.[0].databaseId')
+            echo "Reusing amplify_outputs.json from main run $MAIN_RUN"
+            gh run download "$MAIN_RUN" --repo "${{ github.repository }}" \
+              --name amplify-outputs --dir ..
+          fi
+
+      - name: Upload amplify_outputs.json artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: amplify-outputs
+          path: amplify_outputs.json
+
+      - name: Configure AgentCore auth
+        run: node scripts/configure-agentcore-auth.js
+
+      - name: Deploy AgentCore harness + gateway
+        working-directory: agent/default
+        run: npx @aws/agentcore deploy --target default
+
+      - name: Extract deployment info
+        run: node scripts/extract-deployment-info.js
+
+      # ── Phase 3: Build and publish static website ─────────────────────────────
+
+      - name: Build web app
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm --filter web build
+
+      - name: Deploy to S3 + invalidate CloudFront
+        run: |
+          aws s3 sync web/out/ "s3://$BUCKET/$BRANCH/" --delete
+          AWS_PAGER="" aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" --paths "/$BRANCH/*"
+          echo "Deployed: https://$DOMAIN/$BRANCH/"

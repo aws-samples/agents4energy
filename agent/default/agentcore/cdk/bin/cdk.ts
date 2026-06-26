@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { AgentCoreStack } from '../lib/cdk-stack';
+import { HostingStack } from '../lib/hosting-stack';
 import { ConfigIO, type AwsDeploymentTarget } from '@aws/agentcore-cdk';
 import { App, type Environment } from 'aws-cdk-lib';
 import * as path from 'path';
@@ -121,8 +122,22 @@ async function main() {
     // Deployed state may not exist on first deploy
   }
 
-  if (targets.length === 0) {
+  // When deploying only the hosting stack (--context stackName=...) we don't
+  // need AgentCore targets at all — skip the guard and the AgentCore loop.
+  const app = new App();
+  const hostingStackName = app.node.tryGetContext('stackName') as string | undefined;
+
+  if (!hostingStackName && targets.length === 0) {
     throw new Error('No deployment targets configured. Please define targets in agentcore/aws-targets.json');
+  }
+
+  if (hostingStackName) {
+    new HostingStack(app, hostingStackName, {
+      env: targets.length > 0 ? toEnvironment(targets[0]) : undefined,
+      branch: hostingStackName,
+    });
+    app.synth();
+    return;
   }
 
   // Read harness configs for role creation.
@@ -168,8 +183,6 @@ async function main() {
   }
 
   const invokeAgentLambdaArn = readInvokeAgentLambdaArn(configRoot);
-
-  const app = new App();
 
   for (const target of targets) {
     const env = toEnvironment(target);

@@ -31,20 +31,27 @@ The key difference: the browser calls an AppSync mutation which forwards directl
 | File | Purpose |
 |---|---|
 | `agent.py` | FastAPI app with `/ping` (health) and `/invocations` (start agent run) endpoints |
-| `Dockerfile` | ARM64 Python 3.12 image (required by AgentCore Runtime) |
+| `Dockerfile` | Uses `public.ecr.aws/docker/library/python:3.12-slim` (avoids Docker Hub rate limits in CodeBuild) |
 | `requirements.txt` | `strands-agents`, `fastapi`, `uvicorn`, `httpx`, `boto3` |
 
 The container:
 1. Receives `{ sessionId, prompt, systemPrompt?, modelId? }`.
 2. Returns `{ sessionId }` immediately (so the AppSync HTTP resolver completes fast).
-3. Runs a [Strands agent](https://github.com/strands-agents/sdk-python) in `asyncio.create_task()`.
+3. Runs a [Strands agent](https://github.com/strands-agents/sdk-python) via FastAPI `BackgroundTasks` (runs after the response is sent, guaranteed to complete before the ASGI scope closes).
 4. For each delta, calls the AppSync `publishAgentEvent` mutation using SigV4-signed HTTPS (IAM via the runtime execution role).
+5. Writes user and assistant turns to `MyHarnessMemory` via `bedrock-agentcore:CreateEvent` using `actorId="default"` — the same actor ID the harness uses, so `listSessionMessages` on the frontend finds both.
 
 AG-UI event sequence:
 ```
-run_started → text_message_start → text_message_content* → text_message_end → run_finished
+user_message → run_started → text_message_start → text_message_content* → text_message_end → run_finished
 ```
-On error: `run_error` (with `done: true`).
+`user_message` carries the prompt text as `delta` and is broadcast before `run_started` so all open windows can display the user bubble without waiting for `run_finished`.  On error: `run_error` (with `done: true`).
+
+### Context compaction
+
+The container seeds prior conversation turns from AgentCore Memory (last 40 events) into the Strands agent's `messages` list before each run.  Context compaction is handled automatically by Strands' **`SummarizingConversationManager`** with `proactive_compression=True` — it compresses at ~70% of the model's context window, no custom code required.
+
+Long-term session summaries are produced asynchronously by AgentCore Memory's **`SUMMARIZATION`** strategy (configured in `agentcore.json` on `MyHarnessMemory`), which extracts a condensed running summary of each session without any ETL pipeline.
 
 ### AgentCore Runtime Config (`agentcore.json`)
 
@@ -56,12 +63,13 @@ On error: `run_error` (with `done: true`).
   "entrypoint": "agent.py",
   "networkMode": "PUBLIC",
   "envVars": [
-    { "name": "APPSYNC_HTTP_ENDPOINT", "value": "<AppSync URL>" }
+    { "name": "APPSYNC_HTTP_ENDPOINT", "value": "<AppSync URL>" },
+    { "name": "AGENTCORE_MEMORY_ID", "value": "<MyHarnessMemory ID>" }
   ]
 }
 ```
 
-`networkMode: PUBLIC` is required for the container to reach AppSync over HTTPS.  The `APPSYNC_HTTP_ENDPOINT` value is kept in sync by `scripts/extract-deployment-info.js` after every deploy.
+`networkMode: PUBLIC` is required for the container to reach AppSync over HTTPS.  Both env var values are kept in sync by `scripts/extract-deployment-info.js` after every deploy.
 
 ### AppSync Schema (`aguiHandler.schema.ts`)
 
@@ -84,9 +92,13 @@ After `agentcore deploy`, `scripts/extract-deployment-info.js` calls the AWS CLI
 ### Frontend (`web/app/(with-auth)/chat-handler/page.tsx`)
 
 1. On mount, creates a `ChatSession` record (or reuses one from the URL `?sessionId=` param).
-2. Subscribes to `onAgentEvent(sessionId)` via Amplify's `client.subscriptions.onAgentEvent(...)`.
-3. On user submit, calls `client.mutations.invokeHandler({ sessionId, prompt })`.
-4. As events arrive on the subscription, appends deltas to the in-progress assistant message.
+2. Calls `useInitialMessages(sessionId)` (shared with `/chat`) to restore prior turns from `MyHarnessMemory` via the `listSessionMessages` Lambda.
+3. Subscribes to `onAgentEvent(sessionId)` via Amplify's `client.subscriptions.onAgentEvent(...)`.
+4. On user submit, adds an optimistic user bubble and records the message text in `pendingUserMessageTextRef`, then calls `invokeHandler` via a raw GraphQL POST with the Cognito JWT (the mutation is created by the post-deploy script, not in the Amplify generated client).
+5. As events arrive on the subscription:
+   - `user_message`: skip if text matches `pendingUserMessageTextRef` (sender's own echo); otherwise add user bubble for other windows.
+   - `text_message_*`: append deltas to the in-progress assistant message.
+   - `run_finished`: re-fetch authoritative state from `MyHarnessMemory` via `listSessionMessages` — ensures all open windows converge to the same persisted messages.
 
 ---
 
@@ -108,8 +120,38 @@ After `extract-deployment-info.js` runs:
 
 | Role | Permission | Purpose |
 |---|---|---|
-| `AppSync-AgUiHandler-*` | `bedrock-agentcore:InvokeAgentRuntime` | AppSync HTTP DS calls the runtime |
+| `AppSync-AgUiHandler-*` | `bedrock-agentcore:InvokeAgentRuntime` on `runtime/{id}` AND `runtime/{id}/runtime-endpoint/*` | AppSync HTTP DS calls the runtime |
 | AgentCore runtime execution role | `appsync:GraphQL` on `publishAgentEvent` | Container publishes AG-UI events |
+
+---
+
+## Session Summary (AgentCore SUMMARIZATION strategy)
+
+AgentCore Memory's `SUMMARIZATION` strategy asynchronously produces a rolling text summary of each
+session under the namespace `/summaries/{actorId}/{sessionId}`.  The frontend integrates this in two
+places:
+
+1. **"Earlier messages summarised" banner** — shown above the message list when the session has a
+   summary.  Prior turns already captured in the summary are excluded from the message list by the
+   `listSessionMessages` Lambda (`handler.ts` skips events at or before `summaryTimestamp`).
+
+2. **Session Summary button** — a scroll-text icon in `PromptInputTools` (only visible when a summary
+   exists).  Clicking it opens a Dialog with the full summary text and an **Edit** button.
+
+   **Editing the summary**: clicking Edit reveals an inline `<textarea>` pre-filled with the current
+   text.  Saving calls the `updateSessionSummary` AppSync mutation (backed by the
+   `web/amplify/functions/update-session-summary/` Lambda), which calls
+   `BatchUpdateMemoryRecordsCommand` to overwrite the record in AgentCore Memory.  On success the
+   dialog switches back to read mode with the updated text, and the new text is used as context on
+   the next invocation.
+
+   The `summaryRecordId` returned by `listSessionMessages` is threaded through the stack
+   (`list-session-messages/handler.ts` → GraphQL schema `ListSessionMessagesResult` → `use-initial-messages.ts`
+   → page state) and is required to identify the specific memory record to update.
+
+The summary is also passed as context to the container on the next invocation (via the `summary` field
+in the `invokeHandler` payload → `_run_agent(existing_summary=...)`), so the model has full context
+even after context compaction.
 
 ---
 
@@ -125,3 +167,15 @@ Tests cover:
 - Empty state is shown before messages
 - Agent returns a response via subscription
 - Message contains text after streaming completes
+- Messages persist after reloading the session (memory integration)
+- **Summarisation banner** — intercepts `listSessionMessages` GraphQL response, injects a fake summary,
+  and asserts the "Earlier messages summarised" banner renders
+- **Summary edit dialog** — intercepts `listSessionMessages` (returns fake summary + `summaryRecordId`)
+  and `updateSessionSummary` (returns success), opens the dialog, edits the text, saves, and asserts
+  the updated text appears in read mode
+
+### Required IAM additions (post-deploy, via extract-deployment-info.js)
+
+| Policy | Actions | Purpose |
+|---|---|---|
+| `MemoryListEvents` on runtime role | `bedrock-agentcore:ListEvents` on memory ARN | Seed prior conversation turns into Strands agent before each run |

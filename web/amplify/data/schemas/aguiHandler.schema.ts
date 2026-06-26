@@ -21,8 +21,8 @@ export const aguiHandlerSchema = a.schema({
 
   AgentEvent: a.customType({
     sessionId: a.string().required(),
-    // AG-UI event types: run_started | text_message_start | text_message_content |
-    //                    text_message_end | run_finished | run_error
+    // AG-UI event types: user_message | run_started | text_message_start |
+    //   text_message_content | text_message_end | run_finished | run_error
     eventType: a.string().required(),
     messageId: a.string().required(),
     // Populated for text_message_content events.
@@ -80,6 +80,9 @@ export const aguiHandlerSchema = a.schema({
       prompt: a.string().required(),
       systemPrompt: a.string(),
       modelId: a.string(),
+      // AgentCore-managed session summary, passed through so the container can
+      // inject it into the agent system prompt alongside post-summary history.
+      summary: a.string(),
     })
     .returns(a.ref('InvokeHandlerResult'))
     .handler(

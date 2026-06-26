@@ -18,6 +18,10 @@
         {
           "name": "APPSYNC_HTTP_ENDPOINT",
           "value": "https://7iz4bqmxdndijama5c37ne6mgq.appsync-api.us-east-1.amazonaws.com/graphql"
+        },
+        {
+          "name": "AGENTCORE_MEMORY_ID",
+          "value": "default_MyHarnessMemory-zz6wfiFFUs"
         }
       ]
     }

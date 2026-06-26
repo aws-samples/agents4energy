@@ -6,6 +6,26 @@ For cross-project deployment wiring (Amplify → AgentCore CDK) see [architectur
 
 ---
 
+## `agent/` Folder Structure
+
+The `agent/` directory contains two things that are easy to confuse:
+
+| Path | What it is |
+|------|-----------|
+| `agent/default/` | The AgentCore CLI project root. Running `agentcore deploy` here deploys everything. |
+| `agent/default/agentcore/agentcore.json` | Declarative source of truth (`"managedBy": "CDK"`) — declares all AgentCore resources. |
+| `agent/default/app/MyHarness/` | Harness config. Referenced by the `harnesses[]` entry in `agentcore.json`. |
+| `agent/handler/` | Python source for the Strands agent container (FastAPI + uvicorn). **Not its own deploy unit** — it's referenced by `agentcore.json` via `"codeLocation": "../handler"`. |
+
+`agentcore deploy` (from `agent/default/`) deploys **both** resources declared in `agentcore.json`:
+
+1. **`AgUiHandler` runtime** (`runtimes[]`) — builds `agent/handler/` into a Docker image, pushes to ECR, and creates/updates the AgentCore runtime. Used by the `/chat-handler` page via AppSync mutation → HTTP resolver.
+2. **`MyHarness` harness** (`harnesses[]`) — the managed harness from `agent/default/app/MyHarness/`. Used by the original `/chat` page via the SigV4 streaming transport.
+
+Both share `MyHarnessMemory`, so both chat surfaces see the same conversation history.
+
+---
+
 ## Overview
 
 The agent in this project is a **Bedrock AgentCore Harness** — a managed runtime that handles model invocation, memory, and tool execution. The frontend never talks to a model API directly; all inference flows through the harness.
