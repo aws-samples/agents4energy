@@ -47,15 +47,6 @@ jobs:
             | jq -r '.id' > /tmp/status_comment_id.txt
           echo "Status comment ID: $(cat /tmp/status_comment_id.txt)"
 
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -64,18 +55,104 @@ jobs:
 
       - name: Invoke agent and post reply
         env:
-          INVOKE_AGENT_RUNTIME_ARN: ${{ vars.INVOKE_AGENT_RUNTIME_ARN }}
           APPSYNC_ENDPOINT: ${{ vars.APPSYNC_ENDPOINT }}
           APP_URL: ${{ vars.APP_URL }}
-          AWS_REGION: us-east-1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_BASE_REF: ${{ github.event.repository.default_branch }}
-          STATUS_COMMENT_ID_FILE: /tmp/status_comment_id.txt
         run: |
-          mkdir /tmp/agent-invoke && cd /tmp/agent-invoke
-          echo '{"type":"module"}' > package.json
-          npm install --silent "@octokit/rest@21" "@smithy/signature-v4@5" "@aws-crypto/sha256-js@5" tsx
-          cp $GITHUB_WORKSPACE/scripts/github-agent-invoke.ts .
-          echo "=== installed ===" && ls node_modules | grep aws
-          echo "=== client-lambda anywhere ===" && find / -name 'package.json' -path '*/client-lambda/*' 2>/dev/null | head -5 || echo "none"
-          node_modules/.bin/tsx github-agent-invoke.ts
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_BODY=$(cat <<'ISSUE_BODY_EOF'
+          ${{ github.event.issue.body }}
+          ISSUE_BODY_EOF
+          )
+          COMMENT_BODY=$(cat <<'COMMENT_BODY_EOF'
+          ${{ github.event.comment.body }}
+          COMMENT_BODY_EOF
+          )
+          SENDER="${{ github.event.sender.login }}"
+          REPO="${{ github.repository }}"
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          STATUS_COMMENT_ID=$(cat /tmp/status_comment_id.txt 2>/dev/null || echo "")
+
+          # Extract agent slug from @agent or @agent-<slug> mention
+          RAW_TEXT="${COMMENT_BODY:-$ISSUE_BODY}"
+          AGENT_SLUG=$(echo "$RAW_TEXT" | grep -oP '@agent-\K[\w-]+' | head -1)
+          AGENT_SLUG="${AGENT_SLUG:-default}"
+
+          # Strip the @agent mention to get the user's actual request
+          USER_PROMPT=$(echo "$RAW_TEXT" | sed 's/@agent-[[:alnum:]_-]*//g; s/@agent//g' | xargs)
+          USER_PROMPT="${USER_PROMPT:-$ISSUE_TITLE}"
+
+          PROMPT="You are acting on behalf of a GitHub user in the repository ${REPO}.
+
+          CONTEXT:
+          - Repository: ${REPO}
+          - Default branch: ${DEFAULT_BRANCH}
+          - Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
+          - Issue body: $(echo "$ISSUE_BODY" | head -c 500)
+          - Triggered by: @${SENDER}
+
+          USER REQUEST:
+          ${USER_PROMPT}
+
+          If your response involves code changes, create a new branch off ${DEFAULT_BRANCH}, commit the changes, and open a pull request. Reference issue #${ISSUE_NUMBER} in the PR description."
+
+          # Create a ChatSession so the run is viewable in the web UI
+          SESSION_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+          SESSION_NAME="GitHub #${ISSUE_NUMBER} — ${ISSUE_TITLE}"
+          CREATE_SESSION_BODY=$(jq -n \
+            --arg name "$SESSION_NAME" \
+            '{"query":"mutation CreateChatSession($input: CreateChatSessionInput!) { createChatSession(input: $input) { id } }","variables":{"input":{"name":$name}}}')
+
+          SESSION_RESP=$(curl -s -X POST "$APPSYNC_ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -H "X-Amz-Security-Token: $AWS_SESSION_TOKEN" \
+            --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" \
+            --aws-sigv4 "aws:amz:us-east-1:appsync" \
+            -d "$CREATE_SESSION_BODY")
+          CREATED_ID=$(echo "$SESSION_RESP" | jq -r '.data.createChatSession.id // empty')
+          if [ -n "$CREATED_ID" ]; then
+            SESSION_ID="$CREATED_ID"
+            echo "Chat session created: $SESSION_ID"
+          else
+            echo "Warning: could not create chat session: $SESSION_RESP"
+          fi
+
+          # Update the status comment with a live-chat link
+          if [ -n "$APP_URL" ] && [ -n "$STATUS_COMMENT_ID" ]; then
+            LIVE_BODY="🤖 Agent is working… [Watch live](${APP_URL}/chat-handler?sessionId=${SESSION_ID})"
+            curl -s -X PATCH \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/issues/comments/${STATUS_COMMENT_ID}" \
+              -d "$(jq -n --arg b "$LIVE_BODY" '{"body":$b}')"
+          fi
+
+          # Invoke the agent via AppSync (Lambda handles harness auth)
+          INVOKE_BODY=$(jq -n \
+            --arg slug "$AGENT_SLUG" \
+            --arg prompt "$PROMPT" \
+            --arg sessionId "$SESSION_ID" \
+            '{"query":"mutation InvokeAgent($agentSlug: String!, $prompt: String!, $sessionId: String) { invokeAgent(agentSlug: $agentSlug, prompt: $prompt, sessionId: $sessionId) { response sessionId } }","variables":{"agentSlug":$slug,"prompt":$prompt,"sessionId":$sessionId}}')
+
+          INVOKE_RESP=$(curl -s -X POST "$APPSYNC_ENDPOINT" \
+            -H "Content-Type: application/json" \
+            -H "X-Amz-Security-Token: $AWS_SESSION_TOKEN" \
+            --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" \
+            --aws-sigv4 "aws:amz:us-east-1:appsync" \
+            -d "$INVOKE_BODY")
+
+          AGENT_RESPONSE=$(echo "$INVOKE_RESP" | jq -r '.data.invokeAgent.response // empty')
+          if [ -z "$AGENT_RESPONSE" ]; then
+            ERRORS=$(echo "$INVOKE_RESP" | jq -r '.errors // empty')
+            AGENT_RESPONSE="⚠️ Agent returned no response. Errors: ${ERRORS:-none}"
+          fi
+
+          echo "Agent response length: ${#AGENT_RESPONSE}"
+
+          # Post the agent's reply as a GitHub comment
+          curl -s -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/issues/${ISSUE_NUMBER}/comments" \
+            -d "$(jq -n --arg b "$AGENT_RESPONSE" '{"body":$b}')"
