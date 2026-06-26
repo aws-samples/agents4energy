@@ -71,10 +71,16 @@ function handler(event) {
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     });
 
-    // Amplify app used by `ampx pipeline-deploy` in CI. No branches or
-    // build settings are managed here — Amplify Gen 2 handles that via ampx.
+    // Amplify app used by `ampx pipeline-deploy` in CI. A branch resource is
+    // required so the BranchLinker custom resource in pipeline-deploy succeeds.
     const amplifyApp = new amplify.CfnApp(this, 'AmplifyApp', {
       name: this.stackName,
+    });
+
+    const branch = props?.branch ?? 'main';
+    new amplify.CfnBranch(this, 'AmplifyBranch', {
+      appId: amplifyApp.attrAppId,
+      branchName: branch,
     });
 
     new CfnOutput(this, 'AmplifyAppId', {

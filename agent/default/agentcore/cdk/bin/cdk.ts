@@ -132,9 +132,11 @@ async function main() {
   }
 
   if (hostingStackName) {
+    // Stack name is e.g. "agentcore-cli-hosting-main" — extract just the branch suffix.
+    const branch = hostingStackName.replace(/^agentcore-cli-hosting-/, '');
     new HostingStack(app, hostingStackName, {
       env: targets.length > 0 ? toEnvironment(targets[0]) : undefined,
-      branch: hostingStackName,
+      branch,
     });
     app.synth();
     return;
