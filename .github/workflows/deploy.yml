@@ -12,6 +12,10 @@ env:
   NEXT_TELEMETRY_DISABLED: 1
   ACT: ''  # overridden to 'true' by act for local runs; used to skip OIDC steps
 
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true   # cancel in-progress deploy when a newer push arrives
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
