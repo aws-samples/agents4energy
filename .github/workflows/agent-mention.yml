@@ -112,14 +112,14 @@ jobs:
             "https://api.github.com/repos/${REPO}/issues/${ISSUE_NUMBER}/comments" \
             -d "$(jq -n --arg b "$LIVE_BODY" '{"body":$b}')"
 
-          # Fire invokeHandler — agent runs async, posts its own comment when done
+          # Fire invokeHandler — agent runs async and posts its own reply via gh
           INVOKE_BODY=$(jq -n \
             --arg sessionId "$SESSION_ID" \
             --arg prompt "$PROMPT" \
             --arg githubToken "$GITHUB_TOKEN" \
             --arg githubRepo "$REPO" \
             --arg githubBranch "$DEFAULT_BRANCH" \
-            '{"query":"mutation InvokeHandler($sessionId: String!, $prompt: String!, $systemPrompt: String) { invokeHandler(sessionId: $sessionId, prompt: $prompt, systemPrompt: $systemPrompt) { sessionId } }","variables":{"sessionId":$sessionId,"prompt":$prompt,"systemPrompt":""}}')
+            '{"query":"mutation InvokeHandler($sessionId: String!, $prompt: String!, $githubToken: String, $githubRepo: String, $githubBranch: String) { invokeHandler(sessionId: $sessionId, prompt: $prompt, githubToken: $githubToken, githubRepo: $githubRepo, githubBranch: $githubBranch) { sessionId } }","variables":{"sessionId":$sessionId,"prompt":$prompt,"githubToken":$githubToken,"githubRepo":$githubRepo,"githubBranch":$githubBranch}}')
 
           curl -s -X POST "$APPSYNC_ENDPOINT" \
             -H "Content-Type: application/json" \

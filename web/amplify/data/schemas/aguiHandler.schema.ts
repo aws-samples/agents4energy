@@ -83,6 +83,10 @@ export const aguiHandlerSchema = a.schema({
       // AgentCore-managed session summary, passed through so the container can
       // inject it into the agent system prompt alongside post-summary history.
       summary: a.string(),
+      // GitHub context for workspace setup — token never logged or returned.
+      githubToken: a.string(),
+      githubRepo: a.string(),
+      githubBranch: a.string(),
     })
     .returns(a.ref('InvokeHandlerResult'))
     .handler(

@@ -249,6 +249,9 @@ export function request(ctx) {
         systemPrompt: ctx.args.systemPrompt,
         modelId: ctx.args.modelId,
         summary: ctx.args.summary,
+        githubToken: ctx.args.githubToken,
+        githubRepo: ctx.args.githubRepo,
+        githubBranch: ctx.args.githubBranch,
       }),
     },
   };
