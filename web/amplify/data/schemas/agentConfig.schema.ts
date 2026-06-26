@@ -156,8 +156,8 @@ export const agentConfigSchema = a.schema({
   }),
 
   // Mutation: invoke a named agent synchronously and return its full response.
-  // Authorized for both Cognito users and API key holders so GitHub Actions
-  // can call it without needing AWS IAM credentials.
+  // allow.guest() covers IAM-signed requests (e.g. GitHub Actions role) in
+  // addition to authenticated Cognito users.
   invokeAgent: a
     .mutation()
     .arguments({
@@ -167,7 +167,7 @@ export const agentConfigSchema = a.schema({
     })
     .returns(a.ref('InvokeAgentResult'))
     .handler(a.handler.function(invokeAgent))
-    .authorization((allow) => [allow.authenticated(), allow.publicApiKey()]),
+    .authorization((allow) => [allow.authenticated(), allow.guest()]),
 
   // Self-join: which agents a given agent can call as sub-agents
   AgentSubAgent: a.model({
