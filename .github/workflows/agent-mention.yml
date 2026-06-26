@@ -59,6 +59,15 @@ jobs:
           echo '{"type":"module"}' > package.json
           npm install @octokit/rest @smithy/signature-v4 @aws-crypto/sha256-js
 
+      - name: Debug module resolution
+        working-directory: scripts
+        run: |
+          echo "=== Node version ===" && node --version
+          echo "=== package.json ===" && cat package.json
+          echo "=== node_modules list ===" && ls node_modules | head -20
+          echo "=== client-lambda search ===" && find node_modules -name 'package.json' | xargs grep -l 'client-lambda' 2>/dev/null || echo "none"
+          echo "=== parent node_modules ===" && ls ../node_modules 2>/dev/null | head -5 || echo "no parent node_modules"
+
       - name: Invoke agent and post reply
         env:
           INVOKE_AGENT_RUNTIME_ARN: ${{ vars.INVOKE_AGENT_RUNTIME_ARN }}
