@@ -14,7 +14,7 @@ env:
 
 concurrency:
   group: deploy-${{ github.ref_name }}
-  cancel-in-progress: true   # cancel in-progress deploy when a newer push arrives
+  cancel-in-progress: false
 
 jobs:
   deploy:
