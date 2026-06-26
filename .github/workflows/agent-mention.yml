@@ -53,10 +53,33 @@ jobs:
           role-to-assume: ${{ secrets.AWS_AGENT_ROLE_ARN }}
           aws-region: us-east-1
 
+      - name: Write memory poll script
+        run: |
+          {
+          echo 'import boto3,os,sys,time'
+          echo 'mid=os.environ["MEMORY_ID"]'
+          echo 'sid=os.environ["SESSION_ID"]'
+          echo 'c=boto3.client("bedrock-agentcore",region_name="us-east-1")'
+          echo 'for a in range(36):'
+          echo '  if a:time.sleep(10)'
+          echo '  sys.stderr.write(f"[poll] attempt {a+1}/36\n")'
+          echo '  try:'
+          echo '    r=c.list_events(memoryId=mid,actorId="default",sessionId=sid,includePayloads=True)'
+          echo '    for e in reversed(r.get("events",[])):'
+          echo '      for p in e.get("payload",[]):'
+          echo '        v=p.get("conversational",{})'
+          echo '        if v.get("role","").upper()=="ASSISTANT":'
+          echo '          t=v.get("content",{}).get("text","")'
+          echo '          if t:print(t);sys.exit(0)'
+          echo '  except Exception as ex:sys.stderr.write(str(ex)+"\n")'
+          echo 'sys.stderr.write("[poll] timed out waiting for ASSISTANT event\n")'
+          } > /tmp/poll_memory.py
+
       - name: Invoke agent and post reply
         env:
           APPSYNC_ENDPOINT: ${{ vars.APPSYNC_ENDPOINT }}
           APP_URL: ${{ vars.APP_URL }}
+          AGENTCORE_MEMORY_ID: ${{ vars.AGENTCORE_MEMORY_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ISSUE_NUMBER="${{ github.event.issue.number }}"
@@ -74,12 +97,8 @@ jobs:
           DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
           STATUS_COMMENT_ID=$(cat /tmp/status_comment_id.txt 2>/dev/null || echo "")
 
-          # Extract agent slug from @agent or @agent-<slug> mention
-          RAW_TEXT="${COMMENT_BODY:-$ISSUE_BODY}"
-          AGENT_SLUG=$(echo "$RAW_TEXT" | grep -oP '@agent-\K[\w-]+' | head -1)
-          AGENT_SLUG="${AGENT_SLUG:-default}"
-
           # Strip the @agent mention to get the user's actual request
+          RAW_TEXT="${COMMENT_BODY:-$ISSUE_BODY}"
           USER_PROMPT=$(echo "$RAW_TEXT" | sed 's/@agent-[[:alnum:]_-]*//g; s/@agent//g' | xargs)
           USER_PROMPT="${USER_PROMPT:-$ISSUE_TITLE}"
 
@@ -128,12 +147,11 @@ jobs:
               -d "$(jq -n --arg b "$LIVE_BODY" '{"body":$b}')"
           fi
 
-          # Invoke the agent via AppSync (Lambda handles harness auth)
+          # Fire invokeHandler — returns immediately, agent runs async in the container
           INVOKE_BODY=$(jq -n \
-            --arg slug "$AGENT_SLUG" \
-            --arg prompt "$PROMPT" \
             --arg sessionId "$SESSION_ID" \
-            '{"query":"mutation InvokeAgent($agentSlug: String!, $prompt: String!, $sessionId: String) { invokeAgent(agentSlug: $agentSlug, prompt: $prompt, sessionId: $sessionId) { response sessionId } }","variables":{"agentSlug":$slug,"prompt":$prompt,"sessionId":$sessionId}}')
+            --arg prompt "$PROMPT" \
+            '{"query":"mutation InvokeHandler($sessionId: String!, $prompt: String!) { invokeHandler(sessionId: $sessionId, prompt: $prompt) { sessionId } }","variables":{"sessionId":$sessionId,"prompt":$prompt}}')
 
           INVOKE_RESP=$(curl -s -X POST "$APPSYNC_ENDPOINT" \
             -H "Content-Type: application/json" \
@@ -141,11 +159,13 @@ jobs:
             --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" \
             --aws-sigv4 "aws:amz:us-east-1:appsync" \
             -d "$INVOKE_BODY")
+          echo "invokeHandler response: $INVOKE_RESP"
 
-          AGENT_RESPONSE=$(echo "$INVOKE_RESP" | jq -r '.data.invokeAgent.response // empty')
+          # Poll AgentCore memory until an ASSISTANT event appears (max 6 min, 10s interval)
+          AGENT_RESPONSE=$(MEMORY_ID="$AGENTCORE_MEMORY_ID" SESSION_ID="$SESSION_ID" python3 /tmp/poll_memory.py)
+
           if [ -z "$AGENT_RESPONSE" ]; then
-            ERRORS=$(echo "$INVOKE_RESP" | jq -r '.errors // empty')
-            AGENT_RESPONSE="⚠️ Agent returned no response. Errors: ${ERRORS:-none}"
+            AGENT_RESPONSE="⚠️ Agent did not respond within the timeout."
           fi
 
           echo "Agent response length: ${#AGENT_RESPONSE}"
