@@ -76,4 +76,7 @@ jobs:
           GITHUB_BASE_REF: ${{ github.event.repository.default_branch }}
           STATUS_COMMENT_ID_FILE: /tmp/status_comment_id.txt
         working-directory: scripts
-        run: node --experimental-strip-types github-agent-invoke.ts
+        run: |
+          echo "=== npm root ===" && npm root -g
+          echo "=== node path ===" && node -e "console.log(require.resolve.paths('@aws-sdk/client-lambda'))"
+          node --experimental-strip-types github-agent-invoke.ts
