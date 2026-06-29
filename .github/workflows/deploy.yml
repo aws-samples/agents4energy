@@ -27,32 +27,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4  # reads version from packageManager in package.json
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: pnpm
 
-      - name: Install AWS CLI (act only — real runners have it pre-installed)
+      - name: Install AWS CLI (act only)
+        if: ${{ env.ACT }}
         run: |
-          if [ -n "$ACT" ] && ! command -v aws &>/dev/null; then
+          if ! command -v aws &>/dev/null; then
             curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
-            unzip -q /tmp/awscliv2.zip -d /tmp
-            /tmp/aws/install
-            aws --version
+            unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install
           fi
 
       - name: Configure AWS credentials
-        # In act runs (ACT=true) credentials are already in the environment — skip
-        # the action which would make a network call to STS that fails in Docker.
         if: ${{ !env.ACT }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # Slashes are invalid in CloudFormation stack names; lowercased for consistency
       - name: Sanitize branch name
         run: echo "BRANCH=$(echo '${{ github.ref_name }}' | tr '/' '-' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
@@ -61,46 +57,72 @@ jobs:
       - name: Build CDK app
         run: pnpm --filter agentcore-cdk-app build
 
-      # ── Phase 1: Hosting infrastructure ──────────────────────────────────────
-      # Deploy first so the Amplify app ID is available for pipeline-deploy below.
+      # ── Phase 1: Hosting (S3 + CloudFront + Amplify app) ─────────────────────
 
-      - name: Deploy hosting stack (S3 + CloudFront + Amplify app)
-        working-directory: agent/default/agentcore/cdk
+      - name: Deploy hosting stack
         run: |
+          echo "::group::CloudFormation deploy"
           STACK_NAME="agentcore-cli-hosting-$BRANCH"
-
-          STATUS=$(aws cloudformation describe-stacks \
-            --stack-name "$STACK_NAME" \
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
             --query 'Stacks[0].StackStatus' --output text 2>/dev/null) || STATUS="DOES_NOT_EXIST"
-          echo "Stack status: $STATUS"
 
           if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
-            echo "Stack is in ROLLBACK_COMPLETE — deleting before redeploy"
+            echo "Stack in ROLLBACK_COMPLETE — deleting"
             aws cloudformation delete-stack --stack-name "$STACK_NAME"
             aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
           fi
 
+          cd agent/default/agentcore/cdk
           ./node_modules/.bin/cdk deploy "$STACK_NAME" \
             --require-approval never \
             --outputs-file hosting-outputs.json \
             --context stackName="$STACK_NAME"
 
-          # Flatten the nested stack key so downstream steps can use plain keys
+          # Flatten nested stack key
           node -e "
             const raw = require('./hosting-outputs.json');
             const key = Object.keys(raw)[0];
             require('fs').writeFileSync('hosting-outputs.json', JSON.stringify(raw[key], null, 2));
           "
+          echo "::endgroup::"
 
       - name: Export hosting outputs
-        working-directory: agent/default/agentcore/cdk
         run: |
-          echo "AMPLIFY_APP_ID=$(node -p "require('./hosting-outputs.json').AmplifyAppId")" >> "$GITHUB_ENV"
-          echo "BUCKET=$(node -p "require('./hosting-outputs.json').BucketName")" >> "$GITHUB_ENV"
-          echo "DIST_ID=$(node -p "require('./hosting-outputs.json').DistributionId")" >> "$GITHUB_ENV"
-          echo "DOMAIN=$(node -p "require('./hosting-outputs.json').Domain")" >> "$GITHUB_ENV"
+          OUT=agent/default/agentcore/cdk/hosting-outputs.json
+          echo "AMPLIFY_APP_ID=$(node -p "require('./$OUT').AmplifyAppId")"  >> "$GITHUB_ENV"
+          echo "BUCKET=$(node -p "require('./$OUT').BucketName")"             >> "$GITHUB_ENV"
+          echo "DIST_ID=$(node -p "require('./$OUT').DistributionId")"        >> "$GITHUB_ENV"
+          echo "DOMAIN=$(node -p "require('./$OUT').Domain")"                 >> "$GITHUB_ENV"
 
-      # ── Phase 2: Full app deploy ──────────────────────────────────────────────
+      # ── Phase 2: AgentCore runtime + gateway ──────────────────────────────────
+
+      - name: Write AWS credentials file (act only — agentcore CLI needs ~/.aws)
+        if: ${{ env.ACT }}
+        run: |
+          mkdir -p ~/.aws
+          printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' \
+            "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
+          [ -n "${AWS_SESSION_TOKEN:-}" ] && \
+            printf 'aws_session_token=%s\n' "$AWS_SESSION_TOKEN" >> ~/.aws/credentials
+          printf '[default]\nregion=%s\n' "${AWS_REGION:-us-east-1}" > ~/.aws/config
+
+      - name: Configure AgentCore auth
+        run: |
+          echo "::group::Configure JWT auth"
+          node scripts/configure-agentcore-auth.js
+          echo "::endgroup::"
+
+      - name: Deploy AgentCore harness + gateway
+        run: |
+          echo "::group::agentcore deploy"
+          cd agent/default
+          npx @aws/agentcore deploy --target default
+          echo "::endgroup::"
+
+      - name: Inject AgentCore env vars for Amplify build
+        run: node scripts/inject-agentcore-env.js
+
+      # ── Phase 3: Amplify backend ───────────────────────────────────────────────
 
       - name: Deploy Amplify backend
         working-directory: web
@@ -108,14 +130,13 @@ jobs:
           CI: '1'
           GH_TOKEN: ${{ github.token }}
         run: |
+          echo "::group::ampx pipeline-deploy"
           if [ "${{ github.ref_name }}" = "main" ]; then
-            # Use the sanitized branch name to match the Amplify branch created by the hosting stack
             pnpm exec ampx pipeline-deploy \
               --branch "$BRANCH" \
               --app-id "$AMPLIFY_APP_ID" \
               --outputs-out-dir .
           else
-            # Feature branches share main's backend — download its amplify_outputs.json
             MAIN_RUN=$(gh run list --repo "${{ github.repository }}" \
               --branch main --workflow deploy.yml --status success --limit 1 \
               --json databaseId --jq '.[0].databaseId')
@@ -123,6 +144,7 @@ jobs:
             gh run download "$MAIN_RUN" --repo "${{ github.repository }}" \
               --name amplify-outputs --dir ..
           fi
+          echo "::endgroup::"
 
       - name: Upload amplify_outputs.json artifact
         uses: actions/upload-artifact@v4
@@ -130,26 +152,61 @@ jobs:
           name: amplify-outputs
           path: amplify_outputs.json
 
-      - name: Configure AgentCore auth
-        run: node scripts/configure-agentcore-auth.js
+      # ── Phase 4: Wire AppSync resolver + update runtime env var ──────────────
 
-      - name: Deploy AgentCore harness + gateway
-        working-directory: agent/default
-        run: npx @aws/agentcore deploy --target default
+      - name: Extract deployment info and wire AppSync
+        run: |
+          echo "::group::Wire AppSync resolver"
+          node scripts/extract-deployment-info.js
+          echo "::endgroup::"
 
-      - name: Extract deployment info
-        run: node scripts/extract-deployment-info.js
+      - name: Update AgentCore runtime env var (APPSYNC_HTTP_ENDPOINT)
+        run: |
+          echo "::group::update-agent-runtime"
+          RUNTIME_ID="$AGENTCORE_RUNTIME_ID"
+          REGION="$AGENTCORE_REGION"
 
-      # ── Phase 3: Build and publish static website ─────────────────────────────
+          # Fetch current runtime config
+          CURRENT=$(aws bedrock-agentcore-control get-agent-runtime \
+            --agent-runtime-id "$RUNTIME_ID" --region "$REGION" --output json)
+
+          CONTAINER_URI=$(echo "$CURRENT" | node -e \
+            "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).agentRuntimeArtifact.containerConfiguration.containerUri))")
+          ROLE_ARN=$(echo "$CURRENT" | node -e \
+            "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).roleArn))")
+
+          # Read APPSYNC endpoint from amplify_outputs.json (written by ampx pipeline-deploy)
+          APPSYNC_ENDPOINT=$(node -p "require('./web/amplify_outputs.json').data.url")
+
+          # Merge new env var with existing ones
+          EXISTING_VARS=$(echo "$CURRENT" | node -e \
+            "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const v=JSON.parse(d).environmentVariables??{}; v.APPSYNC_HTTP_ENDPOINT='$APPSYNC_ENDPOINT'; console.log(JSON.stringify(v)); })")
+
+          aws bedrock-agentcore-control update-agent-runtime \
+            --agent-runtime-id "$RUNTIME_ID" \
+            --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"$CONTAINER_URI\"}}" \
+            --role-arn "$ROLE_ARN" \
+            --network-configuration '{"networkMode":"PUBLIC"}' \
+            --environment-variables "$EXISTING_VARS" \
+            --region "$REGION" \
+            --output json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const r=JSON.parse(d); console.log('Runtime version:',r.agentRuntimeVersion,'status:',r.status); })"
+
+          echo "::endgroup::"
+
+      # ── Phase 5: Build and publish static website ─────────────────────────────
 
       - name: Build web app
         env:
           NODE_OPTIONS: --max-old-space-size=6144
-        run: pnpm --filter web build
+        run: |
+          echo "::group::Next.js build"
+          pnpm --filter web build
+          echo "::endgroup::"
 
       - name: Deploy to S3 + invalidate CloudFront
         run: |
           aws s3 sync web/out/ "s3://$BUCKET/$BRANCH/" --delete
           AWS_PAGER="" aws cloudfront create-invalidation \
-            --distribution-id "$DIST_ID" --paths "/$BRANCH/*"
+            --distribution-id "$DIST_ID" --paths "/$BRANCH/*" \
+            --query 'Invalidation.Id' --output text
           echo "Deployed: https://$DOMAIN/$BRANCH/"

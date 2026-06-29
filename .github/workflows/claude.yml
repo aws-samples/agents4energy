@@ -5,6 +5,7 @@ permissions:
   pull-requests: write
   issues: write
   id-token: write   # required for OIDC → AWS credentials
+  actions: write    # required for Claude to trigger and monitor the deploy workflow
 
 on:
   issue_comment:
@@ -27,6 +28,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -34,7 +45,10 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - uses: anthropics/claude-code-action@v1
+        env:
+          # Needed for ampx pipeline-deploy and gh CLI commands Claude runs in bash
+          GH_TOKEN: ${{ github.token }}
         with:
           github_token: ${{ github.token }}
           use_bedrock: "true"
-          claude_args: "--model us.anthropic.claude-sonnet-4-6 --max-turns 5"
+          claude_args: "--model us.anthropic.claude-sonnet-4-6 --max-turns 30"

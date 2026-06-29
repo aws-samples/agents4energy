@@ -1,4 +1,5 @@
 strands-agents
+bedrock-agentcore
 fastapi
 uvicorn[standard]
 httpx

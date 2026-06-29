@@ -13,20 +13,21 @@ Required env vars (injected by the AgentCore runtime execution role):
 The container uses instance-profile / task-role credentials, so boto3 signs
 all requests with SigV4 automatically.
 
-Context management is fully delegated to Strands' SummarizingConversationManager
-with proactive_compression=True — it compresses at ~70% of the model context
-window automatically, no custom summarization code required.
+Conversation memory is fully managed by AgentCoreMemorySessionManager — it
+automatically retrieves prior context and persists each turn to AgentCore Memory.
+Context compaction is handled by Strands' SummarizingConversationManager.
 """
 
 import json
 import os
 import subprocess
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 import boto3
 import httpx
+from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
+from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from fastapi import BackgroundTasks, FastAPI, Request
@@ -42,9 +43,6 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 # The harness stores conversation events under this actor ID. Using the same
 # value means listSessionMessages on the frontend finds handler sessions too.
 ACTOR_ID = "default"
-
-# Maximum number of recent memory events to seed into the agent's message list.
-MAX_HISTORY_EVENTS = 40
 
 app = FastAPI()
 
@@ -126,64 +124,6 @@ async def publish_event(
                 print(f"[handler] AppSync publish failed {resp.status_code}: {resp.text[:200]}")
     except Exception as exc:  # noqa: BLE001
         print(f"[handler] AppSync publish error ({event_type}): {exc}")
-
-
-def _save_memory_event(session_id: str, role: str, text: str) -> None:
-    """Write a conversational event to AgentCore memory (synchronous)."""
-    if not MEMORY_ID:
-        return
-    try:
-        client = _boto_session().client("bedrock-agentcore", region_name=AWS_REGION)
-        client.create_event(
-            memoryId=MEMORY_ID,
-            actorId=ACTOR_ID,
-            sessionId=session_id,
-            eventTimestamp=datetime.now(timezone.utc),
-            payload=[{
-                "conversational": {
-                    "role": role.upper(),
-                    "content": {"text": text},
-                }
-            }],
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(f"[handler] memory write failed ({role}): {exc}")
-
-
-def _fetch_history_as_messages(session_id: str, after_summary: bool = False) -> list[dict]:
-    """
-    Return recent turns from AgentCore memory as Strands-compatible message dicts,
-    oldest-first. When after_summary=True the frontend has already filtered events
-    to post-summary turns, but we still cap at MAX_HISTORY_EVENTS.
-    """
-    if not MEMORY_ID:
-        return []
-    try:
-        client = _boto_session().client("bedrock-agentcore", region_name=AWS_REGION)
-        resp = client.list_events(
-            memoryId=MEMORY_ID,
-            actorId=ACTOR_ID,
-            sessionId=session_id,
-            includePayloads=True,
-            maxResults=MAX_HISTORY_EVENTS,
-        )
-        messages = []
-        for e in resp.get("events", []):
-            for payload in e.get("payload", []):
-                conv = payload.get("conversational")
-                if not conv:
-                    continue
-                role = conv.get("role", "").lower()
-                text = conv.get("content", {}).get("text", "")
-                if role in ("user", "assistant") and text:
-                    messages.append({
-                        "role": role,
-                        "content": [{"text": text}],
-                    })
-        return messages
-    except Exception as exc:  # noqa: BLE001
-        print(f"[handler] history fetch failed: {exc}")
-        return []
 
 
 @app.get("/ping")
@@ -274,16 +214,13 @@ async def _run_agent(
     prompt: str,
     system_prompt: str | None,
     model_id: str | None,
-    existing_summary: str | None,
     github_token: str | None = None,
     github_repo: str | None = None,
     github_branch: str | None = None,
 ) -> str:
-    """Seed history + summary, run agent with managed compaction, publish AG-UI events."""
+    """Run agent with managed memory + compaction, publish AG-UI events."""
     message_id = str(uuid.uuid4())
 
-    # Clone or update the repo before the agent runs so tools like
-    # code_interpreter can execute tests, type-checks, etc. against real code.
     workspace_path: str | None = None
     if github_token and github_repo and github_branch:
         try:
@@ -291,26 +228,11 @@ async def _run_agent(
         except Exception as exc:  # noqa: BLE001
             print(f"[handler] workspace setup failed: {exc}")
 
-    # Fetch only the post-summary events so we don't re-process turns already
-    # captured in the AgentCore-managed summary.
-    history = _fetch_history_as_messages(session_id, after_summary=existing_summary is not None)
-
-    _save_memory_event(session_id, "user", prompt)
     await publish_event(session_id, "user_message", message_id, delta=prompt)
     await publish_event(session_id, "run_started", message_id)
     await publish_event(session_id, "text_message_start", message_id)
 
-    # Prepend the AgentCore summary to the system prompt so the model has full
-    # context. The summary covers turns before the last compaction; `history`
-    # covers turns after it.
     effective_system = system_prompt or ""
-    if existing_summary:
-        effective_system = (
-            f"<conversation_summary>\n{existing_summary}\n</conversation_summary>\n"
-            "The above summarises the conversation so far. Use it as context.\n\n"
-            + effective_system
-        ).strip()
-
     if workspace_path:
         workspace_block = (
             f"\n\n<github_workspace>\n"
@@ -329,13 +251,20 @@ async def _run_agent(
         "conversation_manager": SummarizingConversationManager(
             proactive_compression=True,
         ),
-        "messages": history,
         "tools": [shell],
     }
     if effective_system:
         agent_kwargs["system_prompt"] = effective_system
     if model_id:
         agent_kwargs["model"] = model_id
+
+    if MEMORY_ID:
+        config = AgentCoreMemoryConfig(
+            session_id=session_id,
+            memory_id=MEMORY_ID,
+            actor_id=ACTOR_ID,
+        )
+        agent_kwargs["session_manager"] = AgentCoreMemorySessionManager(config=config)
 
     agent = Agent(**agent_kwargs)
     full_response = ""
@@ -356,11 +285,6 @@ async def _run_agent(
         await publish_event(session_id, "run_error", message_id, delta=str(exc), done=True)
         return str(exc)
 
-    # Persist assistant turn to memory before publishing the terminal events,
-    # so the memory is committed by the time the browser sees run_finished.
-    if full_response:
-        _save_memory_event(session_id, "assistant", full_response)
-
     await publish_event(session_id, "text_message_end", message_id, done=True)
     await publish_event(session_id, "run_finished", message_id, done=True)
     return full_response
@@ -374,7 +298,6 @@ async def invocations(request: Request, background_tasks: BackgroundTasks):
     prompt: str = payload.get("prompt", "")
     system_prompt: str | None = payload.get("systemPrompt")
     model_id: str | None = payload.get("modelId")
-    existing_summary: str | None = payload.get("summary")
     sync_mode: bool = bool(payload.get("sync", False))
     github_token: str | None = payload.get("githubToken")
     github_repo: str | None = payload.get("githubRepo")
@@ -387,7 +310,7 @@ async def invocations(request: Request, background_tasks: BackgroundTasks):
         # Synchronous mode: run agent inline and return the full response.
         # Used by the GitHub Actions integration which can't receive AppSync events.
         response_text = await _run_agent(
-            session_id, prompt, system_prompt, model_id, existing_summary,
+            session_id, prompt, system_prompt, model_id,
             github_token, github_repo, github_branch,
         )
         return JSONResponse({"sessionId": session_id, "response": response_text})
@@ -395,7 +318,7 @@ async def invocations(request: Request, background_tasks: BackgroundTasks):
     # FastAPI BackgroundTasks runs after the response is sent but before the
     # ASGI scope closes, so the task is guaranteed to complete.
     background_tasks.add_task(
-        _run_agent, session_id, prompt, system_prompt, model_id, existing_summary,
+        _run_agent, session_id, prompt, system_prompt, model_id,
         github_token, github_repo, github_branch,
     )
 

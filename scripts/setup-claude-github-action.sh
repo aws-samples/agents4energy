@@ -74,16 +74,45 @@ EOF
 )
 
 # ── 2. Permissions policy ─────────────────────────────────────────────────────
-PERMISSIONS_POLICY=$(cat <<EOF
+# Inline policy: Bedrock invoke + AppSync GraphQL (all APIs, IAM auth bypass) +
+# S3 sync to site buckets + CloudFront invalidation.
+CLAUDE_ACTIONS_POLICY=$(cat <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "BedrockInvoke",
       "Effect": "Allow",
       "Action": [
         "bedrock:InvokeModel",
         "bedrock:InvokeModelWithResponseStream"
       ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AppSyncGraphQL",
+      "Effect": "Allow",
+      "Action": "appsync:GraphQL",
+      "Resource": "arn:aws:appsync:${AWS_REGION}:${ACCOUNT_ID}:apis/*"
+    },
+    {
+      "Sid": "S3SiteSync",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::agentcore-cli-*",
+        "arn:aws:s3:::agentcore-cli-*/*"
+      ]
+    },
+    {
+      "Sid": "CloudFrontInvalidate",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateInvalidation",
       "Resource": "*"
     }
   ]
@@ -102,20 +131,34 @@ else
   aws iam create-role \
     --role-name "$ROLE_NAME" \
     --assume-role-policy-document "$TRUST_POLICY" \
-    --description "Assumed by GitHub Actions via OIDC for claude-code-action (Bedrock)" \
+    --description "Assumed by GitHub Actions via OIDC for claude-code-action (Bedrock + deploy)" \
     > /dev/null
 fi
 
-echo "Attaching Bedrock permissions policy..."
+# ── 4. Attach managed policies ────────────────────────────────────────────────
+echo "Attaching managed policies..."
+aws iam attach-role-policy \
+  --role-name "$ROLE_NAME" \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmplifyBackendDeployFullAccess
+echo "  ✓ AmplifyBackendDeployFullAccess"
+
+aws iam attach-role-policy \
+  --role-name "$ROLE_NAME" \
+  --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess
+echo "  ✓ ReadOnlyAccess"
+
+# ── 5. Write inline policy ────────────────────────────────────────────────────
+echo "Writing ClaudeActions inline policy..."
 aws iam put-role-policy \
   --role-name "$ROLE_NAME" \
-  --policy-name "BedrockInvoke" \
-  --policy-document "$PERMISSIONS_POLICY"
+  --policy-name "ClaudeActions" \
+  --policy-document "$CLAUDE_ACTIONS_POLICY"
+echo "  ✓ ClaudeActions (Bedrock + AppSync + S3 + CloudFront)"
 
 ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text)
 echo "Role ARN: $ROLE_ARN"
 
-# ── 4. Set AWS_ROLE_TO_ASSUME secret ─────────────────────────────────────────
+# ── 6. Set AWS_ROLE_TO_ASSUME secret ─────────────────────────────────────────
 echo ""
 echo "Setting secret AWS_ROLE_TO_ASSUME..."
 gh secret set AWS_ROLE_TO_ASSUME --body "$ROLE_ARN" --repo "$REPO"

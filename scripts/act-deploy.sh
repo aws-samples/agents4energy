@@ -30,6 +30,8 @@ REGION="${AWS_DEFAULT_REGION:-$(aws configure get region 2>/dev/null || echo us-
 # Clean up any leftover containers from a previous aborted run
 docker ps -aq --filter "name=act-Deploy-deploy" | xargs -r docker rm -f >/dev/null 2>&1 || true
 
+PNPM_STORE="$(pnpm store path 2>/dev/null || echo "$HOME/.pnpm-store")"
+
 act push \
   --workflows .github/workflows/deploy.yml \
   -P ubuntu-latest=catthehacker/ubuntu:act-latest \
@@ -40,4 +42,5 @@ act push \
   --env AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
   ${AWS_SESSION_TOKEN:+--env AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN"} \
   --var AWS_REGION="$REGION" \
+  --container-options "--volume $PNPM_STORE:$PNPM_STORE --dns 8.8.8.8" \
   "$@"

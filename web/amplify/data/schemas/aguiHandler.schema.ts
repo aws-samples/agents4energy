@@ -31,6 +31,11 @@ export const aguiHandlerSchema = a.schema({
     done: a.boolean(),
   }),
 
+  DummyModelToAddIamDirective: a.model({//This is required to add the IAM directive to the ResponseStreamChunk type
+    responseStreamChunk: a.ref('AgentEvent')
+  })
+    .authorization((allow) => [allow.owner()]),
+
   // Mutation the runtime container calls to stream events to the frontend.
   // The Lambda execution role publishes via AppSync IAM auth.
   publishAgentEvent: a
@@ -80,9 +85,6 @@ export const aguiHandlerSchema = a.schema({
       prompt: a.string().required(),
       systemPrompt: a.string(),
       modelId: a.string(),
-      // AgentCore-managed session summary, passed through so the container can
-      // inject it into the agent system prompt alongside post-summary history.
-      summary: a.string(),
       // GitHub context for workspace setup — token never logged or returned.
       githubToken: a.string(),
       githubRepo: a.string(),

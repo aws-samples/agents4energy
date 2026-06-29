@@ -122,7 +122,7 @@ export default function ChatHandlerPage() {
       initialMessagesState.messages.map((m) => ({
         id: m.id,
         role: m.role as 'user' | 'assistant',
-        text: typeof m.content === 'string' ? m.content : (m.parts?.[0] as { text: string })?.text ?? '',
+        text: (m.parts?.find((p) => (p as { type: string }).type === 'text') as { text: string } | undefined)?.text ?? '',
         done: true,
       })),
     );
@@ -204,7 +204,7 @@ export default function ChatHandlerPage() {
               fetched.map((m) => ({
                 id: m.id,
                 role: m.role as 'user' | 'assistant',
-                text: typeof m.content === 'string' ? m.content : (m.parts?.[0] as { text: string })?.text ?? '',
+                text: (m.parts?.find((p) => (p as { type: string }).type === 'text') as { text: string } | undefined)?.text ?? '',
                 done: true,
               })),
             );
@@ -251,12 +251,12 @@ export default function ChatHandlerPage() {
             Authorization: token,
           },
           body: JSON.stringify({
-            query: `mutation InvokeHandler($sessionId: String!, $prompt: String!, $systemPrompt: String, $modelId: String, $summary: String) {
-              invokeHandler(sessionId: $sessionId, prompt: $prompt, systemPrompt: $systemPrompt, modelId: $modelId, summary: $summary) {
+            query: `mutation InvokeHandler($sessionId: String!, $prompt: String!, $systemPrompt: String, $modelId: String) {
+              invokeHandler(sessionId: $sessionId, prompt: $prompt, systemPrompt: $systemPrompt, modelId: $modelId) {
                 sessionId
               }
             }`,
-            variables: { sessionId, prompt: text, summary: sessionSummary ?? undefined },
+            variables: { sessionId, prompt: text },
           }),
         });
         const json = await resp.json();
