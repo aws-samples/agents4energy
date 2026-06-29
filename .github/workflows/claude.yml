@@ -20,6 +20,9 @@ env:
 
 jobs:
   claude:
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: true
     if: |
       github.actor == github.repository_owner && (
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
