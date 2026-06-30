@@ -1,0 +1,161 @@
+# Single CDK deployment using ampx sandbox --once.
+# Stack name: $BRANCH-$PROJECT (e.g. main-agentcore-cli-agent)
+# No Amplify app/branch CDK resource needed — ampx sandbox manages its own state.
+name: Deploy
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  NEXT_TELEMETRY_DISABLED: 1
+  ACT: ''  # overridden to 'true' by act for local runs; used to skip OIDC steps
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC auth to AWS
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install AWS CLI (act only)
+        if: ${{ env.ACT }}
+        run: |
+          if ! command -v aws &>/dev/null; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install
+          fi
+
+      - name: Configure AWS credentials
+        if: ${{ !env.ACT }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sanitize branch name
+        run: |
+          PROJECT=$(node -p "require('./package.json').name")
+          BRANCH=$(echo '${{ github.ref_name }}' | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+          echo "STACK_NAME=$BRANCH-$PROJECT" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build CDK app
+        run: pnpm --filter agentcore-cdk-app build
+
+      # ── Phase 1: Amplify backend (Cognito, AppSync, Lambda, DynamoDB) ─────────
+
+      - name: Write AWS credentials file (act only — ampx CLI needs ~/.aws)
+        if: ${{ env.ACT }}
+        run: |
+          mkdir -p ~/.aws
+          printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' \
+            "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
+          [ -n "${AWS_SESSION_TOKEN:-}" ] && \
+            printf 'aws_session_token=%s\n' "$AWS_SESSION_TOKEN" >> ~/.aws/credentials
+          printf '[default]\nregion=%s\n' "${AWS_REGION:-us-east-1}" > ~/.aws/config
+
+      - name: Deploy Amplify backend
+        working-directory: web
+        run: |
+          echo "::group::ampx sandbox --once"
+          pnpm exec ampx sandbox --once --identifier "$BRANCH"
+          echo "::endgroup::"
+
+      # ── Phase 2: Configure AgentCore JWT auth from Amplify outputs ───────────
+
+      - name: Configure AgentCore auth
+        run: |
+          echo "::group::Configure JWT auth"
+          node scripts/configure-agentcore-auth.js
+          echo "::endgroup::"
+
+      # ── Phase 3: Hosting (S3 + CloudFront) ───────────────────────────────────
+
+      - name: Deploy hosting stack
+        run: |
+          echo "::group::CloudFormation deploy"
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null) || STATUS="DOES_NOT_EXIST"
+
+          if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+            echo "Stack in ROLLBACK_COMPLETE — deleting"
+            aws cloudformation delete-stack --stack-name "$STACK_NAME"
+            aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
+          fi
+
+          cd agent/default/agentcore/cdk
+          ./node_modules/.bin/cdk deploy "$STACK_NAME" \
+            --require-approval never \
+            --outputs-file hosting-outputs.json \
+            --context stackName="$STACK_NAME"
+
+          # Flatten nested stack key
+          node -e "
+            const raw = require('./hosting-outputs.json');
+            const key = Object.keys(raw)[0];
+            require('fs').writeFileSync('hosting-outputs.json', JSON.stringify(raw[key], null, 2));
+          "
+          echo "::endgroup::"
+
+      - name: Export hosting outputs
+        run: |
+          OUT=agent/default/agentcore/cdk/hosting-outputs.json
+          echo "BUCKET=$(node -p "require('./$OUT').BucketName")"    >> "$GITHUB_ENV"
+          echo "DIST_ID=$(node -p "require('./$OUT').DistributionId")" >> "$GITHUB_ENV"
+          echo "DOMAIN=$(node -p "require('./$OUT').Domain")"         >> "$GITHUB_ENV"
+
+      # ── Phase 4: AgentCore runtime + gateway ─────────────────────────────────
+
+      - name: Deploy AgentCore harness + gateway
+        run: |
+          echo "::group::agentcore deploy"
+          cd agent/default
+          npx @aws/agentcore deploy --target default
+          echo "::endgroup::"
+
+      - name: Inject AgentCore env vars for Amplify build
+        run: node scripts/inject-agentcore-env.js
+
+      - name: Extract deployment info and wire AppSync
+        run: |
+          echo "::group::Wire AppSync resolver"
+          node scripts/extract-deployment-info.js
+          echo "::endgroup::"
+
+      # ── Phase 5: Build and publish static website ─────────────────────────────
+
+      - name: Build web app
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: |
+          echo "::group::Next.js build"
+          pnpm --filter web build
+          echo "::endgroup::"
+
+      - name: Deploy to S3 + invalidate CloudFront
+        run: |
+          aws s3 sync web/out/ "s3://$BUCKET/$BRANCH/" --delete
+          AWS_PAGER="" aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" --paths "/$BRANCH/*" \
+            --query 'Invalidation.Id' --output text
+          echo "Deployed: https://$DOMAIN/$BRANCH/"

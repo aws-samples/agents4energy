@@ -25,6 +25,8 @@
     "deploy:web": "bash scripts/deploy-web.sh",
     "act:deploy": "bash scripts/act-deploy.sh",
     "act:deploy:dryrun": "bash scripts/act-deploy.sh -n",
+    "act:deploy:draft": "bash scripts/act-deploy.sh --draft",
+    "act:deploy:draft:dryrun": "bash scripts/act-deploy.sh --draft -n",
     "setup:deploy-role": "npx tsx scripts/setup-deploy-role.ts",
     "destroy": "pnpm --filter agent run destroy && (cd web && npx ampx delete --force)",
     "clean": "pnpm --filter web exec rm -rf .next && pnpm --filter agentcore-cdk-app run clean && find . -name 'node_modules' -type d -prune -exec rm -rf {} + && rm -rf node_modules"

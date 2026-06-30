@@ -1,14 +1,10 @@
 import { CfnOutput, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
-import * as amplify from 'aws-cdk-lib/aws-amplify';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
-export interface HostingStackProps extends StackProps {
-  /** Branch name used only for tagging; the stack id/name is set by the caller. */
-  branch?: string;
-}
+export type HostingStackProps = StackProps;
 
 /**
  * Shared static hosting: one S3 bucket + one CloudFront distribution.
@@ -69,23 +65,6 @@ function handler(event) {
         ],
       },
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-    });
-
-    // Amplify app used by `ampx pipeline-deploy` in CI. A branch resource is
-    // required so the BranchLinker custom resource in pipeline-deploy succeeds.
-    const amplifyApp = new amplify.CfnApp(this, 'AmplifyApp', {
-      name: this.stackName,
-    });
-
-    const branch = props?.branch ?? 'main';
-    new amplify.CfnBranch(this, 'AmplifyBranch', {
-      appId: amplifyApp.attrAppId,
-      branchName: branch,
-    });
-
-    new CfnOutput(this, 'AmplifyAppId', {
-      description: 'Amplify app ID — pass to ampx pipeline-deploy --app-id',
-      value: amplifyApp.attrAppId,
     });
 
     new CfnOutput(this, 'BucketName', {
