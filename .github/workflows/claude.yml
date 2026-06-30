@@ -41,6 +41,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Mark in-progress (remove needs-review label)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE=${{ github.event.issue.number || github.event.pull_request.number }}
+          gh label create "needs-review" --repo "$GITHUB_REPOSITORY" --color "0075ca" --description "Claude has responded and is awaiting review" 2>/dev/null || true
+          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label "needs-review" 2>/dev/null || true
+
       - uses: pnpm/action-setup@v4
         with:
           run_install: false
@@ -55,14 +63,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Mark in-progress (remove needs-review label)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ISSUE=${{ github.event.issue.number || github.event.pull_request.number }}
-          gh label create "needs-review" --repo "$GITHUB_REPOSITORY" --color "0075ca" --description "Claude has responded and is awaiting review" 2>/dev/null || true
-          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label "needs-review" 2>/dev/null || true
 
       - uses: anthropics/claude-code-action@v1
         env:
