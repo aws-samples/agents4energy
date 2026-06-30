@@ -70,6 +70,8 @@ jobs:
             Bash(bash scripts/act-deploy.sh*),
             Bash(pnpm act:deploy*),
             Bash(pnpm act:deploy:draft*),
+            Bash(pnpm install),
+            Bash(pnpm run deploy),
             Bash(pnpm run act:deploy*),
             Bash(docker info*),
             Bash(docker ps*),
