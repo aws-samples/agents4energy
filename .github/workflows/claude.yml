@@ -1,3 +1,5 @@
+# claude.yml with act pre-installed so Claude can run act-deploy.sh directly.
+# Copy this to .github/workflows/claude.yml to enable Claude to run local workflow tests.
 name: Claude Code Action
 
 permissions:
@@ -42,6 +44,16 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install act (for running draft workflows locally)
+        run: |
+          ACT_VERSION=$(curl -fsSL https://api.github.com/repos/nektos/act/releases/latest \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          curl -fsSL "https://github.com/nektos/act/releases/download/${ACT_VERSION}/act_Linux_x86_64.tar.gz" \
+            -o /tmp/act.tar.gz
+          tar -xzf /tmp/act.tar.gz -C /tmp act
+          sudo install -m755 /tmp/act /usr/local/bin/act
+          act --version
 
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
