@@ -7,15 +7,55 @@ set -euo pipefail
 # bypassing the OIDC step that only works on real GitHub runners.
 #
 # Usage:
-#   pnpm act:deploy          # simulate a push on the current branch
-#   pnpm act:deploy -n       # dry run — print steps without executing
+#   pnpm act:deploy                # simulate a push on the current branch (deploy.yml)
+#   pnpm act:deploy -n             # dry run — print steps without executing
+#   pnpm act:deploy --draft        # run the draft workflow (.github/workflows-drafts/deploy.yml)
+#   pnpm act:deploy --draft -n     # dry run against the draft
 #   pnpm act:deploy --job deploy --verbose
 #
 # Prerequisites:
-#   brew install act
 #   Docker Desktop running
+#   act installed (brew install act) — or set ACT_BIN to a custom path
 
-command -v act >/dev/null 2>&1 || { echo "act not found — install with: brew install act"; exit 1; }
+# ── Consume --draft flag before passing remaining args to act ─────────────────
+WORKFLOW_FILE=".github/workflows/deploy.yml"
+PASS_THROUGH=()
+for arg in "$@"; do
+  if [ "$arg" = "--draft" ]; then
+    WORKFLOW_FILE=".github/workflows-drafts/deploy.yml"
+  else
+    PASS_THROUGH+=("$arg")
+  fi
+done
+
+# ── Locate act binary (auto-install if missing and on Linux) ─────────────────
+ACT_BIN="${ACT_BIN:-act}"
+if ! command -v "$ACT_BIN" >/dev/null 2>&1; then
+  echo "act not found — attempting to install…"
+  if command -v brew >/dev/null 2>&1; then
+    brew install act
+  elif command -v curl >/dev/null 2>&1; then
+    # Works on Linux CI runners (x86_64 / arm64)
+    ARCH=$(uname -m)
+    case "$ARCH" in
+      x86_64)  ACT_ARCH="x86_64" ;;
+      aarch64) ACT_ARCH="arm64"  ;;
+      arm64)   ACT_ARCH="arm64"  ;;
+      *)       echo "Unknown arch $ARCH — install act manually: https://github.com/nektos/act"; exit 1 ;;
+    esac
+    ACT_VERSION=$(curl -fsSL https://api.github.com/repos/nektos/act/releases/latest \
+      | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+    curl -fsSL "https://github.com/nektos/act/releases/download/${ACT_VERSION}/act_Linux_${ACT_ARCH}.tar.gz" \
+      -o /tmp/act.tar.gz
+    tar -xzf /tmp/act.tar.gz -C /tmp act
+    install -m755 /tmp/act /usr/local/bin/act
+    ACT_BIN=act
+    echo "  ✓ Installed act ${ACT_VERSION}"
+  else
+    echo "act not found — install with: brew install act"; exit 1
+  fi
+fi
+
 command -v docker >/dev/null 2>&1 || { echo "docker not found — start Docker Desktop first"; exit 1; }
 docker info >/dev/null 2>&1 || { echo "Docker daemon is not running — start Docker Desktop first"; exit 1; }
 
@@ -32,8 +72,8 @@ docker ps -aq --filter "name=act-Deploy-deploy" | xargs -r docker rm -f >/dev/nu
 
 PNPM_STORE="$(pnpm store path 2>/dev/null || echo "$HOME/.pnpm-store")"
 
-act push \
-  --workflows .github/workflows/deploy.yml \
+"$ACT_BIN" push \
+  --workflows "$WORKFLOW_FILE" \
   -P ubuntu-latest=catthehacker/ubuntu:act-latest \
   --container-architecture linux/amd64 \
   --rm \
@@ -43,4 +83,4 @@ act push \
   ${AWS_SESSION_TOKEN:+--env AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN"} \
   --var AWS_REGION="$REGION" \
   --container-options "--volume $PNPM_STORE:$PNPM_STORE --dns 8.8.8.8" \
-  "$@"
+  "${PASS_THROUGH[@]+"${PASS_THROUGH[@]}"}"
