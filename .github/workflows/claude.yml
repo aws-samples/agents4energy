@@ -60,13 +60,26 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-
       - uses: anthropics/claude-code-action@v1
         env:
+          # Needed for ampx pipeline-deploy and gh CLI commands Claude runs in bash
           GH_TOKEN: ${{ github.token }}
         with:
           github_token: ${{ github.token }}
           use_bedrock: "true"
-          claude_args: |
+          claude_args: >-
             --model us.anthropic.claude-sonnet-4-6
-            --allowedTools "Bash(act*),Bash(bash scripts/act-deploy.sh*),Bash(pnpm act:deploy*),Bash(pnpm act:deploy:draft*),Bash(pnpm run act:deploy*),Bash(docker info*),Bash(docker ps*),Bash(aws sts get-caller-identity*)"
+            --allowedTools "Bash(act*),
+            Bash(bash scripts/act-deploy.sh*),
+            Bash(pnpm act:deploy*),
+            Bash(pnpm act:deploy:draft*),
+            Bash(pnpm run act:deploy*),
+            Bash(docker info*),
+            Bash(docker ps*),
+            Bash(aws sts get-caller-identity*),
+            Bash(aws configure export-credentials*),
+            Bash(gh workflow run*),
+            Bash(gh workflow list*),
+            Bash(gh run list*),
+            Bash(gh run watch*),
+            Bash(gh run view*)"
