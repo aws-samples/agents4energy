@@ -75,6 +75,7 @@ jobs:
             --model us.anthropic.claude-sonnet-4-6
             --allowedTools "Bash(act
             Bash(cd *),
+            Bash(curl *),
             Bash(npx ampx sandbox*),
             Bash(bash scripts/act-deploy.sh*),
             Bash(pnpm act:deploy*),
