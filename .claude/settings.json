@@ -1,11 +1,14 @@
 {
-  "allowedTools": [
-    "Bash(act*)",
-    "Bash(bash scripts/act-deploy.sh*)",
-    "Bash(pnpm act:deploy*)",
-    "Bash(pnpm act:deploy:draft*)",
-    "Bash(docker info*)",
-    "Bash(docker ps*)",
-    "Bash(aws sts get-caller-identity*)"
-  ]
+  "permissions": {
+    "allow": [
+      "Bash(act*)",
+      "Bash(bash scripts/act-deploy.sh*)",
+      "Bash(pnpm act:deploy*)",
+      "Bash(pnpm act:deploy:draft*)",
+      "Bash(pnpm run act:deploy*)",
+      "Bash(docker info*)",
+      "Bash(docker ps*)",
+      "Bash(aws sts get-caller-identity*)"
+    ]
+  }
 }
