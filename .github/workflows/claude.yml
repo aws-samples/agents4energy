@@ -62,7 +62,24 @@ jobs:
         with:
           github_token: ${{ github.token }}
           use_bedrock: "true"
-          claude_args: "--model us.anthropic.claude-sonnet-4-6"
+          claude_args: >-
+            --model us.anthropic.claude-sonnet-4-6
+            --allowedTools "Bash(act*),
+            Bash(bash scripts/act-deploy.sh*),
+            Bash(pnpm act:deploy*),
+            Bash(pnpm act:deploy:draft*),
+            Bash(pnpm run act:deploy*),
+            Bash(docker info*),
+            Bash(docker ps*),
+            Bash(aws sts get-caller-identity*),
+            Bash(aws * get-*),
+            Bash(aws * list-*),
+            Bash(aws * describe-*),
+            Bash(gh workflow run*),
+            Bash(gh workflow list*),
+            Bash(gh run list*),
+            Bash(gh run watch*),
+            Bash(gh run view*)"
 
       - name: Mark needs-review
         if: always()
