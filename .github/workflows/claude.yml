@@ -64,7 +64,9 @@ jobs:
           use_bedrock: "true"
           claude_args: >-
             --model us.anthropic.claude-sonnet-4-6
-            --allowedTools "Bash(act*),
+            --allowedTools "Bash(act
+            Bash(cd *),
+            Bash(npx ampx sandbox*),
             Bash(bash scripts/act-deploy.sh*),
             Bash(pnpm act:deploy*),
             Bash(pnpm act:deploy:draft*),
