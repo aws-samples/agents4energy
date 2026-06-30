@@ -89,9 +89,10 @@ jobs:
       - name: Export hosting outputs
         run: |
           OUT=agent/default/agentcore/cdk/hosting-outputs.json
-          echo "BUCKET=$(node -p "require('./$OUT').BucketName")"    >> "$GITHUB_ENV"
-          echo "DIST_ID=$(node -p "require('./$OUT').DistributionId")" >> "$GITHUB_ENV"
-          echo "DOMAIN=$(node -p "require('./$OUT').Domain")"         >> "$GITHUB_ENV"
+          echo "AMPLIFY_APP_ID=$(node -p "require('./$OUT').AmplifyAppId")"  >> "$GITHUB_ENV"
+          echo "BUCKET=$(node -p "require('./$OUT').BucketName")"             >> "$GITHUB_ENV"
+          echo "DIST_ID=$(node -p "require('./$OUT').DistributionId")"        >> "$GITHUB_ENV"
+          echo "DOMAIN=$(node -p "require('./$OUT').Domain")"                 >> "$GITHUB_ENV"
 
       # ── Phase 2: AgentCore runtime + gateway ──────────────────────────────────
 
