@@ -6,6 +6,7 @@
  *
  * Usage:
  *   npx tsx scripts/setup-deploy-role.ts
+ *   npx tsx scripts/setup-deploy-role.ts https://github.com/owner/repo
  *   npx tsx scripts/setup-deploy-role.ts --repo owner/name   # non-interactive
  *
  * Prerequisites:
@@ -78,7 +79,9 @@ console.log(`AWS account: ${accountId}  region: ${awsRegion}\n`);
 // ─── Pick a repository ─────────────────────────────────────────────────────────
 
 const repoFlagIdx = process.argv.indexOf('--repo');
-let selectedRepo: string = repoFlagIdx !== -1 ? process.argv[repoFlagIdx + 1] : '';
+// Accept positional URL/slug arg (e.g. npx tsx setup-deploy-role.ts https://github.com/owner/repo)
+const positionalArg = process.argv.slice(2).find(a => !a.startsWith('-') && process.argv[repoFlagIdx + 1] !== a) ?? '';
+let selectedRepo: string = repoFlagIdx !== -1 ? process.argv[repoFlagIdx + 1] : positionalArg;
 selectedRepo = selectedRepo.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
 
 if (!selectedRepo) {
@@ -191,6 +194,7 @@ const MANAGED_POLICIES = [
   'arn:aws:iam::aws:policy/AWSCloudFormationFullAccess',
   'arn:aws:iam::aws:policy/AmazonS3FullAccess',
   'arn:aws:iam::aws:policy/CloudFrontFullAccess',
+  'arn:aws:iam::aws:policy/service-role/AmplifyBackendDeployFullAccess',
 ];
 
 console.log('\nAttaching managed policies…');
