@@ -1,5 +1,6 @@
-# Prerequisites: run `pnpm setup:deploy-role` once to create the IAM OIDC
-# provider + deploy role and write AWS_ROLE_ARN / AWS_REGION to this repo.
+# Single CDK deployment using ampx sandbox --once.
+# Stack name: $BRANCH-$PROJECT (e.g. main-agentcore-cli-agent)
+# No Amplify app/branch CDK resource needed — ampx sandbox manages its own state.
 name: Deploy
 
 on:
@@ -22,7 +23,6 @@ jobs:
     permissions:
       id-token: write   # required for OIDC auth to AWS
       contents: read
-      actions: read     # required to download amplify-outputs artifact on feature branches
 
     steps:
       - uses: actions/checkout@v4
@@ -50,19 +50,50 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Sanitize branch name
-        run: echo "BRANCH=$(echo '${{ github.ref_name }}' | tr '/' '-' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+        run: |
+          PROJECT=$(node -p "require('./package.json').name")
+          BRANCH=$(echo '${{ github.ref_name }}' | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+          echo "STACK_NAME=$BRANCH-$PROJECT" >> "$GITHUB_ENV"
 
       - run: pnpm install --frozen-lockfile
 
       - name: Build CDK app
         run: pnpm --filter agentcore-cdk-app build
 
-      # ── Phase 1: Hosting (S3 + CloudFront + Amplify app) ─────────────────────
+      # ── Phase 1: Amplify backend (Cognito, AppSync, Lambda, DynamoDB) ─────────
+
+      - name: Write AWS credentials file (act only — ampx CLI needs ~/.aws)
+        if: ${{ env.ACT }}
+        run: |
+          mkdir -p ~/.aws
+          printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' \
+            "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
+          [ -n "${AWS_SESSION_TOKEN:-}" ] && \
+            printf 'aws_session_token=%s\n' "$AWS_SESSION_TOKEN" >> ~/.aws/credentials
+          printf '[default]\nregion=%s\n' "${AWS_REGION:-us-east-1}" > ~/.aws/config
+
+      - name: Deploy Amplify backend
+        working-directory: web
+        run: |
+          echo "::group::ampx sandbox --once"
+          pnpm exec ampx sandbox --once --identifier "$BRANCH"
+          echo "::endgroup::"
+
+      # ── Phase 2: Configure AgentCore JWT auth from Amplify outputs ───────────
+
+      - name: Configure AgentCore auth
+        run: |
+          echo "::group::Configure JWT auth"
+          node scripts/configure-agentcore-auth.js
+          echo "::endgroup::"
+
+      # ── Phase 3: Hosting (S3 + CloudFront) ───────────────────────────────────
 
       - name: Deploy hosting stack
         run: |
           echo "::group::CloudFormation deploy"
-          STACK_NAME="agentcore-cli-hosting-$BRANCH"
           STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
             --query 'Stacks[0].StackStatus' --output text 2>/dev/null) || STATUS="DOES_NOT_EXIST"
 
@@ -89,28 +120,11 @@ jobs:
       - name: Export hosting outputs
         run: |
           OUT=agent/default/agentcore/cdk/hosting-outputs.json
-          echo "AMPLIFY_APP_ID=$(node -p "require('./$OUT').AmplifyAppId")"  >> "$GITHUB_ENV"
-          echo "BUCKET=$(node -p "require('./$OUT').BucketName")"             >> "$GITHUB_ENV"
-          echo "DIST_ID=$(node -p "require('./$OUT').DistributionId")"        >> "$GITHUB_ENV"
-          echo "DOMAIN=$(node -p "require('./$OUT').Domain")"                 >> "$GITHUB_ENV"
+          echo "BUCKET=$(node -p "require('./$OUT').BucketName")"    >> "$GITHUB_ENV"
+          echo "DIST_ID=$(node -p "require('./$OUT').DistributionId")" >> "$GITHUB_ENV"
+          echo "DOMAIN=$(node -p "require('./$OUT').Domain")"         >> "$GITHUB_ENV"
 
-      # ── Phase 2: AgentCore runtime + gateway ──────────────────────────────────
-
-      - name: Write AWS credentials file (act only — agentcore CLI needs ~/.aws)
-        if: ${{ env.ACT }}
-        run: |
-          mkdir -p ~/.aws
-          printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' \
-            "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
-          [ -n "${AWS_SESSION_TOKEN:-}" ] && \
-            printf 'aws_session_token=%s\n' "$AWS_SESSION_TOKEN" >> ~/.aws/credentials
-          printf '[default]\nregion=%s\n' "${AWS_REGION:-us-east-1}" > ~/.aws/config
-
-      - name: Configure AgentCore auth
-        run: |
-          echo "::group::Configure JWT auth"
-          node scripts/configure-agentcore-auth.js
-          echo "::endgroup::"
+      # ── Phase 4: AgentCore runtime + gateway ─────────────────────────────────
 
       - name: Deploy AgentCore harness + gateway
         run: |
@@ -122,75 +136,10 @@ jobs:
       - name: Inject AgentCore env vars for Amplify build
         run: node scripts/inject-agentcore-env.js
 
-      # ── Phase 3: Amplify backend ───────────────────────────────────────────────
-
-      - name: Deploy Amplify backend
-        working-directory: web
-        env:
-          CI: '1'
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "::group::ampx pipeline-deploy"
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            pnpm exec ampx pipeline-deploy \
-              --branch "$BRANCH" \
-              --app-id "$AMPLIFY_APP_ID" \
-              --outputs-out-dir .
-          else
-            MAIN_RUN=$(gh run list --repo "${{ github.repository }}" \
-              --branch main --workflow deploy.yml --status success --limit 1 \
-              --json databaseId --jq '.[0].databaseId')
-            echo "Reusing amplify_outputs.json from main run $MAIN_RUN"
-            gh run download "$MAIN_RUN" --repo "${{ github.repository }}" \
-              --name amplify-outputs --dir ..
-          fi
-          echo "::endgroup::"
-
-      - name: Upload amplify_outputs.json artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: amplify-outputs
-          path: amplify_outputs.json
-
-      # ── Phase 4: Wire AppSync resolver + update runtime env var ──────────────
-
       - name: Extract deployment info and wire AppSync
         run: |
           echo "::group::Wire AppSync resolver"
           node scripts/extract-deployment-info.js
-          echo "::endgroup::"
-
-      - name: Update AgentCore runtime env var (APPSYNC_HTTP_ENDPOINT)
-        run: |
-          echo "::group::update-agent-runtime"
-          RUNTIME_ID="$AGENTCORE_RUNTIME_ID"
-          REGION="$AGENTCORE_REGION"
-
-          # Fetch current runtime config
-          CURRENT=$(aws bedrock-agentcore-control get-agent-runtime \
-            --agent-runtime-id "$RUNTIME_ID" --region "$REGION" --output json)
-
-          CONTAINER_URI=$(echo "$CURRENT" | node -e \
-            "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).agentRuntimeArtifact.containerConfiguration.containerUri))")
-          ROLE_ARN=$(echo "$CURRENT" | node -e \
-            "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).roleArn))")
-
-          # Read APPSYNC endpoint from amplify_outputs.json (written by ampx pipeline-deploy)
-          APPSYNC_ENDPOINT=$(node -p "require('./web/amplify_outputs.json').data.url")
-
-          # Merge new env var with existing ones
-          EXISTING_VARS=$(echo "$CURRENT" | node -e \
-            "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const v=JSON.parse(d).environmentVariables??{}; v.APPSYNC_HTTP_ENDPOINT='$APPSYNC_ENDPOINT'; console.log(JSON.stringify(v)); })")
-
-          aws bedrock-agentcore-control update-agent-runtime \
-            --agent-runtime-id "$RUNTIME_ID" \
-            --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"$CONTAINER_URI\"}}" \
-            --role-arn "$ROLE_ARN" \
-            --network-configuration '{"networkMode":"PUBLIC"}' \
-            --environment-variables "$EXISTING_VARS" \
-            --region "$REGION" \
-            --output json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const r=JSON.parse(d); console.log('Runtime version:',r.agentRuntimeVersion,'status:',r.status); })"
-
           echo "::endgroup::"
 
       # ── Phase 5: Build and publish static website ─────────────────────────────
