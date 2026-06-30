@@ -79,12 +79,19 @@ jobs:
 
       - uses: anthropics/claude-code-action@v1
         env:
-          # Needed for ampx pipeline-deploy and gh CLI commands Claude runs in bash
           GH_TOKEN: ${{ github.token }}
         with:
           github_token: ${{ github.token }}
           use_bedrock: "true"
           claude_args: "--model us.anthropic.claude-sonnet-4-6"
+          allowed_tools: |
+            Bash(act*)
+            Bash(bash scripts/act-deploy.sh*)
+            Bash(pnpm act:deploy*)
+            Bash(pnpm act:deploy:draft*)
+            Bash(docker info)
+            Bash(docker ps*)
+            Bash(aws sts get-caller-identity*)
 
       - name: Mark needs-review
         if: always()
