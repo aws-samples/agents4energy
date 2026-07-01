@@ -2,12 +2,13 @@
 
 ## Overview
 
-This monorepo connects two independently deployed AWS services:
+This monorepo deploys everything from a single `npx ampx sandbox --once` command via Amplify Gen 2. The Amplify backend definition (`web/amplify/backend.ts`) uses CDK sub-stacks to deploy all infrastructure in a single CloudFormation deployment:
 
 - **`web/`** — Next.js frontend backed by Amplify Gen 2 (Cognito auth, AppSync data)
-- **`agent/`** — Bedrock AgentCore runtime deployed via the AgentCore CLI and CDK
+- **`hostingStack`** — S3 + CloudFront static website hosting (defined in `backend.ts`)
+- **`agentStack`** — Bedrock AgentCore Runtime (builds + deploys the Python handler from `agent/handler/`)
 
-The key design principle: **Amplify deploys first and owns auth. AgentCore CDK deploys second and reads Amplify's outputs to configure access.** Neither project modifies the other's infrastructure directly.
+All three are deployed together with a single `npx ampx sandbox --once --identifier <branch>` command. `amplify_outputs.json` is written by Amplify and includes all ARNs and endpoints needed for the frontend.
 
 ## Repository Structure
 
@@ -15,76 +16,90 @@ The key design principle: **Amplify deploys first and owns auth. AgentCore CDK d
 /
 ├── web/                        # Next.js + Amplify Gen 2
 │   ├── amplify/
-│   │   ├── backend.ts          # Amplify backend definition + cross-project exports
+│   │   ├── backend.ts          # Amplify backend — auth, data, hostingStack, agentStack
 │   │   ├── auth/resource.ts    # Cognito User Pool + Identity Pool
-│   │   └── data/resource.ts    # AppSync GraphQL API
+│   │   ├── data/resource.ts    # AppSync GraphQL API
+│   │   └── constructs/
+│   │       ├── hostingConstruct.ts          # S3 + CloudFront hosting
+│   │       └── agentCoreRuntimeWithBuild.ts # Builds Docker image + deploys CfnRuntime
 │   └── amplify_outputs.json    # Written by Amplify after each deploy (DO NOT EDIT)
 │
-├── agent/                      # AgentCore runtime
-│   ├── agentcore/
-│   │   ├── agentcore.json      # AgentCore project config
-│   │   ├── aws-targets.json    # Deployment target (account + region, written by predeploy)
-│   │   └── cdk/                # CDK app that deploys the AgentCore stack
-│   │       ├── bin/cdk.ts      # Entry point — reads amplify_outputs.json
-│   │       └── lib/cdk-stack.ts # Stack — grants Amplify roles InvokeAgentRuntime
-│   └── app/Default/main.ts     # Agent runtime code (Vercel AI + BedrockAgentCoreApp)
+├── agent/
+│   └── handler/                # Python handler (Dockerfile + agent.py)
+│       └── Dockerfile
 │
 ├── scripts/
+│   ├── build.sh                # Single deploy: ampx sandbox → extract → build → S3 upload
+│   ├── deploy-web.sh           # Re-deploy just the frontend (reads amplify_outputs.json)
+│   ├── extract-deployment-info.js  # Wires AppSync resolver after deploy
 │   └── set-aws-targets.sh      # Populates aws-targets.json from current AWS identity
-└── package.json                # Root deploy script orchestrates the correct order
+└── package.json                # Root deploy script
 ```
 
-## How Cross-Project Configuration Works
+## How It Works
 
-### The Contract: `amplify_outputs.json`
-
-Amplify writes `web/amplify_outputs.json` after every deploy. This file is the single source of truth for anything the `agent/` project needs from the Amplify deployment.
-
-**Rule: any value the AgentCore CDK needs from Amplify must be exported via `backend.addOutput({ custom: { ... } })` in `web/amplify/backend.ts`.** Never call AWS APIs at CDK synth time to discover Amplify resources.
-
-Currently exported under `custom`:
-
-| Key | Value |
-|-----|-------|
-| `auth_authenticated_role_arn` | IAM role ARN that Cognito Identity Pool vends to signed-in users |
-| `auth_unauthenticated_role_arn` | IAM role ARN for guest (unauthenticated) users |
-
-### How the IAM Grant Works
-
-1. A user signs in via Cognito User Pool (email/password).
-2. The Cognito Identity Pool exchanges the User Pool token for temporary AWS credentials, scoped to the **authenticated IAM role**.
-3. That role has an `InvokeAgentRuntime` policy attached — added by the AgentCore CDK stack, not by Amplify.
-4. The frontend uses these credentials (via `fetchAuthSession()` from `aws-amplify/auth`) to call the AgentCore runtime directly.
-
-The CDK stack reads the authenticated role ARN from `amplify_outputs.json` at synth time (`bin/cdk.ts` → `readAmplifyOutputs()`), imports it as a CDK `Role` reference, and attaches the policy. Amplify never touches the AgentCore stack; the AgentCore stack adds one policy to an Amplify-owned role.
-
-## Deploy Flow
+### Single Deployment Command
 
 ```
 pnpm run deploy
   │
   ├─ predeploy: scripts/set-aws-targets.sh
-  │    └─ writes agent/agentcore/aws-targets.json with current AWS account + region
   │
-  ├─ build
-  │    ├─ next build  (web/)
-  │    └─ tsc         (agent/agentcore/cdk/)
-  │
-  ├─ ampx sandbox --once  (web/)
-  │    ├─ deploys Cognito User Pool, Identity Pool, AppSync
-  │    └─ writes web/amplify_outputs.json  ← includes custom role ARNs
-  │
-  └─ agentcore deploy --yes  (agent/)
-       ├─ CDK synth reads web/amplify_outputs.json
-       ├─ attaches InvokeAgentRuntime to the authenticated IAM role
-       └─ deploys BedrockAgentCore Runtime + Memory
+  └─ scripts/build.sh
+       │
+       ├─ npx ampx sandbox --once --identifier <branch>  (from web/)
+       │    ├─ Deploys Cognito, AppSync, Lambda functions
+       │    ├─ hostingStack: S3 bucket + CloudFront distribution
+       │    ├─ agentStack: builds agent/handler/ Docker image → ECR
+       │    │              creates Bedrock AgentCore CfnRuntime
+       │    └─ writes web/amplify_outputs.json (all ARNs + endpoints)
+       │
+       ├─ node scripts/extract-deployment-info.js
+       │    └─ wires AppSync HTTP resolver → AgentCore runtime
+       │
+       ├─ pnpm --filter web build  (Next.js static export)
+       │
+       └─ aws s3 sync web/out/ s3://<bucket>/<branch>/
+          aws cloudfront create-invalidation ...
 ```
 
-**Order matters.** Amplify must deploy before AgentCore so `amplify_outputs.json` contains the `custom` section when CDK synthesizes.
+### `amplify_outputs.json` — Single Source of Truth
+
+Amplify writes `web/amplify_outputs.json` after every deploy. Everything the frontend and scripts need is in this file.
+
+Currently exported under `custom`:
+
+| Key | Value |
+|-----|-------|
+| `auth_authenticated_role_arn` | IAM role ARN for signed-in Cognito users |
+| `auth_unauthenticated_role_arn` | IAM role ARN for guest users |
+| `invoke_agent_lambda_arn` | Lambda function ARN for the invoke-agent function |
+| `hosting_bucket_name` | S3 bucket for static website files |
+| `hosting_distribution_id` | CloudFront distribution ID (for cache invalidation) |
+| `hosting_domain` | CloudFront domain name (e.g. `abc123.cloudfront.net`) |
+| `agui_runtime_arn` | Bedrock AgentCore Runtime ARN for the AG-UI handler |
+| `agui_runtime_role_arn` | Execution role ARN for the AgentCore runtime |
+
+### Sub-Stacks in `backend.ts`
+
+```ts
+const hostingStack = backend.createStack('hosting');
+const hosting = new HostingConstruct(hostingStack, 'Hosting');
+
+const agentStack = backend.createStack('agent');
+const agUiHandlerRuntime = new AgentCoreRuntimeWithBuild(agentStack, 'AgUiHandler', {
+  protocolConfiguration: 'AGUI',
+  imageAssetDirectory: path.resolve(__dirname, '../../../agent/handler'),
+  cognitoDiscoveryUrl: '...',   // Cognito OIDC discovery URL
+  allowedClients: [...],         // Cognito User Pool Client IDs
+});
+```
+
+The `AgentCoreRuntimeWithBuild` construct builds the Docker image from `agent/handler/` (ARM64 cross-compile), pushes it to ECR, and creates a `CfnRuntime` with Cognito JWT authorization. The `HostingConstruct` creates an S3 bucket + CloudFront distribution with SPA routing.
 
 ## Adding New Cross-Project Exports
 
-To share a new value from Amplify with other projects in this monorepo:
+To share a new value from Amplify with the frontend or scripts:
 
 1. Add it to `backend.addOutput({ custom: { ... } })` in `web/amplify/backend.ts`:
    ```ts
@@ -95,18 +110,18 @@ To share a new value from Amplify with other projects in this monorepo:
    });
    ```
 
-2. Read it in `agent/agentcore/cdk/bin/cdk.ts`:
+2. Read it from `web/amplify_outputs.json`:
    ```ts
-   const amplifyOutputs = readAmplifyOutputs(projectRoot);
-   const myValue = amplifyOutputs.my_new_value;
+   import amplifyOutputs from './amplify_outputs.json';
+   const myValue = amplifyOutputs.custom.my_new_value;
    ```
 
-3. Pass it as a prop to `AgentCoreStack` and use it in `lib/cdk-stack.ts`.
+## Deploying Just the Frontend
 
-## Known Quirks
+After the backend is deployed, you can rebuild and redeploy just the Next.js frontend:
 
-### `INIT_CWD` and pnpm workspaces
+```bash
+pnpm deploy:web [branch]
+```
 
-pnpm sets `INIT_CWD` to the directory where `pnpm run` was invoked (the repo root). The AgentCore CLI uses `INIT_CWD ?? process.cwd()` to locate `agentcore.json`, so running it via `pnpm --filter agent run deploy` from the repo root would send it looking in the wrong place.
-
-Fix: the `deploy` script in `agent/package.json` uses `env -u INIT_CWD` to unset it, letting the CLI fall back to `process.cwd()` (the `agent/` directory).
+This reads S3 and CloudFront info from `amplify_outputs.json` and skips the Amplify backend deploy.
