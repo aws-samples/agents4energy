@@ -73,7 +73,7 @@ jobs:
           use_bedrock: "true"
           claude_args: >-
             --model us.anthropic.claude-sonnet-4-6
-            --allowedTools "Bash(act
+            --allowedTools "Bash(act *),
             Bash(cd *),
             Bash(ls *),
             Bash(cat *),
