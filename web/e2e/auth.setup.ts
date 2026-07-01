@@ -12,8 +12,23 @@ import { nanoid } from 'nanoid';
 const root = resolve(__dirname, '../..');
 const envPath = resolve(root, 'scripts/.env.local');
 const storageStatePath = resolve(__dirname, '../.auth/user.json');
-const amplifyOutputs = JSON.parse(readFileSync(resolve(root, 'web/amplify_outputs.json'), 'utf8'));
-const { user_pool_id: userPoolId, user_pool_client_id: clientId, aws_region: region } = amplifyOutputs.auth;
+
+// Prefer web/e2e-config.json (fetched from SSM via `pnpm fetch:e2e-config`) so
+// tests can run against an already-deployed branch with no local build/deploy.
+// Fall back to amplify_outputs.json for the traditional local-sandbox flow.
+const e2eConfigPath = resolve(root, 'web/e2e-config.json');
+let userPoolId: string;
+let clientId: string;
+let region: string;
+if (existsSync(e2eConfigPath)) {
+  const e2eConfig = JSON.parse(readFileSync(e2eConfigPath, 'utf8'));
+  userPoolId = e2eConfig.userPoolId;
+  clientId = e2eConfig.userPoolClientId;
+  region = e2eConfig.region;
+} else {
+  const amplifyOutputs = JSON.parse(readFileSync(resolve(root, 'web/amplify_outputs.json'), 'utf8'));
+  ({ user_pool_id: userPoolId, user_pool_client_id: clientId, aws_region: region } = amplifyOutputs.auth);
+}
 
 // Key format used by Amplify v6 CookieStorage / DefaultTokenStore.
 // With ssr: true, tokens go into cookies. With ssr: false they go into localStorage.
@@ -105,6 +120,12 @@ setup('authenticate', async ({ page }) => {
   const keys = tokenKeys(username);
   const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
+  // Navigate to the app first so we know the real hostname (localhost for the
+  // local dev server, or the CloudFront domain when running against a remote
+  // deployment) to scope the injected cookies to.
+  await page.goto('agents');
+  const domain = new URL(page.url()).hostname;
+
   // Build a storageState with the Amplify token cookies injected.
   // Amplify v6 with ssr:true uses CookieStorage (js-cookie) with these key names.
   const tokenCookies = [
@@ -119,7 +140,7 @@ setup('authenticate', async ({ page }) => {
     },
   ].map((c) => ({
     ...c,
-    domain: 'localhost',
+    domain,
     path: '/',
     expires: Math.floor(expires.getTime() / 1000),
     httpOnly: false,
@@ -127,8 +148,6 @@ setup('authenticate', async ({ page }) => {
     sameSite: 'Lax' as const,
   }));
 
-  // Navigate to the app to get a valid page state, then inject cookies.
-  await page.goto('/agents');
   await page.context().addCookies(tokenCookies);
 
   // Reload so Amplify picks up the freshly injected cookies.

@@ -5,7 +5,7 @@ import { test, expect, type Page } from '@playwright/test';
 // ---------------------------------------------------------------------------
 
 async function goToMcpServersTab(page: Page) {
-  await page.goto('/agents');
+  await page.goto('agents');
   await expect(page.getByRole('button', { name: 'Sign in' })).not.toBeVisible({ timeout: 15_000 });
   await page.getByTestId('tab-mcp-servers').click();
 }

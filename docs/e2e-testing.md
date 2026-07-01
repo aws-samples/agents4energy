@@ -1,6 +1,6 @@
 # E2E Testing with Playwright
 
-Tests live in [web/e2e/](../web/e2e/) and run against the Next.js dev server at `http://localhost:3000`.
+Tests live in [web/e2e/](../web/e2e/) and run against either a local Next.js dev server (`https://localhost:3000`) or an already-deployed branch (CloudFront + S3), depending on whether `web/e2e-config.json` is present.
 
 ## Quick start
 
@@ -21,6 +21,26 @@ pnpm test:e2e --headed
 ```
 
 The dev server starts automatically. If it's already running, Playwright reuses it.
+
+## Running against a deployed branch (no local build required)
+
+Every deploy (`pnpm deploy` locally, or the CI `Deploy` workflow) publishes a small e2e config — the CloudFront app URL and Cognito user pool info — to SSM Parameter Store at `/agentcore-e2e/<owner>-<repo>/<branch>`, keyed by repo and branch so concurrent branches don't collide. This is done by `scripts/extract-deployment-info.js`, which already runs as part of every deploy.
+
+To run the full e2e suite from a fresh checkout, on a branch that has already been deployed, with no local `ampx sandbox` or `pnpm build` step:
+
+```bash
+# From the repo root — fetches config for the current git branch into web/e2e-config.json
+pnpm fetch:e2e-config
+
+cd web
+pnpm test:e2e
+```
+
+Requires AWS credentials with `ssm:GetParameter` on `/agentcore-e2e/*` (see [scripts/setup-deploy-role.ts](../scripts/setup-deploy-role.ts) for the deploy role's grant of this).
+
+When `web/e2e-config.json` exists, [playwright.config.ts](../web/playwright.config.ts) points `baseURL` at the deployed CloudFront URL (`https://<domain>/<branch>/`) and skips starting a local dev server. [auth.setup.ts](../web/e2e/auth.setup.ts) reads Cognito pool info from the same file instead of `amplify_outputs.json`.
+
+Delete `web/e2e-config.json` (or don't create it) to fall back to the local dev-server flow described above.
 
 ## Authentication
 
@@ -59,6 +79,10 @@ web/e2e/
 
 Group related assertions with `test.describe`. One page = one file is a good default.
 
+### Navigation
+
+Use `page.goto('agents')`, not `page.goto('/agents')`. `baseURL` for a remote deployment includes a branch path prefix (`https://<domain>/<branch>/`); a leading slash resolves against the origin and drops that prefix.
+
 ### Selectors
 
 Prefer stable selectors in this order:
@@ -88,7 +112,7 @@ The global default timeout (5 s) is intentionally kept short for fast failures o
 import { test, expect } from '@playwright/test';
 
 test('agent responds to a greeting', async ({ page }) => {
-  await page.goto('/chat');
+  await page.goto('chat');
 
   const textarea = page.getByRole('textbox', { name: 'message' });
   await textarea.fill('Say exactly: hello');
@@ -104,7 +128,7 @@ test('agent responds to a greeting', async ({ page }) => {
 
 ```ts
 test('agent echoes the user message', async ({ page }) => {
-  await page.goto('/chat');
+  await page.goto('chat');
 
   await page.getByRole('textbox', { name: 'message' }).fill('What is 2 + 2?');
   await page.getByRole('button', { name: 'Submit' }).click();
@@ -123,7 +147,7 @@ On CI set `CI=true`. This enables:
 - 1 retry per failed test (flake tolerance)
 - `forbidOnly` — `test.only` left in source causes a hard failure
 
-The `webServer` block in `playwright.config.ts` spins up `pnpm dev` and waits up to 2 minutes for `http://localhost:3000` to be ready. AWS credentials must be available for the auth setup to create or authenticate a Cognito user.
+If `web/e2e-config.json` is absent, the `webServer` block in `playwright.config.ts` spins up `pnpm dev` and waits up to 2 minutes for `https://localhost:3000` to be ready. If present, no server is started — tests run directly against the deployed CloudFront URL. Either way, AWS credentials must be available for the auth setup to create or authenticate a Cognito user.
 
 ## Debugging
 

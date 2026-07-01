@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Agents page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/agents');
+    await page.goto('agents');
     await expect(page.getByRole('button', { name: 'Sign in' })).not.toBeVisible({ timeout: 15_000 });
   });
 

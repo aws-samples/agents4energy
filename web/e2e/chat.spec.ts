@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Chat page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/chat');
+    await page.goto('chat');
     // Auth gate should be gone — storageState from auth.setup.ts handles login
     await expect(page.getByRole('button', { name: 'Sign in' })).not.toBeVisible();
   });

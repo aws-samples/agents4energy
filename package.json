@@ -28,6 +28,7 @@
     "act:deploy:draft": "bash scripts/act-deploy.sh --draft",
     "act:deploy:draft:dryrun": "bash scripts/act-deploy.sh --draft -n",
     "setup:deploy-role": "npx tsx scripts/setup-deploy-role.ts",
+    "fetch:e2e-config": "npx tsx scripts/fetch-e2e-config.ts",
     "destroy": "pnpm --filter agent run destroy && (cd web && npx ampx delete --force)",
     "clean": "pnpm --filter web exec rm -rf .next && pnpm --filter agentcore-cdk-app run clean && find . -name 'node_modules' -type d -prune -exec rm -rf {} + && rm -rf node_modules"
   },
@@ -36,6 +37,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1065.0",
+    "@aws-sdk/client-ssm": "^3.1075.0",
     "esbuild": "^0.28.0",
     "@octokit/rest": "^21.1.1",
     "@types/node": "^25.9.3",

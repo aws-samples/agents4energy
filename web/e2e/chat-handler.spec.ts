@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Chat Handler page — AG-UI over AppSync', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/chat-handler');
+    await page.goto('chat-handler');
     // Auth gate should be gone — storageState from auth.setup.ts handles login
     await expect(page.getByRole('button', { name: 'Sign in' })).not.toBeVisible();
     // Wait for the session to be bootstrapped (URL gains ?sessionId= param)
@@ -49,7 +49,7 @@ test.describe('Chat Handler page — AG-UI over AppSync', () => {
     });
 
     // Navigate to a fixed session so the intercepted listSessionMessages is called.
-    await page.goto('/chat-handler?sessionId=summary-test-session');
+    await page.goto('chat-handler?sessionId=summary-test-session');
     await page.waitForURL(/sessionId=summary-test-session/);
 
     // The banner should appear once messages are seeded from the injected summary.
@@ -94,7 +94,7 @@ test.describe('Chat Handler page — AG-UI over AppSync', () => {
       }
     });
 
-    await page.goto('/chat-handler?sessionId=edit-summary-test-session');
+    await page.goto('chat-handler?sessionId=edit-summary-test-session');
     await page.waitForURL(/sessionId=edit-summary-test-session/);
 
     // Open the summary dialog

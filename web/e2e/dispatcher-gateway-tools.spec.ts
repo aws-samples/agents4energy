@@ -16,7 +16,7 @@ const GATEWAY_URL_FRAGMENT = 'gateway.bedrock-agentcore';
 // ---------------------------------------------------------------------------
 
 async function selectGatewayServer(page: Page): Promise<boolean> {
-  await page.goto('/agents');
+  await page.goto('agents');
   await expect(page.getByRole('button', { name: 'Sign in' })).not.toBeVisible({ timeout: 15_000 });
   await page.getByTestId('tab-mcp-servers').click();
 
@@ -68,7 +68,7 @@ test('List tools works from the MCP server edit panel', async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 test('List tools works from the agent edit panel', async ({ page }) => {
-  await page.goto('/agents');
+  await page.goto('agents');
   await expect(page.getByRole('button', { name: 'Sign in' })).not.toBeVisible({ timeout: 15_000 });
 
   // Find an agent row that has the gateway assigned — click the first agent.
@@ -109,7 +109,7 @@ test('List tools works from the agent edit panel', async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 test('List tools works from the chat page', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('');
   await expect(page.getByRole('button', { name: 'Sign in' })).not.toBeVisible({ timeout: 15_000 });
 
   // Select an agent from the dropdown (pick the first one).
