@@ -17,7 +17,7 @@
       "envVars": [
         {
           "name": "APPSYNC_HTTP_ENDPOINT",
-          "value": "https://7iz4bqmxdndijama5c37ne6mgq.appsync-api.us-east-1.amazonaws.com/graphql"
+          "value": "https://7h7adjuosbbfbmb44zdsi3g7k4.appsync-api.us-east-1.amazonaws.com/graphql"
         },
         {
           "name": "AGENTCORE_MEMORY_ID",

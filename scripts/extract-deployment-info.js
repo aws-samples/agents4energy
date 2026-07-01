@@ -201,10 +201,14 @@ if (agUiHandlerRuntime && amplifyOutputs) {
       Statement: [{ Effect: 'Allow', Action: ['bedrock-agentcore:InvokeAgentRuntime'],
         Resource: [runtimeArn, `${runtimeArn}/runtime-endpoint/*`] }],
     });
-    execSync(
-      `aws iam put-role-policy --role-name ${roleName} --policy-name InvokeRuntime --policy-document '${invokePolicy}'`,
-      { encoding: 'utf8' }
-    );
+    try {
+      execSync(
+        `aws iam put-role-policy --role-name ${roleName} --policy-name InvokeRuntime --policy-document '${invokePolicy}'`,
+        { encoding: 'utf8' }
+      );
+    } catch (err) {
+      console.warn('extract-deployment-info: could not put InvokeRuntime role policy (may need iam:PutRolePolicy permission):', err.message?.split('\n')[0]);
+    }
 
     // 2. Create or update the AppSync HTTP data source.
     const runtimeBaseUrl = `https://bedrock-agentcore.${appsyncRegion}.amazonaws.com`;

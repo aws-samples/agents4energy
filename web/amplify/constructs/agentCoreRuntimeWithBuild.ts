@@ -167,9 +167,9 @@ export class AgentCoreRuntimeWithBuild extends Construct {
       })
     );
 
-    const stackName = cdk.Stack.of(this).stackName.slice(0, 20);
-    const uniqueSuffix = cdk.Names.uniqueId(this).slice(-8);
-    const agentRuntimeName = `${stackName}_${props.protocolConfiguration}_${uniqueSuffix}`
+    // cdk.Stack.of(this).stackName is a token in nested stacks — use Names.uniqueId() which is always concrete
+    const uniqueId = cdk.Names.uniqueId(this);
+    const agentRuntimeName = `${props.protocolConfiguration}_${uniqueId}`
       .replace(/[^a-zA-Z0-9_]/g, '_')
       .slice(0, 48);
 

@@ -60,11 +60,12 @@ const cognitoDiscoveryUrl = Fn.join('', [
   Stack.of(backend.auth.resources.userPool).region,
   '.amazonaws.com/',
   userPoolId,
+  '/.well-known/openid-configuration',
 ]);
 
 const agUiHandlerRuntime = new AgentCoreRuntimeWithBuild(agentStack, 'AgUiHandler', {
   protocolConfiguration: 'AGUI',
-  imageAssetDirectory: resolve(__dirname, '../../../agent/handler'),
+  imageAssetDirectory: resolve(__dirname, '../../agent/handler'),
   cognitoDiscoveryUrl: cognitoDiscoveryUrl,
   allowedClients: [backend.auth.resources.userPoolClient.userPoolClientId],
   description: 'AG-UI handler runtime for the agentcore-amplify-fullstack app',
@@ -91,16 +92,20 @@ backend.listSessionMessages.addEnvironment('AGENTCORE_MEMORY_ID', AGENTCORE_MEMO
 backend.updateSessionSummary.addEnvironment('AGENTCORE_MEMORY_ID', AGENTCORE_MEMORY_ID);
 
 const listSessionMessagesLambda = backend.listSessionMessages.resources.lambda as LambdaFunction;
-listSessionMessagesLambda.addToRolePolicy(new PolicyStatement({
-  actions: ['bedrock-agentcore:ListEvents', 'bedrock-agentcore:ListMemoryRecords'],
-  resources: [AGENTCORE_MEMORY_ARN],
-}));
+if (AGENTCORE_MEMORY_ARN) {
+  listSessionMessagesLambda.addToRolePolicy(new PolicyStatement({
+    actions: ['bedrock-agentcore:ListEvents', 'bedrock-agentcore:ListMemoryRecords'],
+    resources: [AGENTCORE_MEMORY_ARN],
+  }));
+}
 
 const updateSessionSummaryLambda = backend.updateSessionSummary.resources.lambda as LambdaFunction;
-updateSessionSummaryLambda.addToRolePolicy(new PolicyStatement({
-  actions: ['bedrock-agentcore:BatchUpdateMemoryRecords'],
-  resources: [AGENTCORE_MEMORY_ARN],
-}));
+if (AGENTCORE_MEMORY_ARN) {
+  updateSessionSummaryLambda.addToRolePolicy(new PolicyStatement({
+    actions: ['bedrock-agentcore:BatchUpdateMemoryRecords'],
+    resources: [AGENTCORE_MEMORY_ARN],
+  }));
+}
 
 // ============================================================================
 // REGISTER-MCP-TARGET Lambda — CreateGatewayTarget on the default gateway
@@ -126,13 +131,15 @@ backend.invokeAgent.addEnvironment('HARNESS_ARN', AGENTCORE_HARNESS_ARN);
 
 const invokeAgentLambda = backend.invokeAgent.resources.lambda as LambdaFunction;
 
-invokeAgentLambda.addToRolePolicy(new PolicyStatement({
-  actions: [
-    'bedrock-agentcore:InvokeAgentRuntime',
-    'bedrock-agentcore:InvokeHarness',
-  ],
-  resources: [AGENTCORE_HARNESS_ARN],
-}));
+if (AGENTCORE_HARNESS_ARN) {
+  invokeAgentLambda.addToRolePolicy(new PolicyStatement({
+    actions: [
+      'bedrock-agentcore:InvokeAgentRuntime',
+      'bedrock-agentcore:InvokeHarness',
+    ],
+    resources: [AGENTCORE_HARNESS_ARN],
+  }));
+}
 
 const SVC_SSM_PATH = '/agentcore/invoke-agent-service/password';
 backend.invokeAgent.addEnvironment('COGNITO_USER_POOL_ID', backend.auth.resources.userPool.userPoolId);
@@ -151,19 +158,23 @@ invokeAgentLambda.addToRolePolicy(new PolicyStatement({
 // AUTHENTICATED USERS — SigV4-sign harness invoke requests directly
 // ============================================================================
 
-backend.auth.resources.authenticatedUserIamRole.addToPrincipalPolicy(new PolicyStatement({
-  actions: [
-    'bedrock-agentcore:InvokeAgentRuntime',
-    'bedrock-agentcore:InvokeHarness',
-  ],
-  resources: [AGENTCORE_HARNESS_ARN],
-}));
+if (AGENTCORE_HARNESS_ARN) {
+  backend.auth.resources.authenticatedUserIamRole.addToPrincipalPolicy(new PolicyStatement({
+    actions: [
+      'bedrock-agentcore:InvokeAgentRuntime',
+      'bedrock-agentcore:InvokeHarness',
+    ],
+    resources: [AGENTCORE_HARNESS_ARN],
+  }));
+}
 
-invokeAgentLambda.addPermission('AllowGatewayInvoke', {
-  principal: new ServicePrincipal('bedrock-agentcore.amazonaws.com'),
-  action: 'lambda:InvokeFunction',
-  sourceArn: AGENTCORE_GATEWAY_ARN,
-});
+if (AGENTCORE_GATEWAY_ARN) {
+  invokeAgentLambda.addPermission('AllowGatewayInvoke', {
+    principal: new ServicePrincipal('bedrock-agentcore.amazonaws.com'),
+    action: 'lambda:InvokeFunction',
+    sourceArn: AGENTCORE_GATEWAY_ARN,
+  });
+}
 
 // Grant the runtime execution role permission to invoke the AgentCore runtime
 // (needed for AppSync → runtime invocations post-deploy wiring)
