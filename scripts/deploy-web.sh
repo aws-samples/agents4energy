@@ -1,77 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build the Next.js app and deploy it to the S3 + CloudFront hosting stack.
-# Mirrors what .github/workflows/deploy.yml does so local deploys are identical.
+# Build the Next.js app and deploy it to the S3 + CloudFront hosting.
+# Reads bucket/distribution info from web/amplify_outputs.json (written by ampx sandbox).
 #
 # Usage:
 #   pnpm deploy:web [branch]        # branch defaults to current git branch
 #
 # Prerequisites:
 #   AWS CLI configured (or AWS_* env vars set)
-#   CDK hosting stack already deployed for the branch (runs `cdk deploy` if not)
+#   ampx sandbox already deployed (web/amplify_outputs.json must exist)
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-BRANCH="${1:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)}"
-# Normalise: replace slashes, lowercase — same transform as the workflow
-BRANCH="$(echo "$BRANCH" | tr '/' '-' | tr '[:upper:]' '[:lower:]')"
-STACK_NAME="agentcore-cli-hosting-$BRANCH"
-CDK_DIR="$REPO_ROOT/agent/default/agentcore/cdk"
-OUTPUTS_FILE="$CDK_DIR/hosting-outputs.json"
+BRANCH="${1:-${DEPLOY_BRANCH:-$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)}}"
+BRANCH_SLUG="$(echo "$BRANCH" | tr '/' '-' | tr '[:upper:]' '[:lower:]')"
 
-echo "Branch: $BRANCH"
-echo "Stack:  $STACK_NAME"
+AMPLIFY_OUTPUTS="$REPO_ROOT/web/amplify_outputs.json"
+
+echo "Branch: $BRANCH_SLUG"
 echo ""
 
-# ── 1. Ensure CDK app is compiled ─────────────────────────────────────────────
-echo "Building CDK app…"
-pnpm --filter agentcore-cdk-app build
-
-# ── 2. Deploy / update the hosting stack ─────────────────────────────────────
-echo "Deploying hosting stack…"
-
-STATUS=$(aws cloudformation describe-stacks \
-  --stack-name "$STACK_NAME" \
-  --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
-
-if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
-  echo "Stack is in ROLLBACK_COMPLETE — deleting before redeploy"
-  aws cloudformation delete-stack --stack-name "$STACK_NAME"
-  aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME"
+if [ ! -f "$AMPLIFY_OUTPUTS" ]; then
+  echo "Error: amplify_outputs.json not found at $AMPLIFY_OUTPUTS"
+  echo "Run 'npx ampx sandbox --once --identifier $BRANCH_SLUG' from web/ first."
+  exit 1
 fi
 
-(cd "$CDK_DIR" && ./node_modules/.bin/cdk deploy "$STACK_NAME" \
-  --require-approval never \
-  --outputs-file hosting-outputs.json \
-  --context "stackName=$STACK_NAME")
+BUCKET=$(node -p "JSON.parse(require('fs').readFileSync('$AMPLIFY_OUTPUTS','utf8')).custom?.hosting_bucket_name ?? ''")
+DIST_ID=$(node -p "JSON.parse(require('fs').readFileSync('$AMPLIFY_OUTPUTS','utf8')).custom?.hosting_distribution_id ?? ''")
+DOMAIN=$(node -p "JSON.parse(require('fs').readFileSync('$AMPLIFY_OUTPUTS','utf8')).custom?.hosting_domain ?? ''")
 
-# Flatten nested CDK outputs JSON: { "StackName": { "Key": "val" } } → { "Key": "val" }
-node -e "
-  const raw = require('$OUTPUTS_FILE');
-  const key = Object.keys(raw)[0];
-  require('fs').writeFileSync('$OUTPUTS_FILE', JSON.stringify(raw[key], null, 2));
-"
-
-BUCKET=$(node -p "require('$OUTPUTS_FILE').BucketName")
-DIST_ID=$(node -p "require('$OUTPUTS_FILE').DistributionId")
-DOMAIN=$(node -p "require('$OUTPUTS_FILE').Domain")
+if [ -z "$BUCKET" ] || [ -z "$DIST_ID" ]; then
+  echo "Error: hosting_bucket_name or hosting_distribution_id missing from amplify_outputs.json"
+  exit 1
+fi
 
 echo "  Bucket: $BUCKET"
 echo "  Distribution: $DIST_ID"
 echo ""
 
-# ── 3. Build the Next.js app ──────────────────────────────────────────────────
+# ── Build the Next.js app ─────────────────────────────────────────────────────
 echo "Building web app…"
 NODE_OPTIONS=--max-old-space-size=6144 pnpm --filter web build
 
-# ── 4. Sync to S3 and invalidate CloudFront ───────────────────────────────────
+# ── Sync to S3 and invalidate CloudFront ─────────────────────────────────────
 echo "Deploying to S3…"
-aws s3 sync "$REPO_ROOT/web/out/" "s3://$BUCKET/$BRANCH/" --delete
+aws s3 sync "$REPO_ROOT/web/out/" "s3://$BUCKET/$BRANCH_SLUG/" --delete
 
 echo "Invalidating CloudFront cache…"
 AWS_PAGER="" aws cloudfront create-invalidation \
-  --distribution-id "$DIST_ID" --paths "/$BRANCH/*"
+  --distribution-id "$DIST_ID" --paths "/$BRANCH_SLUG/*"
 
 echo ""
-echo "Deployed: https://$DOMAIN/$BRANCH/"
+echo "Deployed: https://$DOMAIN/$BRANCH_SLUG/"

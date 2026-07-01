@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Reads agent/default/agentcore/.cli/deployed-state.json after `agentcore deploy`
-// and CloudFormation stack outputs for gateway ARN/endpoint,
+// Reads runtime/gateway ARNs from amplify_outputs.json (written by ampx sandbox --once)
+// and/or agent/default/agentcore/.cli/deployed-state.json (legacy agentcore deploy),
 // then writes web/deployment-info.json so the frontend can import ARNs at build time.
 import { readFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
@@ -15,8 +15,9 @@ let deployedState;
 try {
   deployedState = JSON.parse(readFileSync(deployedStatePath, 'utf8'));
 } catch {
-  console.error(`extract-deployment-info: cannot read ${deployedStatePath}`);
-  process.exit(1);
+  // Not fatal — the runtime may now be managed by the Amplify agentStack
+  console.warn(`extract-deployment-info: no deployed-state.json found at ${deployedStatePath} — will use amplify_outputs.json`);
+  deployedState = { targets: {} };
 }
 
 const targets = deployedState?.targets ?? {};
@@ -121,14 +122,14 @@ if (Object.keys(runtimes).length === 0) {
 // Wire the AG-UI invokeHandler AppSync resolver
 //
 // The HTTP data source and resolver are fully managed here (no CFn ownership).
-// After agentcore deploy creates the AgUiHandler runtime, this script:
+// After the Amplify agentStack (or agentcore deploy) creates the AgUiHandler
+// runtime, this script:
 //   1. Creates IAM role + AppSync HTTP data source (idempotent).
 //   2. Creates or updates the Mutation.invokeHandler resolver.
 //   3. Calls PutGraphqlApiEnvironmentVariables to set AGUI_RUNTIME_ARN.
 //   4. Grants the runtime execution role appsync:GraphQL for publishAgentEvent.
-//   5. Keeps agentcore.json APPSYNC_HTTP_ENDPOINT in sync.
+//   5. Keeps agentcore.json APPSYNC_HTTP_ENDPOINT in sync (if it exists).
 // ============================================================================
-const agUiHandlerRuntime = runtimes['AgUiHandler'];
 const amplifyOutputsPath = resolve(root, 'web/amplify_outputs.json');
 let amplifyOutputs;
 try {
@@ -136,6 +137,16 @@ try {
 } catch {
   console.warn('extract-deployment-info: could not read amplify_outputs.json — skipping AppSync wiring');
 }
+
+// Prefer the runtime ARN from amplify_outputs.json (agentStack), fall back to deployed-state.json
+if (!runtimes['AgUiHandler'] && amplifyOutputs?.custom?.agui_runtime_arn) {
+  runtimes['AgUiHandler'] = {
+    runtimeArn: amplifyOutputs.custom.agui_runtime_arn,
+    roleArn: amplifyOutputs.custom.agui_runtime_role_arn,
+  };
+}
+
+const agUiHandlerRuntime = runtimes['AgUiHandler'];
 
 if (agUiHandlerRuntime && amplifyOutputs) {
   const appsyncEndpoint = amplifyOutputs?.data?.url ?? '';
@@ -190,10 +201,14 @@ if (agUiHandlerRuntime && amplifyOutputs) {
       Statement: [{ Effect: 'Allow', Action: ['bedrock-agentcore:InvokeAgentRuntime'],
         Resource: [runtimeArn, `${runtimeArn}/runtime-endpoint/*`] }],
     });
-    execSync(
-      `aws iam put-role-policy --role-name ${roleName} --policy-name InvokeRuntime --policy-document '${invokePolicy}'`,
-      { encoding: 'utf8' }
-    );
+    try {
+      execSync(
+        `aws iam put-role-policy --role-name ${roleName} --policy-name InvokeRuntime --policy-document '${invokePolicy}'`,
+        { encoding: 'utf8' }
+      );
+    } catch (err) {
+      console.warn('extract-deployment-info: could not put InvokeRuntime role policy (may need iam:PutRolePolicy permission):', err.message?.split('\n')[0]);
+    }
 
     // 2. Create or update the AppSync HTTP data source.
     const runtimeBaseUrl = `https://bedrock-agentcore.${appsyncRegion}.amazonaws.com`;

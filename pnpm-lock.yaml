@@ -195,7 +195,7 @@ importers:
         specifier: ^19
         version: 19.2.3(@types/react@19.2.17)
       aws-cdk-lib:
-        specifier: ^2.244.0
+        specifier: ^2.248.0
         version: 2.258.1(constructs@10.6.0)
       constructs:
         specifier: ^10.6.0
