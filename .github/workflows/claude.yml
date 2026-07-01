@@ -78,6 +78,7 @@ jobs:
             Bash(curl *),
             Bash(npx ampx sandbox*),
             Bash(node scripts/*),
+            Bash(bash scripts/*),
             Bash(bash scripts/act-deploy.sh*),
             Bash(pnpm act:deploy*),
             Bash(pnpm act:deploy:draft*),
