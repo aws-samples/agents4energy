@@ -6,6 +6,10 @@ set -euo pipefail
 #   2. Extract deployment info and wire AppSync resolver
 #   3. Build the Next.js frontend
 #   4. Upload to S3 and invalidate CloudFront cache
+#
+# Note: ampx sandbox --once already writes backend.addOutput({ custom: {...} })
+# values into amplify_outputs.json — no separate CloudFormation extraction step
+# is needed to recover them.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -28,52 +32,6 @@ fi
 # ── 1. Deploy everything with a single ampx sandbox --once ───────────────────
 echo "Deploying Amplify sandbox (including hosting + agent stacks)…"
 (cd "$REPO_ROOT/web" && npx ampx sandbox --once --identifier "$BRANCH_SLUG")
-
-# ── 1b. Patch amplify_outputs.json with custom outputs from CloudFormation ────
-# ampx sandbox --once writes only the base outputs (auth/data/etc.) but omits
-# the backend.addOutput({ custom: {...} }) values. Fetch them from the CFn
-# customOutputs stack output and merge them in manually.
-echo "Patching amplify_outputs.json with custom CloudFormation outputs…"
-# ampx strips hyphens from the identifier when naming the stack
-BRANCH_SLUG_CLEAN="$(echo "$BRANCH_SLUG" | tr -d '-')"
-# Match the root sandbox stack only — filter out nested stacks by requiring no extra '-' after 'sandbox-<hash>'
-# Root stack pattern: amplify-web-<slug>-sandbox-<8hexchars>  (no further hyphens except in the hash)
-SANDBOX_STACK=$(aws cloudformation list-stacks \
-  --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE \
-  --query "StackSummaries[?starts_with(StackName, 'amplify-web-${BRANCH_SLUG_CLEAN}-sandbox-')].StackName" \
-  --output text | tr '\t' '\n' | grep -E '^amplify-web-[^-]+-sandbox-[a-f0-9]+$' | head -1)
-
-if [ -n "$SANDBOX_STACK" ]; then
-  echo "Found sandbox stack: $SANDBOX_STACK"
-  CUSTOM_OUTPUTS_FILE=$(mktemp)
-  aws cloudformation describe-stacks \
-    --stack-name "$SANDBOX_STACK" \
-    --query "Stacks[0].Outputs[?OutputKey=='customOutputs'].OutputValue" \
-    --output text > "$CUSTOM_OUTPUTS_FILE"
-  CUSTOM_OUTPUTS=$(cat "$CUSTOM_OUTPUTS_FILE")
-  if [ -n "$CUSTOM_OUTPUTS" ] && [ "$CUSTOM_OUTPUTS" != "None" ]; then
-    # Write a small merge script to avoid shell quoting issues
-    MERGE_SCRIPT=$(mktemp --suffix=.cjs)
-    cat > "$MERGE_SCRIPT" <<'NODESCRIPT'
-const fs = require('fs');
-const outputsPath = process.argv[2];
-const customFile = process.argv[3];
-const existing = JSON.parse(fs.readFileSync(outputsPath, 'utf8'));
-const customStr = fs.readFileSync(customFile, 'utf8').trim();
-const customObj = JSON.parse(customStr);
-const merged = Object.assign({}, existing, customObj);
-fs.writeFileSync(outputsPath, JSON.stringify(merged, null, 2) + '\n');
-console.log('Patched amplify_outputs.json with custom outputs');
-NODESCRIPT
-    node "$MERGE_SCRIPT" "$REPO_ROOT/web/amplify_outputs.json" "$CUSTOM_OUTPUTS_FILE"
-    rm -f "$MERGE_SCRIPT" "$CUSTOM_OUTPUTS_FILE"
-  else
-    echo "Warning: no customOutputs found in stack $SANDBOX_STACK"
-    rm -f "$CUSTOM_OUTPUTS_FILE"
-  fi
-else
-  echo "Warning: could not find sandbox stack for identifier ${BRANCH_SLUG_CLEAN}"
-fi
 
 # ── 2. Extract deployment info and wire AppSync resolver ─────────────────────
 echo "Extracting deployment info and wiring AppSync resolver…"
