@@ -1,0 +1,107 @@
+# Draft workflow — copy this file to .github/workflows/ to enable it.
+# (Claude's GitHub App cannot write directly to .github/workflows/.)
+#
+# Deletes the per-branch preview stack when its branch is deleted:
+#   - Amplify sandbox (Cognito, AppSync, Lambda, DynamoDB) — identifier = branch name
+#   - Hosting CDK stack ($BRANCH-$PROJECT: S3 bucket + CloudFront distribution)
+#
+# Does NOT touch AgentCore (harness, gateway, memory). Those are deployed once to
+# a single shared "default" target (agent/default/agentcore/aws-targets.json) —
+# not per branch — so branch deletion must never tear them down.
+#
+# `delete` events only fire for workflow files present on the repo's default
+# branch, so this only takes effect once merged there.
+name: Delete branch stack
+
+on:
+  delete:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch name whose preview stack should be deleted'
+        required: true
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+concurrency:
+  group: deploy-${{ github.event.ref || inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  delete-stack:
+    if: github.event_name == 'workflow_dispatch' || github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC auth to AWS
+      contents: read
+
+    steps:
+      # The deleted branch no longer exists, so check out the default branch
+      # (which has the CDK app + scripts needed to tear down the stack).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sanitize branch name
+        run: |
+          RAW_BRANCH="${{ github.event.ref || inputs.branch }}"
+          PROJECT=$(node -p "require('./package.json').name")
+          BRANCH=$(echo "$RAW_BRANCH" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+          echo "STACK_NAME=$BRANCH-$PROJECT" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build CDK app
+        run: pnpm --filter agentcore-cdk-app build
+
+      # ── Delete hosting stack (S3 + CloudFront) ────────────────────────────────
+
+      - name: Empty and delete hosting stack
+        run: |
+          echo "::group::Delete $STACK_NAME"
+          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].StackStatus' --output text 2>/dev/null) || STATUS="DOES_NOT_EXIST"
+
+          if [ "$STATUS" = "DOES_NOT_EXIST" ]; then
+            echo "Stack $STACK_NAME does not exist — nothing to delete"
+          else
+            BUCKET=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+              --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+            if [ -n "$BUCKET" ]; then
+              echo "Emptying bucket $BUCKET…"
+              aws s3 rm "s3://$BUCKET" --recursive
+            fi
+
+            cd agent/default/agentcore/cdk
+            ./node_modules/.bin/cdk destroy "$STACK_NAME" \
+              --force \
+              --context stackName="$STACK_NAME"
+          fi
+          echo "::endgroup::"
+
+      # ── Delete Amplify sandbox (Cognito, AppSync, Lambda, DynamoDB) ───────────
+
+      - name: Delete Amplify sandbox
+        working-directory: web
+        run: |
+          echo "::group::ampx sandbox delete --identifier $BRANCH"
+          # `ampx sandbox delete` prompts for confirmation; pipe "y" since there's
+          # no documented non-interactive flag as of @aws-amplify/backend-cli 1.8.
+          yes | pnpm exec ampx sandbox delete --identifier "$BRANCH"
+          echo "::endgroup::"
