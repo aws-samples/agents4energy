@@ -5,7 +5,7 @@ This project uses a structured loop where planning happens before coding, Claude
 ## The Loop
 
 ```
-Plan → Issues → Implement → Review → Merge → Unblock → repeat
+Plan → Milestones → Issues → Implement → Review → Merge → Unblock → repeat
 ```
 
 ### 1. Plan (Claude Code, local)
