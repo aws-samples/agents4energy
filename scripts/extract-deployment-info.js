@@ -468,7 +468,7 @@ if (amplifyOutputs?.auth && amplifyOutputs?.custom?.hosting_domain) {
   ).toLowerCase().replace(/[^a-z0-9-/]+/g, '-');
 
   if (branch && repoSlug) {
-    const ssmPath = `/agentcore-e2e/${repoSlug}/${branch}`;
+    const ssmPath = `/outputs/${repoSlug}/${branch}/e2e-config`;
     const e2eConfig = {
       appUrl: `https://${amplifyOutputs.custom.hosting_domain}/${branch}/`,
       userPoolId: amplifyOutputs.auth.user_pool_id,

@@ -4,7 +4,7 @@
 //
 // This lets Playwright run against an already-deployed branch (CloudFront + S3)
 // without a local build or `ampx sandbox` deploy — just a fresh checkout plus
-// AWS credentials with ssm:GetParameter on /agentcore-e2e/*.
+// AWS credentials with ssm:GetParameter on /outputs/*.
 //
 // Usage:
 //   npx tsx scripts/fetch-e2e-config.ts [branch]   # branch defaults to current git branch
@@ -43,7 +43,7 @@ const repoSlug = slugRepo(
 );
 
 const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-east-1';
-const ssmPath = `/agentcore-e2e/${repoSlug}/${branch}`;
+const ssmPath = `/outputs/${repoSlug}/${branch}/e2e-config`;
 
 console.log(`Fetching e2e config from SSM: ${ssmPath} (region ${region})`);
 

@@ -24,7 +24,7 @@ The dev server starts automatically. If it's already running, Playwright reuses 
 
 ## Running against a deployed branch (no local build required)
 
-Every deploy (`pnpm deploy` locally, or the CI `Deploy` workflow) publishes a small e2e config — the CloudFront app URL and Cognito user pool info — to SSM Parameter Store at `/agentcore-e2e/<owner>-<repo>/<branch>`, keyed by repo and branch so concurrent branches don't collide. This is done by `scripts/extract-deployment-info.js`, which already runs as part of every deploy.
+Every deploy (`pnpm deploy` locally, or the CI `Deploy` workflow) publishes a small e2e config — the CloudFront app URL and Cognito user pool info — to SSM Parameter Store at `/outputs/<owner>-<repo>/<branch>/e2e-config`, keyed by repo and branch so concurrent branches don't collide. This is done by `scripts/extract-deployment-info.js`, which already runs as part of every deploy.
 
 To run the full e2e suite from a fresh checkout, on a branch that has already been deployed, with no local `ampx sandbox` or `pnpm build` step:
 
@@ -36,7 +36,7 @@ cd web
 pnpm test:e2e
 ```
 
-Requires AWS credentials with `ssm:GetParameter` on `/agentcore-e2e/*` (see [scripts/setup-deploy-role.ts](../scripts/setup-deploy-role.ts) for the deploy role's grant of this).
+Requires AWS credentials with `ssm:GetParameter` on `/outputs/*` (see [scripts/setup-deploy-role.ts](../scripts/setup-deploy-role.ts) for the deploy role's grant of this).
 
 When `web/e2e-config.json` exists, [playwright.config.ts](../web/playwright.config.ts) points `baseURL` at the deployed CloudFront URL (`https://<domain>/<branch>/`) and skips starting a local dev server. [auth.setup.ts](../web/e2e/auth.setup.ts) reads Cognito pool info from the same file instead of `amplify_outputs.json`.
 

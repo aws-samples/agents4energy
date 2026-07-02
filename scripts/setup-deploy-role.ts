@@ -224,15 +224,15 @@ const inlinePolicy = JSON.stringify({
     {
       // CDK bootstrap & deploy need to read/write SSM parameter for bootstrap version
       // Amplify Gen 2 reads parameters under /amplify/* during backend deploy
-      // /agentcore-e2e/* holds the per-branch e2e config published by
-      // scripts/extract-deployment-info.js so `pnpm test:e2e` can run without a local build
+      // /outputs/* holds per-branch outputs (e.g. the e2e config published by
+      // scripts/extract-deployment-info.js so `pnpm test:e2e` can run without a local build)
       Sid: 'CdkSsm',
       Effect: 'Allow',
       Action: ['ssm:GetParameter', 'ssm:GetParametersByPath', 'ssm:PutParameter'],
       Resource: [
         `arn:aws:ssm:${awsRegion}:${accountId}:parameter/cdk-bootstrap/*`,
         `arn:aws:ssm:${awsRegion}:${accountId}:parameter/amplify/*`,
-        `arn:aws:ssm:${awsRegion}:${accountId}:parameter/agentcore-e2e/*`,
+        `arn:aws:ssm:${awsRegion}:${accountId}:parameter/outputs/*`,
       ],
     },
   ],
