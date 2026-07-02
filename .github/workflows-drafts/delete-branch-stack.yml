@@ -1,9 +1,12 @@
 # Draft workflow — copy this file to .github/workflows/ to enable it.
 # (Claude's GitHub App cannot write directly to .github/workflows/.)
 #
-# Deletes the per-branch preview stack when its branch is deleted:
-#   - Amplify sandbox (Cognito, AppSync, Lambda, DynamoDB) — identifier = branch name
-#   - Hosting CDK stack ($BRANCH-$PROJECT: S3 bucket + CloudFront distribution)
+# Deletes the per-branch Amplify sandbox stack when its branch is deleted.
+# The hosting resources (S3 + CloudFront) are a nested stack inside the sandbox
+# root stack (see web/amplify/backend.ts's `backend.createStack('hosting')`),
+# so deleting the root stack tears down hosting too — no separate CDK destroy
+# or `ampx sandbox delete` needed. The hosting bucket has autoDeleteObjects
+# enabled, so CloudFormation empties it automatically before deletion.
 #
 # Does NOT touch AgentCore (harness, gateway, memory). Those are deployed once to
 # a single shared "default" target (agent/default/agentcore/aws-targets.json) —
@@ -38,17 +41,14 @@ jobs:
 
     steps:
       # The deleted branch no longer exists, so check out the default branch
-      # (which has the CDK app + scripts needed to tear down the stack).
+      # (only needed to read web/package.json for the sandbox stack's app-name prefix).
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
 
-      - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: pnpm
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -56,52 +56,32 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Sanitize branch name
+      - name: Resolve branch slug
         run: |
           RAW_BRANCH="${{ github.event.ref || inputs.branch }}"
-          PROJECT=$(node -p "require('./package.json').name")
-          BRANCH=$(echo "$RAW_BRANCH" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
-          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+          # Mirror scripts/build.sh's normalisation exactly, so this resolves to the
+          # same --identifier the sandbox was deployed with (ampx limit is 15 chars).
+          BRANCH_SLUG=$(echo "$RAW_BRANCH" | tr '/' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-14)
+          # ampx strips hyphens from the identifier when naming the sandbox stack.
+          BRANCH_SLUG_CLEAN=$(echo "$BRANCH_SLUG" | tr -d '-')
+          PROJECT=$(node -p "require('./web/package.json').name")
+          echo "BRANCH_SLUG_CLEAN=$BRANCH_SLUG_CLEAN" >> "$GITHUB_ENV"
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
-          echo "STACK_NAME=$BRANCH-$PROJECT" >> "$GITHUB_ENV"
 
-      - run: pnpm install --frozen-lockfile
-
-      - name: Build CDK app
-        run: pnpm --filter agentcore-cdk-app build
-
-      # ── Delete hosting stack (S3 + CloudFront) ────────────────────────────────
-
-      - name: Empty and delete hosting stack
+      - name: Delete Amplify sandbox stack (fire-and-forget)
         run: |
-          echo "::group::Delete $STACK_NAME"
-          STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
-            --query 'Stacks[0].StackStatus' --output text 2>/dev/null) || STATUS="DOES_NOT_EXIST"
+          echo "::group::Find sandbox root stack for $BRANCH_SLUG_CLEAN"
+          # Root stack pattern: amplify-<project>-<slug>-sandbox-<8hexchars>
+          # (excludes nested stacks, which have additional trailing segments).
+          STACK_NAME=$(aws cloudformation list-stacks \
+            --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE ROLLBACK_COMPLETE \
+            --query "StackSummaries[?starts_with(StackName, 'amplify-${PROJECT}-${BRANCH_SLUG_CLEAN}-sandbox-')].StackName" \
+            --output text | tr '\t' '\n' | grep -E "^amplify-${PROJECT}-[^-]+-sandbox-[a-f0-9]+\$" | head -1)
 
-          if [ "$STATUS" = "DOES_NOT_EXIST" ]; then
-            echo "Stack $STACK_NAME does not exist — nothing to delete"
+          if [ -z "$STACK_NAME" ]; then
+            echo "No sandbox stack found for branch slug $BRANCH_SLUG_CLEAN — nothing to delete"
           else
-            BUCKET=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
-              --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
-            if [ -n "$BUCKET" ]; then
-              echo "Emptying bucket $BUCKET…"
-              aws s3 rm "s3://$BUCKET" --recursive
-            fi
-
-            cd agent/default/agentcore/cdk
-            ./node_modules/.bin/cdk destroy "$STACK_NAME" \
-              --force \
-              --context stackName="$STACK_NAME"
+            echo "Deleting $STACK_NAME (not waiting for completion)…"
+            aws cloudformation delete-stack --stack-name "$STACK_NAME"
           fi
-          echo "::endgroup::"
-
-      # ── Delete Amplify sandbox (Cognito, AppSync, Lambda, DynamoDB) ───────────
-
-      - name: Delete Amplify sandbox
-        working-directory: web
-        run: |
-          echo "::group::ampx sandbox delete --identifier $BRANCH"
-          # `ampx sandbox delete` prompts for confirmation; pipe "y" since there's
-          # no documented non-interactive flag as of @aws-amplify/backend-cli 1.8.
-          yes | pnpm exec ampx sandbox delete --identifier "$BRANCH"
           echo "::endgroup::"
