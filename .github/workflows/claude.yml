@@ -105,6 +105,67 @@ jobs:
             Bash(gh run watch*),
             Bash(gh run view*)"
 
+      - name: Upload execution log to CloudWatch
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import json, os, subprocess, time, sys
+
+          LOG_GROUP = "/github-actions/claude-code"
+          repo = os.environ.get("GITHUB_REPOSITORY", "unknown").replace("/", "-")
+          run_id = os.environ.get("GITHUB_RUN_ID", "0")
+          LOG_STREAM = f"{repo}/{run_id}"
+          region = os.environ.get("AWS_REGION", "us-east-1")
+
+          def aws(*args):
+              return subprocess.run(["aws", "--region", region] + list(args),
+                                    capture_output=True, text=True)
+
+          aws("logs", "create-log-group", "--log-group-name", LOG_GROUP)
+          aws("logs", "put-retention-policy", "--log-group-name", LOG_GROUP,
+              "--retention-in-days", "30")
+          aws("logs", "create-log-stream", "--log-group-name", LOG_GROUP,
+              "--log-stream-name", LOG_STREAM)
+
+          log_file = "/home/runner/work/_temp/claude-execution-output.json"
+          if not os.path.exists(log_file):
+              print("No execution log found")
+              sys.exit(0)
+
+          with open(log_file) as f:
+              lines = [l for l in f.read().splitlines() if l.strip()]
+
+          MAX_BATCH_BYTES = 900_000
+          MAX_EVENT_BYTES = 250_000
+
+          events = []
+          ts = int(time.time() * 1000)
+          for i, line in enumerate(lines):
+              events.append({"timestamp": ts + i, "message": line[:MAX_EVENT_BYTES]})
+
+          batch, batch_size = [], 0
+          for event in events:
+              size = len(event["message"].encode()) + 26
+              if batch and (batch_size + size > MAX_BATCH_BYTES or len(batch) >= 10000):
+                  r = aws("logs", "put-log-events", "--log-group-name", LOG_GROUP,
+                          "--log-stream-name", LOG_STREAM,
+                          "--log-events", json.dumps(batch))
+                  if r.returncode != 0:
+                      print(f"Warning: {r.stderr}", file=sys.stderr)
+                  batch, batch_size = [], 0
+              batch.append(event)
+              batch_size += size
+
+          if batch:
+              r = aws("logs", "put-log-events", "--log-group-name", LOG_GROUP,
+                      "--log-stream-name", LOG_STREAM,
+                      "--log-events", json.dumps(batch))
+              if r.returncode != 0:
+                  print(f"Warning: {r.stderr}", file=sys.stderr)
+
+          print(f"Uploaded {len(events)} events to {LOG_GROUP}/{LOG_STREAM}")
+          EOF
+
       - name: Remove agent-working label
         if: always()
         env:
