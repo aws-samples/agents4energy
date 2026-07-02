@@ -109,7 +109,7 @@ jobs:
         if: always()
         run: |
           python3 - <<'EOF'
-          import json, os, subprocess, time, sys
+          import json, os, subprocess, time, sys, tempfile
 
           LOG_GROUP = "/github-actions/claude-code"
           repo = os.environ.get("GITHUB_REPOSITORY", "unknown").replace("/", "-")
@@ -120,6 +120,20 @@ jobs:
           def aws(*args):
               return subprocess.run(["aws", "--region", region] + list(args),
                                     capture_output=True, text=True)
+
+          def put_log_events(batch):
+              # Pass the batch via a temp file (file://) rather than inline on the
+              # command line — a large --log-events value overflows the OS argument
+              # limit (Errno 7: Argument list too long).
+              with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tf:
+                  json.dump(batch, tf)
+                  path = tf.name
+              try:
+                  return aws("logs", "put-log-events", "--log-group-name", LOG_GROUP,
+                             "--log-stream-name", LOG_STREAM,
+                             "--log-events", f"file://{path}")
+              finally:
+                  os.unlink(path)
 
           aws("logs", "create-log-group", "--log-group-name", LOG_GROUP)
           aws("logs", "put-retention-policy", "--log-group-name", LOG_GROUP,
@@ -147,9 +161,7 @@ jobs:
           for event in events:
               size = len(event["message"].encode()) + 26
               if batch and (batch_size + size > MAX_BATCH_BYTES or len(batch) >= 10000):
-                  r = aws("logs", "put-log-events", "--log-group-name", LOG_GROUP,
-                          "--log-stream-name", LOG_STREAM,
-                          "--log-events", json.dumps(batch))
+                  r = put_log_events(batch)
                   if r.returncode != 0:
                       print(f"Warning: {r.stderr}", file=sys.stderr)
                   batch, batch_size = [], 0
@@ -157,9 +169,7 @@ jobs:
               batch_size += size
 
           if batch:
-              r = aws("logs", "put-log-events", "--log-group-name", LOG_GROUP,
-                      "--log-stream-name", LOG_STREAM,
-                      "--log-events", json.dumps(batch))
+              r = put_log_events(batch)
               if r.returncode != 0:
                   print(f"Warning: {r.stderr}", file=sys.stderr)
 
