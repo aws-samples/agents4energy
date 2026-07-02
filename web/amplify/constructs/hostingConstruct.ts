@@ -19,6 +19,7 @@ export class HostingConstruct extends Construct {
 
     this.bucket = new s3.Bucket(this, 'HostingBucket', {
       removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
     });
 
