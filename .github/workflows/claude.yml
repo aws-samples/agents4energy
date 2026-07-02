@@ -99,6 +99,7 @@ jobs:
             Bash(aws * get-*),
             Bash(aws * list-*),
             Bash(aws * describe-*),
+            Bash(openssl *),
             Bash(gh workflow run*),
             Bash(gh workflow list*),
             Bash(gh run list*),
