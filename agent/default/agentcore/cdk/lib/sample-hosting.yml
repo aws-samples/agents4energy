@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Chess Coach shared static hosting (S3 + CloudFront).
+  Stack name: chess-coach-hosting-{amplifyAppId}.
+  Created once; reused by every branch build and local sandbox deploys.
+  All branch content lives under per-branch prefixes: s3://bucket/{branch}/
+  Deployed URL per branch: https://{domain}/{branch}/
+
+Resources:
+  HostingBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  OAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub "Chess Coach OAI (${AWS::StackName})"
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref HostingBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser: !GetAtt OAI.S3CanonicalUserId
+            Action: s3:GetObject
+            Resource: !Sub "${HostingBucket.Arn}/*"
+
+  SpaRouter:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub "chess-coach-spa-router-${AWS::AccountId}"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Route extensionless paths to per-route HTML files; fall back to index.html for branch root
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var uri = event.request.uri;
+          if (/\.[^/]+$/.test(uri)) return event.request;
+          var parts = uri.split("/").filter(function(s) { return s !== ""; });
+          var branch = parts.length > 0 ? parts[0] : "main";
+          if (parts.length <= 1) {
+            event.request.uri = "/" + branch + "/index.html";
+          } else {
+            event.request.uri = "/" + parts.join("/") + ".html";
+          }
+          return event.request;
+        }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        PriceClass: PriceClass_100
+        DefaultCacheBehavior:
+          ViewerProtocolPolicy: redirect-to-https
+          # CachingOptimized managed policy
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          TargetOriginId: HostingS3
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt SpaRouter.FunctionARN
+        Origins:
+          - Id: HostingS3
+            DomainName: !GetAtt HostingBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${OAI}"
+
+Outputs:
+  BucketName:
+    Description: S3 bucket that holds all branch deployments
+    Value: !Ref HostingBucket
+  DistributionId:
+    Description: CloudFront distribution ID (for cache invalidation)
+    Value: !Ref Distribution
+  Domain:
+    Description: CloudFront domain name (e.g. abc123.cloudfront.net)
+    Value: !GetAtt Distribution.DomainName

@@ -1,0 +1,37 @@
+name: Upload execution log to CloudWatch
+description: >-
+  Streams the Claude Code execution log to a CloudWatch Logs stream, creating
+  the log group / stream and retention policy if needed. Batches events to stay
+  under the CloudWatch PutLogEvents size limits.
+
+inputs:
+  aws-region:
+    description: AWS region for the CloudWatch Logs group.
+    required: false
+    default: us-east-1
+  log-group:
+    description: CloudWatch Logs group name.
+    required: false
+    default: /github-actions/claude-code
+  retention-days:
+    description: Retention period for the log group, in days.
+    required: false
+    default: "30"
+  log-file:
+    description: Path to the Claude execution output JSON log.
+    required: false
+    default: /home/runner/work/_temp/claude-execution-output.json
+
+runs:
+  using: composite
+  steps:
+    - name: Upload execution log
+      shell: bash
+      env:
+        # Untrusted / caller-supplied values are passed as env vars, never
+        # interpolated into the script body — the script reads them from os.environ.
+        AWS_REGION: ${{ inputs.aws-region }}
+        LOG_GROUP: ${{ inputs.log-group }}
+        RETENTION_DAYS: ${{ inputs.retention-days }}
+        LOG_FILE: ${{ inputs.log-file }}
+      run: python3 "$GITHUB_ACTION_PATH/upload_log.py"

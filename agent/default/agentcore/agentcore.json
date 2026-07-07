@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
+  "name": "default",
+  "version": 1,
+  "managedBy": "CDK",
+  "tags": {
+    "agentcore:created-by": "agentcore-cli",
+    "agentcore:project-name": "default"
+  },
+  "runtimes": [
+    {
+      "name": "AgUiHandler",
+      "build": "Container",
+      "codeLocation": "../handler",
+      "entrypoint": "agent.py",
+      "networkMode": "PUBLIC",
+      "envVars": [
+        {
+          "name": "APPSYNC_HTTP_ENDPOINT",
+          "value": "https://i2w4civyrbfg5ezyow63htyeru.appsync-api.us-east-1.amazonaws.com/graphql"
+        },
+        {
+          "name": "AGENTCORE_MEMORY_ID",
+          "value": "default_MyHarnessMemory-zz6wfiFFUs"
+        }
+      ]
+    }
+  ],
+  "memories": [
+    {
+      "name": "MyHarnessMemory",
+      "eventExpiryDuration": 30,
+      "strategies": [
+        {
+          "type": "SEMANTIC",
+          "namespaces": [
+            "/users/{actorId}/facts"
+          ]
+        },
+        {
+          "type": "USER_PREFERENCE",
+          "namespaces": [
+            "/users/{actorId}/preferences"
+          ]
+        },
+        {
+          "type": "SUMMARIZATION",
+          "namespaces": [
+            "/summaries/{actorId}/{sessionId}"
+          ]
+        },
+        {
+          "type": "EPISODIC",
+          "namespaces": [
+            "/episodes/{actorId}/{sessionId}"
+          ],
+          "reflectionNamespaces": [
+            "/episodes/{actorId}"
+          ]
+        }
+      ]
+    }
+  ],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [
+    {
+      "name": "default-gateway",
+      "description": "Gateway for default-gateway",
+      "targets": [],
+      "authorizerType": "CUSTOM_JWT",
+      "authorizerConfiguration": {
+        "customJwtAuthorizer": {
+          "discoveryUrl": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_qG5061DTr/.well-known/openid-configuration",
+          "allowedClients": [
+            "2hugv1ugrni8jts323q1ldiopt"
+          ]
+        }
+      },
+      "enableSemanticSearch": true,
+      "exceptionLevel": "DEBUG"
+    }
+  ],
+  "policyEngines": [],
+  "configBundles": [],
+  "abTests": [],
+  "httpGateways": [],
+  "harnesses": [
+    {
+      "name": "MyHarness",
+      "path": "app/MyHarness"
+    }
+  ],
+  "datasets": []
+}

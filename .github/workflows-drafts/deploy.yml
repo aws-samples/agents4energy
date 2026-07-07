@@ -1,0 +1,118 @@
+# Single CDK deployment using ampx sandbox --once.
+# Everything (Cognito/AppSync/hosting/AgentCore harness+memory+gateway) is built
+# in-stack by web/amplify/backend.ts — there is no separate `agentcore deploy`,
+# `inject-agentcore-env.js`, or `extract-deployment-info.js` step anymore.
+# This mirrors scripts/build.sh exactly; see docs/architecture.md.
+name: Deploy
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  NEXT_TELEMETRY_DISABLED: 1
+  ACT: ''  # overridden to 'true' by act for local runs; used to skip OIDC steps
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC auth to AWS
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install AWS CLI (act only)
+        if: ${{ env.ACT }}
+        run: |
+          if ! command -v aws &>/dev/null; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install
+          fi
+
+      - name: Configure AWS credentials
+        if: ${{ !env.ACT }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sanitize branch name
+        run: |
+          BRANCH=$(echo '${{ github.ref_name }}' | tr '/' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-14)
+          echo "BRANCH_SLUG=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Write AWS credentials file (act only — ampx CLI needs ~/.aws)
+        if: ${{ env.ACT }}
+        run: |
+          mkdir -p ~/.aws
+          printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' \
+            "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
+          [ -n "${AWS_SESSION_TOKEN:-}" ] && \
+            printf 'aws_session_token=%s\n' "$AWS_SESSION_TOKEN" >> ~/.aws/credentials
+          printf '[default]\nregion=%s\n' "${AWS_REGION:-us-east-1}" > ~/.aws/config
+
+      - run: pnpm install --frozen-lockfile
+
+      # ── 0. Register QEMU ARM64 binfmt (needed to build ARM64 Docker images on AMD64 runners) ─
+      - name: Register QEMU ARM64 binfmt
+        run: docker run --rm --privileged tonistiigi/binfmt --install arm64
+
+      # ── 1. Deploy everything with a single ampx sandbox --once ───────────────────
+      - name: Deploy Amplify sandbox (backend + hosting + agent stacks)
+        working-directory: web
+        run: |
+          echo "::group::ampx sandbox --once"
+          pnpm exec ampx sandbox --once --identifier "$BRANCH_SLUG"
+          echo "::endgroup::"
+
+      # ── 1b. Publish amplify_outputs.json as a build artifact ─────────────────────
+      # Not committed to git (see web/.gitignore) since it contains per-branch ARNs
+      # and endpoints. Uploading it here lets reviewers download it from the run's
+      # "Artifacts" section instead of pulling it off a live sandbox.
+      - name: Upload amplify_outputs.json
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amplify_outputs-${{ env.BRANCH_SLUG }}
+          path: web/amplify_outputs.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      # ── 2. Build the Next.js frontend ─────────────────────────────────────────────
+      # NEXT_BASE_PATH must match the S3 upload prefix below — see web/next.config.ts.
+      - name: Build web app
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+          NEXT_BASE_PATH: /${{ env.BRANCH_SLUG }}
+        run: |
+          echo "::group::Next.js build"
+          pnpm --filter web build
+          echo "::endgroup::"
+
+      # ── 3. Upload to S3 and invalidate CloudFront ────────────────────────────────
+      - name: Deploy to S3 + invalidate CloudFront
+        run: |
+          BUCKET=$(node -p "JSON.parse(require('fs').readFileSync('web/amplify_outputs.json','utf8')).custom?.hosting_bucket_name ?? ''")
+          DIST_ID=$(node -p "JSON.parse(require('fs').readFileSync('web/amplify_outputs.json','utf8')).custom?.hosting_distribution_id ?? ''")
+          DOMAIN=$(node -p "JSON.parse(require('fs').readFileSync('web/amplify_outputs.json','utf8')).custom?.hosting_domain ?? ''")
+
+          aws s3 sync web/out/ "s3://$BUCKET/$BRANCH_SLUG/" --delete
+          AWS_PAGER="" aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" --paths "/$BRANCH_SLUG/*" \
+            --query 'Invalidation.Id' --output text
+          echo "Deployed: https://$DOMAIN/$BRANCH_SLUG/"

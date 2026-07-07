@@ -1,0 +1,5 @@
+{
+  "typescript.tsconfig.paths": {
+    "web": "./web/tsconfig.json"
+  }
+}

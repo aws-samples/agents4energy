@@ -1,0 +1,34 @@
+{
+  "name": "MyHarness",
+  "model": {
+    "provider": "bedrock",
+    "modelId": "openai.gpt-oss-120b",
+    "apiFormat": "chat_completions"
+  },
+  "tools": [
+    {
+      "type": "agentcore_browser",
+      "name": "browser"
+    },
+    {
+      "type": "agentcore_code_interpreter",
+      "name": "code-interpreter"
+    }
+  ],
+  "skills": [],
+  "memory": {
+    "name": "MyHarnessMemory"
+  },
+  "truncation": {
+    "strategy": "summarization"
+  },
+  "authorizerType": "CUSTOM_JWT",
+  "authorizerConfiguration": {
+    "customJwtAuthorizer": {
+      "discoveryUrl": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_qG5061DTr/.well-known/openid-configuration",
+      "allowedClients": [
+        "2hugv1ugrni8jts323q1ldiopt"
+      ]
+    }
+  }
+}

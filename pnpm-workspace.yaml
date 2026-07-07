@@ -1,0 +1,4 @@
+packages:
+  - web
+  - agent/default/agentcore/cdk
+  - packages/shared-types
