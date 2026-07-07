@@ -1,0 +1,87 @@
+# Draft workflow — copy this file to .github/workflows/ to enable it.
+# (Claude's GitHub App cannot write directly to .github/workflows/.)
+#
+# Deletes the per-branch Amplify sandbox stack when its branch is deleted.
+# The hosting resources (S3 + CloudFront) are a nested stack inside the sandbox
+# root stack (see web/amplify/backend.ts's `backend.createStack('hosting')`),
+# so deleting the root stack tears down hosting too — no separate CDK destroy
+# or `ampx sandbox delete` needed. The hosting bucket has autoDeleteObjects
+# enabled, so CloudFormation empties it automatically before deletion.
+#
+# Does NOT touch AgentCore (harness, gateway, memory). Those are deployed once to
+# a single shared "default" target (agent/default/agentcore/aws-targets.json) —
+# not per branch — so branch deletion must never tear them down.
+#
+# `delete` events only fire for workflow files present on the repo's default
+# branch, so this only takes effect once merged there.
+name: Delete branch stack
+
+on:
+  delete:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch name whose preview stack should be deleted'
+        required: true
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+concurrency:
+  group: deploy-${{ github.event.ref || inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  delete-stack:
+    if: github.event_name == 'workflow_dispatch' || github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC auth to AWS
+      contents: read
+
+    steps:
+      # The deleted branch no longer exists, so check out the default branch
+      # (only needed to read web/package.json for the sandbox stack's app-name prefix).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve branch slug
+        run: |
+          RAW_BRANCH="${{ github.event.ref || inputs.branch }}"
+          # Mirror scripts/build.sh's normalisation exactly, so this resolves to the
+          # same --identifier the sandbox was deployed with (ampx limit is 15 chars).
+          BRANCH_SLUG=$(echo "$RAW_BRANCH" | tr '/' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-14)
+          # ampx strips hyphens from the identifier when naming the sandbox stack.
+          BRANCH_SLUG_CLEAN=$(echo "$BRANCH_SLUG" | tr -d '-')
+          PROJECT=$(node -p "require('./web/package.json').name")
+          echo "BRANCH_SLUG_CLEAN=$BRANCH_SLUG_CLEAN" >> "$GITHUB_ENV"
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+
+      - name: Delete Amplify sandbox stack (fire-and-forget)
+        run: |
+          echo "::group::Find sandbox root stack for $BRANCH_SLUG_CLEAN"
+          # Root stack pattern: amplify-<project>-<slug>-sandbox-<8hexchars>
+          # (excludes nested stacks, which have additional trailing segments).
+          STACK_NAME=$(aws cloudformation list-stacks \
+            --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE ROLLBACK_COMPLETE \
+            --query "StackSummaries[?starts_with(StackName, 'amplify-${PROJECT}-${BRANCH_SLUG_CLEAN}-sandbox-')].StackName" \
+            --output text | tr '\t' '\n' | grep -E "^amplify-${PROJECT}-[^-]+-sandbox-[a-f0-9]+\$" | head -1)
+
+          if [ -z "$STACK_NAME" ]; then
+            echo "No sandbox stack found for branch slug $BRANCH_SLUG_CLEAN — nothing to delete"
+          else
+            echo "Deleting $STACK_NAME (not waiting for completion)…"
+            aws cloudformation delete-stack --stack-name "$STACK_NAME"
+          fi
+          echo "::endgroup::"

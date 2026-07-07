@@ -1,0 +1,32 @@
+{
+  "targets": {
+    "default": {
+      "resources": {
+        "runtimes": {
+          "AgUiHandler": {
+            "runtimeId": "default_AgUiHandler-HISztIENHn",
+            "runtimeArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:runtime/default_AgUiHandler-HISztIENHn",
+            "roleArn": "arn:aws:iam::796988593450:role/AgentCore-default-default-ApplicationAgentAgUiHandl-MMwH2RMyxHuo"
+          }
+        },
+        "memories": {
+          "MyHarnessMemory": {
+            "memoryId": "default_MyHarnessMemory-zz6wfiFFUs",
+            "memoryArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:memory/default_MyHarnessMemory-zz6wfiFFUs"
+          }
+        },
+        "mcp": {
+          "gateways": {
+            "default-gateway": {
+              "gatewayId": "default-default-gateway-5qwnlmsqe3",
+              "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:796988593450:gateway/default-default-gateway-5qwnlmsqe3",
+              "gatewayUrl": "https://default-default-gateway-5qwnlmsqe3.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp"
+            }
+          }
+        },
+        "stackName": "AgentCore-default-default",
+        "deployHash": "b40dc5b00d68454d"
+      }
+    }
+  }
+}

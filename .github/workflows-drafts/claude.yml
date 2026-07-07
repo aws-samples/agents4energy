@@ -1,0 +1,71 @@
+# claude.yml with act pre-installed so Claude can run act-deploy.sh directly.
+# Copy this to .github/workflows/claude.yml to enable Claude to run local workflow tests.
+name: Claude Code Action
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write   # required for OIDC → AWS credentials
+  actions: write    # required for Claude to trigger and monitor the deploy workflow
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  claude:
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: true
+    if: |
+      github.actor == github.repository_owner && (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'issues' && contains(github.event.issue.body, '@claude'))
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install act (for running draft workflows locally)
+        run: |
+          ACT_VERSION=$(curl -fsSL https://api.github.com/repos/nektos/act/releases/latest \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          curl -fsSL "https://github.com/nektos/act/releases/download/${ACT_VERSION}/act_Linux_x86_64.tar.gz" \
+            -o /tmp/act.tar.gz
+          tar -xzf /tmp/act.tar.gz -C /tmp act
+          sudo install -m755 /tmp/act /usr/local/bin/act
+          act --version
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: anthropics/claude-code-action@v1
+        env:
+          # Needed for ampx pipeline-deploy and gh CLI commands Claude runs in bash
+          GH_TOKEN: ${{ github.token }}
+        with:
+          github_token: ${{ github.token }}
+          use_bedrock: "true"
+          claude_args: "--model us.anthropic.claude-sonnet-4-6"

@@ -1,0 +1,7 @@
+strands-agents
+bedrock-agentcore
+fastapi
+uvicorn[standard]
+httpx
+boto3
+botocore

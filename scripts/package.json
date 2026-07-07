@@ -1,0 +1,12 @@
+{
+  "name": "agent-invoke",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@octokit/rest": "^21.1.1",
+    "@smithy/signature-v4": "^5.1.1",
+    "tsx": "^4.19.4"
+  }
+}
