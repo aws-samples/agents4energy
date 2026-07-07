@@ -6,7 +6,7 @@ permissions:
   issues: write
   id-token: write   # required for OIDC → AWS credentials
   actions: write    # required for Claude to trigger and monitor the deploy workflow
-
+  
 on:
   issue_comment:
     types: [created]
@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Mark in-progress
         env:
@@ -56,9 +56,9 @@ jobs:
         with:
           run_install: false
       
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Configure AWS credentials via OIDC
@@ -68,11 +68,240 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-duration-seconds: 21600
 
+      - name: Create OTLP log stream for this run
+        # The CloudWatch Logs OTLP endpoint writes to a specific log group/stream
+        # named via the x-aws-log-* headers below. The stream must exist first,
+        # so create a per-run stream using the OIDC role (which has
+        # logs:CreateLogStream on this repo's group). The group (per-repo) +
+        # bearer-token auth are provisioned by the CloudFormation stack. The
+        # group name mirrors deploy-to-repo.sh: /github-actions/claude-code-otlp/<repo-slug>
+        # where <repo-slug> is the bare repo name with non-[A-Za-z0-9_-] → '-'.
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          OTLP_LOG_STREAM: ${{ github.repository }}/${{ github.run_id }}
+        run: |
+          REPO_SLUG="${REPO_NAME//[^a-zA-Z0-9_-]/-}"
+          OTLP_LOG_GROUP="/github-actions/claude-code-otlp/${REPO_SLUG}"
+          echo "OTLP_LOG_GROUP=$OTLP_LOG_GROUP" >> "$GITHUB_ENV"
+          aws logs create-log-stream \
+            --region "$AWS_REGION" \
+            --log-group-name "$OTLP_LOG_GROUP" \
+            --log-stream-name "$OTLP_LOG_STREAM" 2>/dev/null || true
+
+      - name: Post CloudWatch log links
+        # Comment on the issue/PR with TWO CloudWatch deep-links, both scoped to
+        # THIS run's log stream (so only the invoked session shows, not other
+        # concurrent agent sessions):
+        #   1. Live Tail — auto-streaming raw events as they arrive (logStreamNames
+        #      filter pins it to this run's stream).
+        #   2. Logs Insights — a readable transcript: @timestamp first, a unified
+        #      "message" column (prompt / response / tool name / event body), a
+        #      "tool_call" JSON column on tool events, then context columns.
+        # Both encode their fragment in the console's rison codec: unreserved
+        # chars pass through, everything else becomes '*' + 2 lowercase hex digits.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number || github.event.pull_request.number }}
+          # OTLP_LOG_GROUP is inherited from $GITHUB_ENV (set by the stream step).
+          OTLP_LOG_STREAM: ${{ github.repository }}/${{ github.run_id }}
+        run: |
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          ACCOUNT_ID="$ACCOUNT_ID" python3 <<'PY' > /tmp/cw-comment.md
+          import os
+          region  = os.environ["AWS_REGION"]
+          group   = os.environ["OTLP_LOG_GROUP"]
+          stream  = os.environ["OTLP_LOG_STREAM"]
+          account = os.environ["ACCOUNT_ID"]
+
+          # Console rison string codec: keep [A-Za-z0-9-._], else *<2-hex-lower>.
+          def enc(s):
+              return "".join(c if (c.isalnum() or c in "-._") else "*%02x" % ord(c) for c in s)
+
+          base = "https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#" % (region, region)
+
+          # ── 1. Live Tail, filtered to this run's stream ──────────────────────
+          arn = "arn:aws:logs:%s:%s:log-group:%s:*" % (region, account, group)
+          live_url = (base + "logsV2:live-tail?logGroupArns=~(~'%s)~logStreamNames~(~'%s)"
+                      % (enc(arn), enc(stream)))
+
+          # ── 2. Logs Insights transcript, filtered to this run's stream ───────
+          # tool_call is built only for tool_ events (blank otherwise) and carries
+          # call metadata. Keep field count modest — Insights caps total function
+          # arguments per query.
+          query = (
+              "fields @timestamp, "
+              "coalesce(attributes.prompt, attributes.response, attributes.tool_name, body) as message, "
+              'if(body like /tool_/, concat('
+              '"{tool:", coalesce(attributes.tool_name,""), '
+              '", decision:", coalesce(attributes.decision,""), '
+              '", success:", coalesce(attributes.success,""), '
+              '", id:", coalesce(attributes.tool_use_id,""), "}"), "") as tool_call, '
+              "body as event, attributes.model, attributes.cost_usd, attributes.duration_ms\n"
+              '| filter @logStream = "%s"\n'
+              "| sort @timestamp asc\n"
+              "| limit 1000"
+          ) % stream
+          detail = ("~(end~0~start~-604800~timeType~'RELATIVE~unit~'seconds"
+                    "~editorString~'%s~source~(~'%s))") % (enc(query), enc(group))
+          insights_url = base + "logsV2:logs-insights?queryDetail=" + detail
+
+          # ── 3. Terminal poll-loop: follow this run as a readable YAML transcript ──
+          # NOTE: we deliberately do NOT use `aws logs tail --follow` here. aws-cli
+          # v2 is a frozen binary that block-buffers stdout when piped, and a single
+          # run's history is under that ~8KB flush threshold, so a piped `--follow`
+          # shows nothing until it grows/exits. Instead we poll: each iteration runs
+          # `tail` WITHOUT --follow (so it exits and flushes), renders new events,
+          # and dedupes on event.timestamp so only fresh events print. `--format
+          # short` gives "<ts> <compact-json>" per line; jq's sub() strips the ts.
+          #
+          # The jq program (written to a temp file so the multi-line defs stay
+          # readable) turns each event into a YAML block: time, event, message
+          # (prompt/response as a block scalar when multi-line), tool + decoded
+          # tool INPUT args (real nested YAML, not an escaped blob), a compact
+          # api {model,tokens,cost} line, and for the big *_body events either the
+          # full decoded JSON (SHOW_BODIES=1) or a one-line size note (default —
+          # those bodies are the whole conversation, huge). A helper recursively
+          # emits JSON as YAML with block scalars, so it reads like a transcript.
+          # First @tsv column is the timestamp (dedupe key); second is the block.
+          JQ_PROG = (
+              "def pad0(n): \" \" * n;\n"
+              "def toyaml(ind):\n"
+              "  if type == \"object\" then\n"
+              "    if (.|length)==0 then \" {}\"\n"
+              "    else \"\\n\" + ( to_entries | map( pad0(ind) + (.key|tostring) + \":\" + (.value | toyaml(ind+2)) ) | join(\"\\n\") ) end\n"
+              "  elif type == \"array\" then\n"
+              "    if (.|length)==0 then \" []\"\n"
+              "    else \"\\n\" + ( map( ( toyaml(ind+2) | ltrimstr(\"\\n\") ) as $r | if (type==\"object\" or type==\"array\") then pad0(ind) + \"- \" + ($r[ind+2:]) else pad0(ind) + \"-\" + $r end ) | join(\"\\n\") ) end\n"
+              "  elif type == \"string\" then\n"
+              "    if (. | contains(\"\\n\")) then \" |\\n\" + ( split(\"\\n\") | map(pad0(ind+2) + .) | join(\"\\n\") ) else \" \" + (@json) end\n"
+              "  else \" \" + (tostring) end;\n"
+              "def emit_scalar(key; val; ind): pad0(ind) + key + \":\" + (val | toyaml(ind));\n"
+              "def emit_json(key; raw; ind):\n"
+              "  (raw | try (fromjson|true) catch false) as $ok\n"
+              "  | if $ok then pad0(ind) + key + \":\" + ((raw|fromjson) | toyaml(ind+2)) else emit_scalar(key; raw; ind) end;\n"
+              "# Slurp all lines: strip the \"<ts> \" prefix, parse each event.\n"
+              "[ split(\"\\n\")[] | select(length>0) | sub(\"^[^ ]+ \";\"\") | (try fromjson catch empty) ] as $events\n"
+              "# Tool OUTPUT isn't on the tool_result event (only a byte count). It lives in the\n"
+              "# api_request_body events (the result fed back to the model), keyed by tool_use_id.\n"
+              "# Regex-scrape id->output (survives the 60KB inline truncation, which breaks fromjson).\n"
+              "# NOTE: ids contain underscores, so the char class must include _.\n"
+              "| ( [ $events[] | select(.body==\"claude_code.api_request_body\") | .attributes.body ] | join(\"\\n\") ) as $bodies\n"
+              "| ( reduce ( $bodies | scan(\"\\\"tool_use_id\\\":\\\"(toolu_[A-Za-z0-9_]+)\\\",\\\"type\\\":\\\"tool_result\\\",\\\"content\\\":\\\"((?:[^\\\"\\\\\\\\]|\\\\\\\\.)*)\\\"\") ) as $m\n"
+              "      ({}; .[$m[0]] = ($m[1] | gsub(\"\\\\\\\\n\";\"\\n\") | gsub(\"\\\\\\\\t\";\"\\t\") | gsub(\"\\\\\\\\\\\"\";\"\\\"\")) ) ) as $outmap\n"
+              "| $events[]\n"
+              "| .body as $b | (.attributes.tool_name // \"\") as $tn | (.attributes.tool_use_id // \"\") as $tid\n"
+              "# Keep conversation-relevant events only; api bodies only under SHOW_BODIES=1.\n"
+              "| if ( $b==\"claude_code.user_prompt\"\n"
+              "       or $b==\"claude_code.assistant_response\"\n"
+              "       or ($b==\"claude_code.tool_result\" and $tn!=\"ToolSearch\")\n"
+              "       or ($show_bodies==\"1\" and ($b|test(\"api_(request|response)_body\"))) )\n"
+              "  then\n"
+              "  [ (.attributes[\"event.timestamp\"] // \"\"),\n"
+              "  ( \"- time:  \\\"\\(.attributes[\"event.timestamp\"] // \"\" | .[11:23])\\\"\"\n"
+              "    + \"\\n  event: \\($b | ltrimstr(\"claude_code.\"))\"\n"
+              "    + ( (.attributes.prompt // .attributes.response) | if . then \"\\n\" + emit_scalar(\"message\"; .; 2) else \"\" end )\n"
+              "    + ( if $b==\"claude_code.tool_result\" then\n"
+              "          \"\\n  tool:   \\($tn)\"\n"
+              "          + (if .attributes.tool_use_id then \"\\n  id:     \\(.attributes.tool_use_id)\" else \"\" end)\n"
+              "          + (if .attributes.tool_input then \"\\n\" + emit_json(\"input\"; .attributes.tool_input; 2) else \"\" end)\n"
+              "          + ( ($outmap[$tid]) | if . then \"\\n\" + emit_scalar(\"output\"; .; 2) else \"\" end )\n"
+              "        else \"\" end )\n"
+              "    + ( if ($b|test(\"api_(request|response)_body\")) then\n"
+              "          \"\\n  model:  \\(.attributes.model // \"\")\\n\" + emit_json(\"api_body\"; (.attributes.body // \"\\\"\\\"\"); 2)\n"
+              "        else \"\" end ) ) ] | @tsv\n"
+              "  else empty end"
+          )
+          tail_cmd = (
+              "jqf=$(mktemp); cat > \"$jqf\" <<'JQ'\n"
+              "%s\n"
+              "JQ\n"
+              "seen=$(mktemp)\n"
+              "while true; do\n"
+              "  aws logs tail %s --region %s --log-stream-names \"%s\" \\\n"
+              "    --since 1h --format short 2>/dev/null \\\n"
+              "  | jq -Rr -s --arg show_bodies \"${SHOW_BODIES:-}\" -f \"$jqf\" \\\n"
+              "  | while IFS=$'\\t' read -r ts block; do\n"
+              "      grep -qF \"$ts\" \"$seen\" && continue\n"
+              "      echo \"$ts\" >> \"$seen\"\n"
+              "      printf '\\n%%b\\n' \"$block\"\n"
+              "    done\n"
+              "  sleep 3\n"
+              "done"
+          ) % (JQ_PROG, group, region, stream)
+
+          print("## 📊 CloudWatch logs for this run\n")
+          print("- **[Live Tail](%s)** — auto-streaming raw log events as Claude works "
+                "(filtered to this session)." % live_url)
+          print("- **[Logs Insights transcript](%s)** — timestamp-first, readable view with "
+                "`message` and `tool_call` columns; press **Run query** to refresh." % insights_url)
+          # Terminal command is long, so tuck it in a collapsible <details> block.
+          # GitHub keeps the fenced code block's copy button inside <details>, so
+          # the reader clicks to expand, then copies with one click. A blank line
+          # after </summary> and around the fence is required for GitHub to render
+          # the code block (and its copy button) inside the disclosure.
+          print("\n<details>\n<summary>▶ Or follow the conversation live in your terminal as YAML "
+                "(polls every 3s; prompts, responses, and tool calls with their args). Prefix "
+                "<code>SHOW_BODIES=1</code> to also dump the full API request/response JSON. "
+                "Needs AWS creds + <code>jq</code>.</summary>\n")
+          print("```bash\n%s\n```\n" % tail_cmd)
+          print("</details>")
+          print("\n_All three are scoped to this run's log stream. The console links require "
+                "sign-in to the AWS account._")
+          PY
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file /tmp/cw-comment.md
+
       - uses: anthropics/claude-code-action@v1
         timeout-minutes: 300
         env:
           # Needed for ampx pipeline-deploy and gh CLI commands Claude runs in bash
           GH_TOKEN: ${{ github.token }}
+          # ── Live telemetry → CloudWatch (metrics) ──────────────────────────
+          # Claude Code's built-in OTel exporter ships token/cost/session
+          # metrics straight to the CloudWatch OTLP metrics endpoint. Auth is a
+          # long-lived API key (bearer token) — the endpoint is HTTP-only and
+          # bearer auth needs no SigV4/collector, so a static header is all it
+          # takes. The key is scoped to metrics ingestion only.
+          # Docs: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-OTLP-MetricsBearerTokenAuth.html
+          CLAUDE_CODE_ENABLE_TELEMETRY: "1"
+          OTEL_METRICS_EXPORTER: otlp
+          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+          OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: https://monitoring.${{ env.AWS_REGION }}.amazonaws.com/v1/metrics
+          OTEL_EXPORTER_OTLP_METRICS_HEADERS: "Authorization=Bearer ${{ secrets.CW_METRICS_API_KEY }}"
+          # Flush metrics quickly so a short session still reports before exit.
+          OTEL_METRIC_EXPORT_INTERVAL: "10000"
+          # ── Live telemetry → CloudWatch (log events) ───────────────────────
+          # Ships user_prompt / tool_decision / api_error events to the Logs
+          # OTLP endpoint. Needs its own bearer token (logs scope) plus the
+          # x-aws-log-group / x-aws-log-stream headers that route the events to
+          # the bearer-auth-enabled group and the per-run stream created above.
+          # Docs: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_HTTP_Endpoints_BearerTokenAuth.html
+          OTEL_LOGS_EXPORTER: otlp
+          OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: https://logs.${{ env.AWS_REGION }}.amazonaws.com/v1/logs
+          # env.OTLP_LOG_GROUP was set into $GITHUB_ENV by the stream-creation step.
+          OTEL_EXPORTER_OTLP_LOGS_HEADERS: "Authorization=Bearer ${{ secrets.CW_LOGS_API_KEY }},x-aws-log-group=${{ env.OTLP_LOG_GROUP }},x-aws-log-stream=${{ github.repository }}/${{ github.run_id }}"
+          OTEL_LOGS_EXPORT_INTERVAL: "5000"
+          # ── Content verbosity flags (what goes INTO the log events) ─────────
+          # OTEL_LOG_USER_PROMPTS       — prompt text on user_prompt events.
+          # OTEL_LOG_ASSISTANT_RESPONSES— assistant reply text (≤60KB).
+          # OTEL_LOG_TOOL_DETAILS       — tool INPUT arguments (bash cmd, paths,
+          #                               params) on tool_decision/tool_result,
+          #                               as tool_input / tool_parameters.
+          # OTEL_LOG_RAW_API_BODIES     — full Anthropic Messages API request +
+          #                               response JSON as claude_code.api_request_body
+          #                               / api_response_body log events (≤60KB).
+          #   ⚠ This logs the ENTIRE conversation (prompts, tool I/O, responses)
+          #   in plaintext to CloudWatch on every request — high volume + sensitive.
+          #   OTEL_LOG_TOOL_CONTENT is intentionally NOT set: tested empirically
+          #   (run 28887588635) — it + CLAUDE_CODE_ENHANCED_TELEMETRY_BETA add
+          #   nothing to the LOGS pipeline (tool output goes to trace spans / X-Ray,
+          #   which the OTLP logs endpoint doesn't receive). The tool OUTPUT is only
+          #   recoverable from the api_request_body events (as tool_result content,
+          #   keyed by tool_use_id) — which is what the terminal transcript joins on.
+          # Docs: https://code.claude.com/docs/en/monitoring-usage
+          OTEL_LOG_USER_PROMPTS: "1"
+          OTEL_LOG_ASSISTANT_RESPONSES: "1"
+          OTEL_LOG_TOOL_DETAILS: "1"
+          OTEL_LOG_RAW_API_BODIES: "1"
         with:
           github_token: ${{ github.token }}
           use_bedrock: "true"
@@ -94,14 +323,11 @@ jobs:
             Bash(openssl *),
             Bash(gh *),
             Bash(npx *),
-            Bash(tsc *)
+            Bash(tsc *),
+            Bash(mkdocs *),
+            Bash(python*),
+            Bash(pip*)
             "
-
-      - name: Upload execution log to CloudWatch
-        if: always()
-        uses: ./.github/actions/upload-execution-log
-        with:
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Remove agent-working label
         if: always()
