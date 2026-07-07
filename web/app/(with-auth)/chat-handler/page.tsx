@@ -52,7 +52,25 @@ type ChatMessage = {
   role: 'user' | 'assistant';
   text: string;
   done?: boolean;
+  // True when this bubble was created from a text_message_content event with no
+  // preceding text_message_start seen by this client (joined mid-stream) — its
+  // text is a suffix of the real message, not the full thing.
+  missingStart?: boolean;
 };
+
+function toChatMessages(fetched: Awaited<ReturnType<typeof fetchSessionMessages>>['messages']): ChatMessage[] {
+  return fetched.map((m) => ({
+    id: m.id,
+    role: m.role as 'user' | 'assistant',
+    text: (m.parts?.find((p) => (p as { type: string }).type === 'text') as { text: string } | undefined)?.text ?? '',
+    done: true,
+  }));
+}
+
+// Delays (ms) between re-checks of AgentCore memory after a run's terminal event.
+// Memory indexing lags a completed turn by a few seconds, so an immediate fetch
+// often returns stale/partial history — keep retrying for ~15s before giving up.
+const POLL_DELAYS_MS = [0, 2000, 3000, 5000, 5000];
 
 type AgUiEventType =
   | 'user_message'
@@ -84,11 +102,49 @@ export default function ChatHandlerPage() {
   const [isSaving, startSaveTransition] = useTransition();
   const activeMessageIdRef = useRef<string | null>(null);
   const pendingUserMessageTextRef = useRef<string | null>(null);
+  // messageIds whose text_message_start we never saw (this client subscribed mid-stream) —
+  // their locally-assembled text is only a suffix of the real message.
+  const missingStartIdsRef = useRef<Set<string>>(new Set());
 
   const client = useMemo(
     () => generateClient<Schema>({ authMode: 'userPool' }),
     [],
   );
+
+  // Re-fetch memory on a backoff schedule until a message we only saw the tail
+  // end of (joined mid-stream) shows up with its full, authoritative text.
+  const pollForMessageBackfill = useCallback((messageId: string) => {
+    const attempt = (i: number) => {
+      if (i >= POLL_DELAYS_MS.length) {
+        missingStartIdsRef.current.delete(messageId);
+        return;
+      }
+      setTimeout(() => {
+        fetchSessionMessages(sessionId!).then(({ messages: fetched, summary, summaryRecordId: rid }) => {
+          if (summary) setSessionSummary(summary);
+          if (rid) setSummaryRecordId(rid);
+          const authoritative = fetched.find((m) => m.id === messageId);
+          if (!authoritative) {
+            attempt(i + 1);
+            return;
+          }
+          missingStartIdsRef.current.delete(messageId);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === messageId
+                ? {
+                    ...m,
+                    text: (authoritative.parts?.find((p) => (p as { type: string }).type === 'text') as { text: string } | undefined)?.text ?? m.text,
+                    missingStart: false,
+                  }
+                : m,
+            ),
+          );
+        }).catch(() => attempt(i + 1));
+      }, POLL_DELAYS_MS[i]);
+    };
+    attempt(0);
+  }, [sessionId]);
 
   // Bootstrap: create a new session if none in URL.
   useEffect(() => {
@@ -118,14 +174,7 @@ export default function ChatHandlerPage() {
     if (initialMessagesState.summary) setSessionSummary(initialMessagesState.summary);
     if (initialMessagesState.summaryRecordId) setSummaryRecordId(initialMessagesState.summaryRecordId);
     if (initialMessagesState.messages.length === 0) return;
-    setMessages(
-      initialMessagesState.messages.map((m) => ({
-        id: m.id,
-        role: m.role as 'user' | 'assistant',
-        text: (m.parts?.find((p) => (p as { type: string }).type === 'text') as { text: string } | undefined)?.text ?? '',
-        done: true,
-      })),
-    );
+    setMessages(toChatMessages(initialMessagesState.messages));
   }, [initialMessagesState]);
 
   // Subscribe to AG-UI events for this session.
@@ -171,22 +220,40 @@ export default function ChatHandlerPage() {
         }
 
         if (eventType === 'text_message_content' && event.delta) {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === event.messageId
-                ? { ...m, text: m.text + event.delta }
-                : m,
-            ),
-          );
+          setMessages((prev) => {
+            const idx = prev.findIndex((m) => m.id === event.messageId);
+            if (idx === -1) {
+              // Joined mid-stream: this delta belongs to a message whose
+              // text_message_start already fired before we subscribed. Open a
+              // bubble now so the stream renders immediately, flagged as
+              // missing its beginning — it'll be replaced once memory catches up.
+              missingStartIdsRef.current.add(event.messageId);
+              activeMessageIdRef.current = event.messageId;
+              setIsStreaming(true);
+              return [
+                ...prev,
+                { id: event.messageId, role: 'assistant', text: event.delta ?? '', done: false, missingStart: true },
+              ];
+            }
+            const next = [...prev];
+            next[idx] = { ...next[idx], text: next[idx].text + event.delta };
+            return next;
+          });
           return;
         }
 
         if (eventType === 'text_message_end') {
+          const hadMissingStart = missingStartIdsRef.current.has(event.messageId);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === event.messageId ? { ...m, done: true } : m,
             ),
           );
+          if (hadMissingStart) {
+            // We only ever saw the tail of this message. Poll memory until the
+            // authoritative full text is indexed, then swap it in.
+            pollForMessageBackfill(event.messageId);
+          }
           return;
         }
 
@@ -200,14 +267,7 @@ export default function ChatHandlerPage() {
             if (summary) setSessionSummary(summary);
             if (rid) setSummaryRecordId(rid);
             if (!fetched.length) return;
-            setMessages(
-              fetched.map((m) => ({
-                id: m.id,
-                role: m.role as 'user' | 'assistant',
-                text: (m.parts?.find((p) => (p as { type: string }).type === 'text') as { text: string } | undefined)?.text ?? '',
-                done: true,
-              })),
-            );
+            setMessages(toChatMessages(fetched));
           }).catch(() => {});
         }
       },
@@ -219,7 +279,7 @@ export default function ChatHandlerPage() {
     });
 
     return () => sub.unsubscribe();
-  }, [sessionId, client]);
+  }, [sessionId, client, pollForMessageBackfill]);
 
   const sendMessage = useCallback(
     async ({ text }: { text: string }) => {
@@ -305,7 +365,7 @@ export default function ChatHandlerPage() {
               <MessageContent>
                 {message.role === 'assistant' ? (
                   <MessageResponse isAnimating={isStreaming && !message.done}>
-                    {message.text}
+                    {message.missingStart ? `…${message.text}` : message.text}
                   </MessageResponse>
                 ) : (
                   message.text

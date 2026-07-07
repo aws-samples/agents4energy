@@ -205,4 +205,40 @@ test.describe('Chat Handler page — AG-UI over AppSync', () => {
     // The original user message text should still be present.
     await expect(userMessages.first()).toContainText(userText?.trim() ?? 'memory test');
   });
+
+  test('a second window joining mid-stream renders the in-flight message and backfills it', async ({ page, browser }) => {
+    const textarea = page.getByPlaceholder('Type a message…');
+    await textarea.fill('Count from 1 to 20, one number per line.');
+    await textarea.press('Enter');
+
+    // Wait until the first window is actively streaming an assistant reply.
+    await expect(page.locator('[data-testid="message-assistant"]').last()).toBeVisible({
+      timeout: 90_000,
+    });
+
+    const sessionUrl = page.url();
+
+    // Open the same session from a second, independent browser context — this
+    // simulates loading the session from another site while the agent is still
+    // replying. It subscribes fresh, so it never saw text_message_start.
+    const ctx = await browser.newContext({ storageState: '.auth/user.json' });
+    const joiner = await ctx.newPage();
+    await joiner.goto(sessionUrl);
+
+    // The joiner should render the in-flight assistant message (even without
+    // its beginning) rather than waiting for the run to finish.
+    const joinerAssistant = joiner.locator('[data-testid="message-assistant"]').last();
+    await expect(joinerAssistant).toBeVisible({ timeout: 30_000 });
+
+    // Once the run completes, the joiner's message should be backfilled with
+    // the authoritative full text from memory (non-empty, no leading "…").
+    await expect(page.getByRole('button', { name: 'Submit' })).toBeVisible({ timeout: 90_000 });
+    await expect(async () => {
+      const text = await joinerAssistant.textContent();
+      expect(text?.trim().length).toBeGreaterThan(0);
+      expect(text?.trim().startsWith('…')).toBe(false);
+    }).toPass({ timeout: 30_000 });
+
+    await ctx.close();
+  });
 });
