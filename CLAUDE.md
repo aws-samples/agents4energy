@@ -20,11 +20,17 @@ If you discover a bug:
 ### Docuemntation
 Be sure to keep the documentation in the `./docs` folder fresh. After you make a change, make sure the relevant docs are still correct, and create a new doc if it's something either a developer or user would want to know about.
 
+### Environment setup
+Run `pnpm install` from the repo root before running `pnpm deploy`, `pnpm test:e2e`, or any other command below — fresh checkouts and sandboxes don't have `node_modules` installed. If `pnpm install` isn't available in your environment, say so explicitly rather than skipping straight to a static review.
+
 ## Commands
 
 All commands run from the repo root unless noted.
 
 ```bash
+# Install dependencies (run this first)
+pnpm install
+
 # Full build + deploy (Amplify sandbox → AgentCore → Next.js export)
 pnpm deploy
 
