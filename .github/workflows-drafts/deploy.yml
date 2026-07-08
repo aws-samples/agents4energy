@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_REGION: us-east-1
   NEXT_TELEMETRY_DISABLED: 1
   ACT: ''  # overridden to 'true' by act for local runs; used to skip OIDC steps
 
