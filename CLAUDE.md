@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Guidance
 
+### GitHub Issues
+If you discover a bug:
+1. Check the current github issues cover the bug, and if so make sure the issue has sufficient context
+2. If not, create a github issue. Use the github native relationships feature to describe blocking relationships with other issues.
+
 ### Docuemntation
 Be sure to keep the documentation in the `./docs` folder fresh. After you make a change, make sure the relevant docs are still correct, and create a new doc if it's something either a developer or user would want to know about.
 
