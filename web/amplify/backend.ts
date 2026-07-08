@@ -6,7 +6,7 @@ import { updateSessionSummary } from './functions/update-session-summary/resourc
 import { registerMcpTarget } from './functions/register-mcp-target/resource';
 import { listMcpTools } from './functions/list-mcp-tools/resource';
 import { invokeAgent } from './functions/invoke-agent/resource';
-import { PolicyStatement, ServicePrincipal, Effect, Role } from 'aws-cdk-lib/aws-iam';
+import { Policy, PolicyStatement, ServicePrincipal, Effect, Role } from 'aws-cdk-lib/aws-iam';
 import { Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
 import { Fn, Stack } from 'aws-cdk-lib';
 import { HttpDataSource, CfnResolver } from 'aws-cdk-lib/aws-appsync';
