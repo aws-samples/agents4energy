@@ -73,7 +73,7 @@
     "aws-cdk-lib": "^2.246.0",
     "aws-sdk": "^2.1691.0",
     "constructs": "^10.4.2",
-    "esbuild": "^0.25.2",
+    "esbuild": "^0.28.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.14",
     "jsdom": "^25.0.1",
