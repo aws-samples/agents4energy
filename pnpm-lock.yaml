@@ -7,6 +7,11 @@ settings:
 overrides:
   '@typescript/vfs': ^1.6.4
 
+patchedDependencies:
+  '@aws/agentcore-cdk':
+    hash: f534ccaee3e8e2e56d9b468c788446088e08bc0e5c36c3d2b63889270708299d
+    path: patches/@aws__agentcore-cdk.patch
+
 importers:
 
   .:
@@ -41,7 +46,7 @@ importers:
     dependencies:
       '@aws/agentcore-cdk':
         specifier: ^0.1.0-alpha.19
-        version: 0.1.0-alpha.36(aws-cdk-lib@2.258.1(constructs@10.6.0))(constructs@10.6.0)
+        version: 0.1.0-alpha.36(patch_hash=f534ccaee3e8e2e56d9b468c788446088e08bc0e5c36c3d2b63889270708299d)(aws-cdk-lib@2.258.1(constructs@10.6.0))(constructs@10.6.0)
       aws-cdk-lib:
         specifier: ^2.248.0
         version: 2.258.1(constructs@10.6.0)
@@ -105,7 +110,7 @@ importers:
         version: 3.996.5(@aws-sdk/client-dynamodb@3.1075.0)
       '@aws/agentcore-cdk':
         specifier: ^0.1.0-alpha.36
-        version: 0.1.0-alpha.36(aws-cdk-lib@2.258.1(constructs@10.6.0))(constructs@10.6.0)
+        version: 0.1.0-alpha.36(patch_hash=f534ccaee3e8e2e56d9b468c788446088e08bc0e5c36c3d2b63889270708299d)(aws-cdk-lib@2.258.1(constructs@10.6.0))(constructs@10.6.0)
       '@base-ui/react':
         specifier: ^1.5.0
         version: 1.5.0(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -10222,7 +10227,7 @@ snapshots:
       '@smithy/types': 4.14.3
       tslib: 2.8.1
 
-  '@aws/agentcore-cdk@0.1.0-alpha.36(aws-cdk-lib@2.258.1(constructs@10.6.0))(constructs@10.6.0)':
+  '@aws/agentcore-cdk@0.1.0-alpha.36(patch_hash=f534ccaee3e8e2e56d9b468c788446088e08bc0e5c36c3d2b63889270708299d)(aws-cdk-lib@2.258.1(constructs@10.6.0))(constructs@10.6.0)':
     dependencies:
       '@aws-sdk/client-sts': 3.1065.0
       '@aws-sdk/credential-providers': 3.1065.0

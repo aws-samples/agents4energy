@@ -1,0 +1,42 @@
+diff --git a/dist/cdk/logical-ids.js b/dist/cdk/logical-ids.js
+index 28b2ee0f27bde241d23218b8b97e40bfbe24de2e..11c5b6054e3f1a9c56995dc511f6f9fb4534f2c8 100644
+--- a/dist/cdk/logical-ids.js
++++ b/dist/cdk/logical-ids.js
+@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.toPascalId = toPascalId;
+ exports.outputId = outputId;
+ exports.exportName = exportName;
++const { Token } = require("aws-cdk-lib");
+ /**
+  * Utilities for generating stable CloudFormation logical IDs and export names.
+  *
+@@ -74,12 +75,28 @@ function outputId(...parts) {
+  * Export names allow: alphanumerics, colons, hyphens (max 255 chars).
+  * Underscores are converted to hyphens; other invalid chars are removed.
+  *
++ * Parts that are unresolved CDK tokens (e.g. `stack.stackName` for a
++ * NestedStack, which isn't known until deploy time) are passed through
++ * untouched instead of being string-sanitized: running `.replace()` on a
++ * token's encoded placeholder (e.g. "${Token[TOKEN.3753]}") strips its
++ * framing characters and collapses it to a fixed literal like "TokenTOKEN3753"
++ * that's identical across every deployment of the same CDK app — silently
++ * defeating the per-stack uniqueness this export name is meant to have, and
++ * causing a CloudFormation export name collision between two stacks that both
++ * happen to nest this construct at the same construct path (see GH issue
++ * about "Export with name ... is already exported by stack ...").
++ *
+  * @example
+  * exportName(stackName, agentName, 'RuntimeId')
+  * // -> "MyStack-MyAgent-RuntimeId"
+  */
+ function exportName(...parts) {
+-    const name = parts.map(part => part.replace(/_/g, '-').replace(/[^a-zA-Z0-9:-]/g, '')).join('-');
++    const name = parts
++        .map(part => Token.isUnresolved(part) ? part : part.replace(/_/g, '-').replace(/[^a-zA-Z0-9:-]/g, ''))
++        .join('-');
++    if (Token.isUnresolved(name)) {
++        return name;
++    }
+     if (name.length === 0 || name.length > 255) {
+         throw new Error(`Invalid CloudFormation export name: "${name}". Must be 1-255 characters.`);
+     }
